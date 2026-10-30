@@ -1,6 +1,6 @@
 # PEEC Studio 数据布局规范（DATA_LAYOUT）
 
-v1.0 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径与目录的唯一事实源；manifest 中所有 path 以本文件为基准；冲突时以本文件为准。
+v1.1 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径与目录的唯一事实源；manifest 中所有 path 以本文件为基准；冲突时以本文件为准。
 
 ## 一、总则
 
@@ -21,7 +21,7 @@ v1.0 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径
 │   ├── port_em.json          [UI]       EM 端口绑定（compact_em 消费）
 │   └── port_thermal.json     [UI]       热端口绑定（热模块消费，预留）
 ├── Setting\          【配置】跨任务持久
-│   └── set.txt               [UI 或 compact_em 模板]
+│   └── set.json              [UI 或 compact_em 模板]  求解设置（JSON，schemaVersion 1）
 ├── Result\
 │   ├── gds2geo\        【模块产物区：gds2geo 独占】
 │   │   ├── source\    model.geo / model.json / matdb.json
@@ -29,19 +29,21 @@ v1.0 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径
 │   │   ├── em\        model_em.msh（工作副本）/ model_em.msh.json / matdb.json
 │   │   └── thermal\   model_thermal.msh / model_thermal.msh.json / matdb.json（可选）
 │   ├── compact_em\     【模块产物区：compact_em 独占】
-│   │   ├── extract\   model.peec / state.json
-│   │   ├── solve\     S_parameter.csv / state.json
+│   │   ├── extract\   model.peec / stage_receipt.json
+│   │   ├── solve\     S_parameter.csv / stage_receipt.json
 │   │   ├── plot\      *.svg（可选）
 │   │   └── post\      Source.msh / Post_Model.txt / Post_Source.txt（可选）
 │   ├── logs\           【模块诊断日志】按模块子目录隔离
 │   │   ├── gds2geo\   gds2geo.log / geo_prepare.log / ...
 │   │   └── compact_em\<exe>-<trace_id>.jsonl
-│   └── tasks\          【任务编排记录：task_layer 独占】
+│   └── tasks\          【任务编排记录：task_layer 独占，模块不写不读】
 │       └── <taskId>\  state.json / task.log / job.<stageId>.json
 └── .locks\         【锁集中处】<providerId>.*.lock
 ```
 
-注：模块交付包内**不含**输入文件与 DATA/；UI 选取的输入直接写入 `<dataRoot>\Model\`。包内可选 `examples/` 仅为模块团队本地自测样品（只读），与 UI 流程无关。
+注：
+- 模块交付包内**不含**输入文件与 DATA/；UI 选取的输入直接写入 `<dataRoot>\Model\`。包内可选 `examples/` 仅为模块团队本地自测样品（只读），与 UI 流程无关。
+- `Result/tasks/` 下的 `state.json` 是 **task_layer 的任务编排记录**（阶段状态/errorCode/outputs/providers 版本快照），模块不写、不读、不依赖其内容做调度判断。详见 §七。
 
 ## 三、分区规则
 
@@ -52,54 +54,129 @@ v1.0 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径
 | D3 | `Model/` 是唯一跨模块共享区；port 文件按链路命名（port_em.json / port_thermal.json），各消费方只认自己那份 |
 | D4 | 模块诊断日志 → `Result/logs/<providerId>/`；任务编排记录 → `Result/tasks/`（task_layer 所有） |
 | D5 | 锁集中 `.locks/`，命名 `<providerId>.*.lock`；运行中禁止手工删除 |
-| D6 | 阶段状态文件统一命名 `state.json`（放各自阶段目录内） |
+| D6 | 模块阶段自证文件统一命名 `stage_receipt.json`（可选，放各自阶段目录内）；取代历史上的 extract.state / solve.state |
+| D7 | **publisher 机制**：正式件落位（如 `Result/gds2geo/em/model_em.msh` → `Model/model_em.msh`）由 **task_layer 统一执行**（按 manifest `publishTo` 声明复制）。模块只负责把阶段产物正确写到 `Result/<providerId>/<stageId>/`，**不自己往 Model//Setting/ 搬文件** |
 
 ## 四、所有权表
 
 | 目录/文件 | 写者 | 读者 |
 |---|---|---|
 | `Model/model.gds`、`model_info.*` | UI | gds2geo |
-| `Model/*.msh`、`matdb.json` | gds2geo（经 publisher） | compact_em、UI（渲染） |
+| `Model/*.msh`、`matdb.json` | task_layer publisher（源：gds2geo） | compact_em、UI（渲染） |
 | `Model/port_em.json` | UI | compact_em（sha 校验） |
 | `Model/port_thermal.json` | UI | 热模块（预留） |
-| `Setting/set.txt` | UI 或 compact_em 模板 | compact_em |
-| `Result/gds2geo/**` | gds2geo | 其下游阶段、publisher |
+| `Setting/set.json` | UI 或 compact_em 模板 | compact_em |
+| `Result/gds2geo/**` | gds2geo | 其下游阶段、task_layer publisher |
 | `Result/compact_em/**` | compact_em | 其下游阶段、UI |
 | `Result/logs/<providerId>/` | 对应模块 | 排错 |
 | `Result/tasks/` | task_layer | 排错、UI |
 | `.locks/` | 各后端 | —（禁手工操作） |
 
-## 五、CLI 铁律（R1-R3）
+## 五、CLI 规则（R1-R3）
 
-| # | 规则 |
-|---|---|
-| R1 | `--data-root <dir>` 必填（参数名统一，不允许别名）；相对路径一律按 dataRoot 解析；禁止按 EXE 目录解析、禁止缺省回退包内 input//output/ |
-| R2 | 日志/私有锁/临时文件经 `--runtime-dir` 指定（task_layer 统一指到 `<dataRoot>/Result/logs/<providerId>/`）；不支持该参数的模块日志固定落此处 |
-| R3 | 安装目录完全只读时可正常工作（静态链接，不依赖安装目录内 DLL） |
+| # | 规则 | 说明 |
+|---|---|---|
+| R1 | **数据根入口**：每个可执行单元必须有一个参数指定 dataRoot（推荐名 `--data-root`；允许别名但须在 manifest 的 `cli.dataRootArg` 字段登记）。其读取的所有相对路径按 dataRoot 解析。**禁止**按 EXE 所在目录解析数据路径 | 已有散参数设计（如 gds2geo 的 --gds/--tech/--output-dir）可通过 argsTemplate 显式传绝对路径适配，不必强行改 CLI |
+| R2 | **运行痕迹出口**：日志/私有锁/临时文件经 `--runtime-dir` 指定（task_layer 统一指到 `<dataRoot>/Result/logs/<providerId>/`）；不支持该参数的模块日志固定落此处 |
+| R3 | **安装目录只读**：安装目录完全只读时可正常工作（静态链接，不依赖安装目录内 DLL） |
 
-task_layer 部署期检查 stage 命令含 dataRoot 绑定，不合规拒绝注册。
+**历史兼容命令约束**：
+- 无参模式（双击默认）、EXE 旁 input//output/ 缺省回退、gds2geo_setting.json 等历史行为：**交付版中废弃**（不再作为文档化接口）；
+- 若二进制仍保留这些代码路径（未物理删除），manifest 可在 `cli.deprecatedModes` 数组中声明（如 `["no-arg-default", "exe-relative-fallback"]`），task_layer 注册期给出警告；
+- 约束范围仅限**数据路径解析**；纯功能性兼容入口（如 gds2geo 的 `convert` 子命令）不受影响，但须单独登记为独立 stage。
 
 ## 六、命名与不变式
 
-固定名工件（名字定死，模块不得改）：`model.gds`、`model_info.csv/.xtf`、`matdb.json`、`port_em.json`、`port_thermal.json`、`set.txt`。
+固定名工件（名字定死，模块不得改）：`model.gds`、`model_info.csv/.xtf`、`matdb.json`、`port_em.json`、`port_thermal.json`、`set.json`、`stage_receipt.json`。
 模块内部自由区：`Result/<providerId>/<stageId>/` 之内中间产物命名自定，须以 internal ref 登记（MANIFEST_SPEC §五）。
 
 | # | 不变式 | 违反时报 |
 |---|---|---|
 | I1 | peec_basic 入口时 `Model/*.msh` 数量 == 1 | QS-FMT-INPUT-AMBIGUOUS / 预检 warning |
-| I2 | 建模链产物坐标单位 = mm（set.txt DIM=1000 依赖此条） | 模块自检 |
+| I2 | 建模链产物坐标单位 = mm（set.json 的 DIM=1000 依赖此条） | 模块自检 |
 | I3 | `port_em.json.meshSha256` == 当前主网格实际 SHA-256 | QS-IO-FILE-CORRUPTED / 预检 |
 | I4 | receipt schemaVersion 在消费者 accept 区间内 | 消费者自报 QS-FMT-* |
 | I5 | 锁文件存在 ≠ 错误；运行中不得删除 `.locks/` 内文件 | — |
+| I6 | `Setting/set.json` 存在且 schemaVersion 在消费者 accept 区间内 | 消费者自报 / 预检 |
 
-## 七、禁止事项
+## 七、状态文件职责划分（消除双源）
+
+| 文件 | 写者 | 用途 | 模块是否感知 |
+|---|---|---|---|
+| `Result/tasks/<taskId>/state.json` | **task_layer** | 任务编排记录：阶段状态机（pending/running/done/failed/skipped）、errorCode、outputs 清单、providers 版本快照、时间戳。UI 通过 task.status/task.result API 读取 | **否**。模块不写、不读、不依赖 |
+| `Result/<providerId>/<stageId>/stage_receipt.json` | **模块**（可选） | 模块自证：本阶段执行摘要（输入指纹、输出指纹、关键参数、耗时）。排错与复现用 | 是。模块自愿写；task_layer 不解析内容、不校验、不作为调度依据 |
+
+规则：
+1. **调度事实只有一个来源**：task_layer 的 state.json。模块退出码 + task_layer 浅检决定阶段成败，receipt 不影响调度；
+2. receipt 是**增强信息**（有更好，没有不影响链路）；写了就按 §七 schema 写，不写也合法；
+3. 模块**禁止**写 `Result/tasks/` 下任何文件；
+4. 模块**禁止**读其他任务的 state.json 做判断（每次调用是独立的）。
+
+### stage_receipt.json schema（v1，模块可选遵循）
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "provider": "compact_em",        // providerId
+  "stage": "extract",              // stage id
+  "startedAt": "2026-10-30T14:30:00+08:00",
+  "finishedAt": "2026-10-30T14:31:22+08:00",
+  "exitCode": 0,
+  "inputs": {                      // 本阶段实际消费的工件指纹
+    "Model/model_em.msh": { "sha256": "ab12...", "size": 50436 },
+    "Setting/set.json": { "sha256": "cd34..." }
+  },
+  "outputs": {                     // 本阶段产出的工件指纹
+    "Result/compact_em/extract/model.peec": { "sha256": "ef56...", "size": 102400 }
+  },
+  "params": { "export": "post,report" },   // 关键运行参数（人可读）
+  "notes": []                       // 可选备注（warning 级别信息）
+}
+```
+
+写入时机：阶段成功或失败后、进程退出前写入（失败时也写，exitCode 非 0）。
+失败恢复：写 receipt 失败**不改变**退出码（receipt 是增强信息，丢了不阻塞）；stderr 打一条 warning 即可。
+
+## 八、set.json 格式（取代 set.txt）
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "Solver_SET": 0,
+  "MNA_WEIGHT": 1,
+  "FS": "1e9",
+  "FE": "10e9",
+  "N_FP": 100,
+  "DIM": 1000,
+  "Taylor": 0,
+  "SAVE_BIN": 1,
+  "SAVE_TXT": 0,
+  "SAVE_SP": 0,
+  "POST_PROCESSING": 1,
+  "POST_FREQ_INDEX": -1,
+  "POST_PORT": 1,
+  "POST_PLOT_J": 1,
+  "POST_PLOT_QE": 1,
+  "POST_PLOT_VE": 1,
+  "POST_FIELD": 1
+}
+```
+
+- 键名与原 set.txt 一致（大写蛇形），值为 JSON number/string/bool；
+- `schemaVersion` 必填；新增键向后兼容（消费者忽略未知键），删键/改语义 → schemaVersion +1；
+- 过渡期：compact_em 下一版 CLI 同时接受 `set.json`（新）与 `set.txt`（旧，deprecated）；两个文件同时存在时 **set.json 优先**并打 warning；
+- 模板文件：`templates/default_set.json`（模块包内），task_layer defaultTemplate 机制复制用。
+
+## 九、禁止事项
 
 1. 写非自己声明的目录（拦截码 `QS-TL-CFG-LAYOUT-VIOLATION`）；
 2. 代码硬编码其他模块的目录名/providerId 字符串；
 3. 假设 dataRoot 之外路径存在；
-4. 交付包携带可读写 `DATA/`（测试数据降级只读 `examples/`）；
-5. UI 改写 `Result/` 内文件（UI 只写 `Model/`、`Setting/` 中归它的文件）。
+4. 交付包携带可读写 `DATA/`（测试数据降级只读 `examples/`）;
+5. UI 改写 `Result/` 内文件（UI 只写 `Model/`、`Setting/` 中归它的文件）；
+6. 模块写 `Result/tasks/` 下任何文件；
+7. 模块自行往 `Model/`、`Setting/` 复制正式件（publisher 职责归 task_layer）。
 
-## 八、版本
+## 十、版本
 
-本规范带版本（当前 v1.0），manifest 的 `capabilities.dataLayout` 声明遵循版本。破坏性变更（移动契约件/改固定名）→ 版本 +1，窗口期内全模块适配；新增模块或自由区目录不升版本。
+本规范带版本（当前 v1.1），manifest 的 `capabilities.dataLayout` 声明遵循版本。破坏性变更（移动契约件/改固定名/改 set 格式）→ 版本 +1，窗口期内全模块适配；新增模块或自由区目录不升版本。
