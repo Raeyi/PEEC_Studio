@@ -58,7 +58,7 @@ if (Test-Path $wh) {
 }
 
 # 4) docs
-foreach ($f in @("UI_API.md", "README.md")) {
+foreach ($f in @("UI_API.md", "README.md", "ERROR_CODES.md")) {
     if (Test-Path (Join-Path $root $f)) {
         Copy-Item (Join-Path $root $f) $dist
     }
@@ -70,3 +70,4 @@ Write-Host ""
 Get-ChildItem $dist -Recurse -File | Sort-Object FullName | ForEach-Object {
     "{0,-42} {1,10:N0} B" -f $_.FullName.Substring($dist.Length + 1), $_.Length
 }
+

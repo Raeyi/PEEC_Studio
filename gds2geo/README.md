@@ -1,5 +1,30 @@
 # GDS2GEO CLI 集成包
 
+
+## 2026-10-29 更新：非金属底面与逐层截面
+
+本次更新同步替换 `gds2geo.exe`、`geo_prepare.exe`、`geo2thermal.exe`、`geo2em.exe`。
+四个程序继续采用静态运行库，无须补充 DLL；Gmsh 仍使用 4.11.1，原命令行参数和四阶段文件名保持。
+
+- 热网格新增非金属底面和各金属层高度的独立 `Physical Surface`，并将对应 Tri3 写入 MSH；GEO/MSH 的组名、Physical ID、面实体和面积一致。
+- 补面由原 Tet 网格的既有面导出，保留原有金属、体网格及节点。MATDB 不新增辅助面材料，也不为这些面自动施加边界条件或热源。
+- 新准备策略为 `four-executable-6`。`thermal.json` 和热网格 receipt 显式记录 `nonmaterialSurfaces`；热 receipt 升为 schema 5，EM receipt 保持 schema 4，EM 继续忽略 D/I 介质。
+- 读取热网格时，用 `nonmaterialSurfaces` 区分非材料面组，其余材料组按 MATDB 绑定；不要把所有 Physical ID 都解释为材料 ID。具体编号由实际材料和层高确定，不应硬编码。
+- demo1 回归中，upper 非金属截面为 Physical 10001 / Surface 10，底面为 Physical 10002 / Surface 9；各新增 1884 个 Tri3。原 5112 个节点、22786 个 Tet4、1242 个金属 Tri3 保持不变。三金属层的多个独立截面也已验证。
+
+要应用新方案，需重新运行 `geo_prepare.exe` 和所需网格程序；旧准备包仍按原策略兼容读取。
+包内已有 `DATA/Model/`、`DATA/Result/`、`DATA/runtime/` 保留原字节，其中历史结果不会随 EXE 替换自动更新。
+下文安装位置和案例路径是可替换的调用示例；四步调用方式不变。
+
+## 版本记录
+
+| 日期 | 内容 |
+| --- | --- |
+| 2026-10-30 | 四个 EXE 更新至当前版本（本包 GDS2GEO_pipeline_20261030）：CLI 参数与退出码不变；新增非金属底面与各金属层逐层截面的独立 Physical Surface（热 receipt schema 5，nonmaterialSurfaces），准备策略 four-executable-6。程序自报版本仍为 0.1.0（--version），以本表为准区分交付批次。 |
+| 2026-10-29 | 首个纳入仓库的静态链接交付包（GCC/C++ 标准库/线程运行库静态链接，Gmsh 4.11.1 随包）。 |
+
+## 集成说明
+
 本包通过完整命令行参数调用四个程序，依次生成源模型、准备几何及热/电磁网格，不执行物理场求解。路径设置文件 `gds2geo_setting.json` 已移除；下述完整显式流程不读取也不生成该文件。
 
 四个 EXE 与 `gmsh.exe`（4.11.1）放在同一安装目录，可由宿主软件直接启动。当前正式交付将 GCC、C++ 标准库和线程运行库静态链接到四个 EXE，无须附带 `libgcc_s_seh-1.dll`、`libstdc++-6.dll`、`libwinpthread-1.dll`；仍依赖 Windows 系统 DLL，网格阶段仍需 Gmsh 4.11.1。安装目录可以只读；输入、source/prepared 交接包、网格结果和运行记录使用外部案例工作区，正式输出及对应数据共享锁位置须可写。
@@ -50,7 +75,7 @@ if ($LASTEXITCODE -ne 0) { throw 'geo2em failed' }
 
 source 三文件足以供第二步使用，无须重新读取原 GDS/工艺。热网格只需要本目标 `thermal.geo`、`thermal.json` 和 prepared 的 `matdb.json`；EM 同理。各阶段分别发布文件组，失败保留上一组可用正式结果。上游重建不会自动重跑下游，应重新生成所需后续阶段。
 
-当前准备策略为 `four-executable-5`：共用 500 nm 有界轮廓近似；原厚度严格小于 1 µm 的 C 导体取原 bottom 面，MATDB 保留厚度，整体 Z 不压缩。热保留介质回填，EM 在完整材料归属后剔除 D/I，不补空气域。网格使用自由 Tet4 与材料 Tri3，纯片 EM 可只有 Tri3；本包不计算温度、场或 S 参数。
+当前准备策略为 `four-executable-6`：共用 500 nm 有界轮廓近似；原厚度严格小于 1 µm 的 C 导体取原 bottom 面，MATDB 保留厚度，整体 Z 不压缩。热保留介质回填，EM 在完整材料归属后剔除 D/I，不补空气域。网格使用自由 Tet4 与材料 Tri3，纯片 EM 可只有 Tri3；热网格还保存非金属底面及逐层截面的独立Physical组，GEO/MSH一致；它们不是MATDB材料，不自动施加边界条件。热receipt为schema5并记录nonmaterialSurfaces，EM保持schema4。本包不计算温度、场或 S 参数。
 
 ## 日志、暂存与锁
 
