@@ -48,6 +48,7 @@ UI 用 `QProcess::start("task_layer.exe", {"serve", ...})` 启动任务层，
 错误响应：`{jsonrpc:"2.0", id, error:{code,message,data}}`；
 错误码：-32000 取消 / -32001 任务不存在 / -32002 任务运行中 /
 -32003 输入非法 / -32004 配置错误 / -32005 模块执行失败。
+阶段层 `QS-TL-*` 错误码及后端透传规则见 [ERROR_CODES.md](ERROR_CODES.md)。
 
 #### `inputs`：UI 动态输入（重点：port.json 由前端配置下发）
 
