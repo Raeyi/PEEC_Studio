@@ -1,4 +1,4 @@
-﻿# build_local.ps1 — 本地构建 task_layer（免管理员：Qt6 MinGW + MinGW 工具链）
+# build_local.ps1 — 本地构建 task_layer（免管理员：Qt6 MinGW + MinGW 工具链）
 #
 # 一次性准备（不需要管理员权限，也不会改动系统）：
 #   python -m pip install aqtinstall
@@ -85,7 +85,8 @@ else {
         }
         $src = @(
             "src\main.cpp", "src\App.cpp",
-            "src\config\ModuleRegistry.cpp", "src\config\PipelineLoader.cpp",
+            "src\config\ModuleRegistry.cpp", "src\config\ModuleManifest.cpp",
+            "src\config\PipelineLoader.cpp",
             "src\io\InputValidator.cpp", "src\io\ResultStore.cpp",
             "src\modules\ModuleRunner.cpp", "src\orchestrator\TaskOrchestrator.cpp",
             "src\rpc\StdioTransport.cpp"

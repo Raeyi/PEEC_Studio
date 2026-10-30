@@ -39,6 +39,8 @@ public:
     void finish(const QString& status, const QString& summary, qint64 elapsedMs);
     // UI 动态输入（如 port.json 路径），落盘便于任务追溯
     void setInputs(const QJsonObject& inputs) { m_inputs = inputs; persist(); }
+    // providers version snapshot: which module versions produced this task (traceability)
+    void setProviders(const QJsonObject& providers) { m_providers = providers; persist(); }
 
     QString taskDir() const { return m_dir; }
     QString taskId() const { return m_taskId; }
@@ -53,6 +55,7 @@ private:
     QString m_pipelineId;
     QVector<StageRecord> m_stages;
     QJsonObject m_inputs;
+    QJsonObject m_providers;   // providerId -> {version, apiVersion}
     QString m_status = "queued";
     QString m_summary;
     QDateTime m_started;

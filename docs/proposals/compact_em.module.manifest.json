@@ -1,0 +1,74 @@
+{
+  "manifestVersion": 1,
+  "id": "compact_em",
+  "name": "Compact EM 电磁求解链",
+  "version": "2026.10.22",
+  "apiVersion": 1,
+  "cli": {
+    "executables": ["PEEC_Model_Extractor.exe", "PEEC_Solver.exe",
+                    "PEEC_S_Parameter_Plotter.exe", "PEEC_Post_Processing.exe"]
+  },
+  "stages": [
+    {
+      "id": "extract",
+      "executable": "PEEC_Model_Extractor.exe",
+      "argsTemplate": ["--data-root", "{dataRoot}", "--export", "post,report"],
+      "exitCodes": { "0": "ok", "1": "failure" },
+      "errorContract": { "type": "qs-json-stderr",
+                         "traceLog": "Result/logs/compact_em/Model_Extractor-{trace_id}.jsonl" }
+    },
+    {
+      "id": "solve",
+      "executable": "PEEC_Solver.exe",
+      "argsTemplate": ["--data-root", "{dataRoot}", "--export", "post,touchstone"],
+      "exitCodes": { "0": "ok", "1": "failure" },
+      "errorContract": { "type": "qs-json-stderr",
+                         "traceLog": "Result/logs/compact_em/Solver-{trace_id}.jsonl" }
+    },
+    {
+      "id": "plot",
+      "executable": "PEEC_S_Parameter_Plotter.exe",
+      "optional": true,
+      "argsTemplate": ["--data-root", "{dataRoot}", "--format", "svg"],
+      "exitCodes": { "0": "ok", "1": "failure" },
+      "errorContract": { "type": "qs-json-stderr",
+                         "traceLog": "Result/logs/compact_em/S_Parameter_Plotter-{trace_id}.jsonl" }
+    },
+    {
+      "id": "post",
+      "executable": "PEEC_Post_Processing.exe",
+      "optional": true,
+      "argsTemplate": ["--data-root", "{dataRoot}", "--source-plots", "j,qe,ve", "--parts", "mag"],
+      "exitCodes": { "0": "ok", "1": "failure" },
+      "errorContract": { "type": "qs-json-stderr",
+                         "traceLog": "Result/logs/compact_em/Post_Processing-{trace_id}.jsonl" }
+    }
+  ],
+  "artifacts": {
+    "produced": [
+      { "ref": "compact_em/model.peec", "path": "Result/compact_em/extract/model.peec" },
+      { "ref": "compact_em/sp.csv", "path": "Result/compact_em/solve/S_parameter.csv" }
+    ],
+    "consumed": [
+      { "ref": "gds2geo/mesh.em", "path": "Model/model_em.msh",
+        "accept": { "schemaVersion": { "min": 4, "max": 4 } } },
+      { "ref": "gds2geo/matdb.model", "path": "Model/matdb.json",
+        "accept": { "schemaVersion": { "min": 3, "max": 3 } } },
+      { "ref": "em/ports.def", "path": "Model/port_em.json",
+        "maintainedBy": ["ui"],
+        "accept": { "fields": ["meshFile", "meshSha256", "triangleIds"] } },
+      { "ref": "user/solver.set", "path": "Setting/set.txt",
+        "defaultTemplate": "templates/default_set.txt" }
+    ]
+  },
+  "dependsOn": {
+    "modules": ["gds2geo"],
+    "artifacts": ["gds2geo/mesh.em", "gds2geo/matdb.model", "em/ports.def", "user/solver.set"]
+  },
+  "capabilities": {
+    "dataLayout": "peec-data/v1",
+    "breakingChanges": [
+      { "version": "2026.10.22", "note": "初版登记。待适配项（ONBOARDING §三）：输出位置迁 Result/compact_em/<stage>/、port 文件名 port_em.json、trace jsonl 落 Result/logs/compact_em/" }
+    ]
+  }
+}

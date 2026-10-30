@@ -33,7 +33,7 @@ signals:
     void exitRequested(int code);
 
 private:
-    bool loadConfig();
+    bool loadConfig(QString* detail = nullptr);
     void handleRequest(const QJsonValue& reqId, const QString& method,
                        const QJsonObject& params);
     void onNotify(const QString& method, const QJsonObject& params);
@@ -76,6 +76,7 @@ private:
     QJsonObject m_activeInputs;   // UI 动态输入（{PORT_JSON} 等）
     QString m_lastTaskId;
     QString m_lastTaskDir;
+    QMap<QString, RefRoute> m_refRoutes;   // ref -> producer route (aggregate at registration)
     ResultStore m_store;
 };
 

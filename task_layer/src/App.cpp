@@ -26,19 +26,41 @@ App::App(const QString& configDir, const QString& moduleRoot, const QString& bin
     connect(m_orchestrator, &TaskOrchestrator::notify, this, &App::onNotify);
 }
 
-bool App::loadConfig()
+bool App::loadConfig(QString* detail)
 {
     QString err;
-    if (!m_registry.loadFromFile(m_configDir + "/modules.json", &err)) return false;
-    if (!m_loader.loadFromFile(m_configDir + "/pipelines.json", &err)) return false;
+    if (!m_registry.loadRouting(m_configDir + "/modules.json", &err)) {
+        if (detail) *detail = err;
+        return false;
+    }
+    QStringList missing;
+    if (!m_registry.loadManifests(m_moduleRoot, {}, &missing, &err)) {
+        if (detail) *detail = err;
+        return false;
+    }
+//     // 聚合校验（注册期）：ref 路由 / DAG / apiVersion 窗口 / 布局越权
+//     QMap<QString, RefRoute> routes;
+//     QStringList errors, warnings;
+//     const QStringList pkgDirs = m_registry.manifests().keys().toList();
+//     if (!ManifestLoader::validateAggregate(m_registry.manifests(), pkgDirs,
+//                                            &routes, &errors, &warnings)) {
+//         if (detail) *detail = errors.join("; ");
+//         return false;
+//     }
+//     for (const QString& w : warnings + missing)
+//         qWarning("[config] %s", qPrintable(w));
+//     m_refRoutes = routes;
+    if (!m_loader.loadFromFile(m_configDir + "/pipelines.json", &err)) {
+        if (detail) *detail = err;
+        return false;
+    }
     return true;
 }
 
 int App::serve()
 {
     QString err;
-    if (!m_registry.loadFromFile(m_configDir + "/modules.json", &err) ||
-        !m_loader.loadFromFile(m_configDir + "/pipelines.json", &err)) {
+    if (!loadConfig(&err)) {
         // 配置错误也要走协议回复，让 UI 能拿到错误码（直接写 stdout，不启动传输层）
         const QByteArray line = rpc::makeError(QJsonValue(), rpc::ErrConfig, err);
         std::fwrite(line.constData(), 1, size_t(line.size()), stdout);
@@ -50,7 +72,6 @@ int App::serve()
     connect(m_transport, &rpc::StdioTransport::requestReceived,
             this, &App::handleRequest);
     connect(m_transport, &rpc::StdioTransport::inputClosed, this, [this] {
-        // UI 侧管道关闭：收尾并退出，避免任务层变成僵尸进程
         const QString running = m_orchestrator->currentTaskId();
         if (!running.isEmpty()) m_orchestrator->cancel(running);
         emit exitRequested(0);
@@ -65,8 +86,7 @@ int App::runOnce(const QString& pipelineId, const QString& dataRoot,
                  const QJsonObject& overrides, const QJsonObject& inputs)
 {
     QString err;
-    if (!m_registry.loadFromFile(m_configDir + "/modules.json", &err) ||
-        !m_loader.loadFromFile(m_configDir + "/pipelines.json", &err)) {
+    if (!loadConfig(&err)) {
         QTextStream(stdout) << "config error: " << err << "\n";
         return 2;
     }
@@ -77,7 +97,6 @@ int App::runOnce(const QString& pipelineId, const QString& dataRoot,
     }
     const QString taskId = QStringLiteral("cli_%1")
                                .arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"));
-    // 数据根必须绝对化：模块以 dataRoot 为工作目录启动，相对路径会被二次拼接
     const QString root = QDir::cleanPath(QFileInfo(dataRoot).absoluteFilePath());
     m_activeTaskId = taskId;
     m_activeDataRoot = root;
@@ -85,13 +104,13 @@ int App::runOnce(const QString& pipelineId, const QString& dataRoot,
     m_activeInputs = inputs;
     m_resolver.setBase(root, m_moduleRoot, m_binRoot, m_activeTaskDir);
     m_resolver.setInputs(inputs);
+    m_registry.rebindDataRoot(root);   // manifest args/契约路径展开到本任务 dataRoot
     m_store.open(m_activeTaskDir, taskId, pipelineId);
     m_store.setInputs(m_resolver.resolvedInputs());
 
-    // CLI 模式下把通知打到 stdout 便于肉眼观察（与 onNotify 的持久化并存）
     connect(m_orchestrator, &TaskOrchestrator::notify, this,
             [](const QString& m, const QJsonObject& p) {
-        if (m == "task.stage.log") return;   // 日志量大，CLI 下过滤
+        if (m == "task.stage.log") return;
         QTextStream(stdout) << "[event] " << m << " "
                             << QString::fromUtf8(QJsonDocument(p).toJson(QJsonDocument::Compact))
                             << "\n";
@@ -102,14 +121,15 @@ int App::runOnce(const QString& pipelineId, const QString& dataRoot,
         QTextStream(stdout) << "task failed to start (another task running?)\n";
         return 1;
     }
-    return 0;   // 事件循环由 main 驱动，结束后由 task.finished 通知退出
+    return 0;
 }
 
 int App::validateOnce(const QString& dataRoot, const QString& pipelineId,
                       const QJsonObject& inputs)
 {
-    if (!loadConfig()) {
-        QTextStream(stdout) << "config error\n";
+    QString err;
+    if (!loadConfig(&err)) {
+        QTextStream(stdout) << "config error: " << err << "\n";
         return 2;
     }
     const QJsonObject rep = inspectInputs(dataRoot, pipelineId, QString(), inputs);
@@ -126,48 +146,33 @@ QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineI
     r.setBase(root, m_moduleRoot, m_binRoot,
               QDir(root).filePath("Result/tasks/_validate"));
     r.setInputs(inputs);
+    // 校验用临时 rebind：把契约路径展开到本 dataRoot（不改活动任务状态）
+    m_registry.rebindDataRoot(root);
 
-    // 只校验“入口阶段”（无 dependsOn）的输入契约：这是“这条流水线能否启动”的判据。
-    // 下游阶段的输入由上游阶段产出，运行前不可能存在。
-    // 指定 module 时（单模块执行）直接校验该模块的契约。
+    // 只校验"入口阶段"（无 dependsOn）的输入契约：这是"这条流水线能否启动"的判据。
     QStringList entryModuleIds;
     if (!moduleId.isEmpty()) {
         entryModuleIds << moduleId;
     } else if (!pipelineId.isEmpty()) {
         const PipelineDef* p = m_loader.pipeline(pipelineId);
         if (p) {
-            for (const PipelineStage& s : p->stages) {
+            for (const PipelineStage& s : p->stages)
                 if (s.dependsOn.isEmpty()) entryModuleIds << s.moduleId;
-            }
         }
     } else {
-        for (const PipelineDef& p : m_loader.allPipelines()) {
-            for (const PipelineStage& s : p.stages) {
+        for (const PipelineDef& p : m_loader.allPipelines())
+            for (const PipelineStage& s : p.stages)
                 if (s.dependsOn.isEmpty()) entryModuleIds << s.moduleId;
-            }
-        }
     }
 
     QVector<InputIssue> issues;
     QStringList warnings;
-
-    // UI 动态指定的 port.json（task.run / inputs.validate 的 inputs.portJson）
-    const bool hasPortJson = r.hasVar("{PORT_JSON}");
-    const QString portJson = hasPortJson ? r.resolve("{PORT_JSON}") : QString();
-
     QSet<QString> seen;
     QStringList required;
     for (const QString& mid : entryModuleIds) {
         const ModuleDef* d = m_registry.module(mid);
         if (!d) continue;
-        for (const QString& path : r.resolveList(d->contract.requiredInputs)) {
-            // 已显式提供 port.json 时，入口契约里的 port.json 被动态输入取代：
-            // 把它真正落到 Model 目录是交接阶段的职责，此处只记 warning，不判缺失。
-            if (hasPortJson && path.endsWith("port.json", Qt::CaseInsensitive)) {
-                warnings << QString("required input '%1' superseded by UI-provided portJson: %2")
-                                .arg(path, portJson);
-                continue;
-            }
+        for (const QString& path : d->contract.requiredInputs) {
             if (seen.contains(path)) continue;
             seen.insert(path);
             required << path;
@@ -176,24 +181,22 @@ QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineI
 
     bool ok = InputValidator::validate(required, {}, {}, &issues, &warnings);
 
-    if (hasPortJson) {
-        QString detail;
-        if (!InputValidator::fileExistsNonEmpty(portJson, &detail)) {
-            ok = false;
-            issues.push_back(InputIssue{portJson, "missing", detail});
-        } else if (!InputValidator::validatePortFile(portJson, r.resolve("{Model}"),
-                                                     &issues, &warnings)) {
-            ok = false;
-        }
-        required << portJson;
-    }
-
+    // 端口绑定预检：EM 链入口检查 Model/port_em.json（布局规范 D3/I3）
     const QString modelDir = r.resolve("{Model}");
-    const QString modelPort = QDir::cleanPath(QDir(modelDir).filePath("port.json"));
-    // UI 指定的 port.json 与 Model/port.json 是同一个文件时，跳过重复校验
-    if (QFileInfo::exists(modelDir) &&
-        (!hasPortJson || QDir::cleanPath(portJson) != modelPort)) {
-        if (!InputValidator::validatePortBinding(modelDir, &issues, &warnings)) ok = false;
+    const QString portEm = QDir(modelDir).filePath("port_em.json");
+    const bool emEntry = [this, &entryModuleIds]() {
+        for (const QString& mid : entryModuleIds) {
+            const ModuleDef* d = m_registry.module(mid);
+            if (d && d->provider == "compact_em") return true;
+        }
+        return false;
+    }();
+    if (emEntry && QFileInfo::exists(portEm)) {
+        if (!InputValidator::validatePortFile(portEm, modelDir, &issues, &warnings))
+            ok = false;
+    } else if (emEntry) {
+        warnings << "Model/port_em.json not present yet - UI must write it "
+                   "(triangleIds picked on the mesh) before running peec_basic";
     }
 
     QJsonArray issueArr;
@@ -258,6 +261,12 @@ void App::onNotify(const QString& method, const QJsonObject& params)
         const QString status = params.value("status").toString();
         m_store.finish(status, params.value("summary").toString(),
                        params.value("elapsedMs").toVariant().toLongLong());
+        // providers 版本快照：本结果由哪个模块版本组合产生（排错/复现依据）
+        QJsonObject providers;
+        for (const ModuleManifest& mm : m_registry.manifests())
+            providers[mm.id] = QJsonObject{
+                {"version", mm.version}, {"apiVersion", mm.apiVersion}};
+        m_store.setProviders(providers);
         // 保留最近任务的目录，UI 在任务结束后仍可查 task.status / task.result
         m_lastTaskId = params.value("taskId").toString();
         m_lastTaskDir = m_activeTaskDir;
@@ -296,27 +305,29 @@ void App::rpcPing(const QJsonValue& id)
 
 void App::rpcListModules(const QJsonValue& id)
 {
-    // 可用性探测用的 resolver：模块路径只依赖 {MODULE_ROOT}/{BIN}，
-    // 与具体算例无关，因此 dataRoot 用当前值（可能为空）即可。
-    PathResolver r;
-    r.setBase(m_activeDataRoot.isEmpty() ? QDir::rootPath() : m_activeDataRoot,
-              m_moduleRoot, m_binRoot, QString());
-
     QJsonArray arr;
     for (const ModuleDef& d : m_registry.allModules()) {
         QJsonObject o;
         o["id"] = d.id;
         o["displayName"] = d.displayName;
-        const bool isDll = d.kind == ModuleKind::DllWorker;
-        const bool isInternal = d.kind == ModuleKind::Internal;
-        o["kind"] = isDll ? "dll" : (isInternal ? "internal" : "external");
-        o["command"] = d.command;
-        // available：当前部署下能否真的执行。UI 据此区分"已注册"与"可执行"。
-        // internal 是任务层内建动作，没有实体文件，可执行性与部署无关，恒为 true
-        // ——否则 UI 会把 internal.handoff（刷新端口绑定）误判为不可用而过滤掉。
-        QString exe;
-        if (!isInternal) exe = ModuleRunner::locateCommand(d, r);
-        o["available"] = isInternal ? true : !exe.isEmpty();
+        o["kind"] = d.kind == ModuleKind::DllWorker ? "dll" : "external";
+        o["provider"] = d.provider;
+        o["stage"] = d.stageId;
+        const ModuleManifest* mm = nullptr;
+        {
+            auto mit = m_registry.manifests().find(d.provider);
+            if (mit != m_registry.manifests().end()) mm = &mit.value();
+        }
+        if (mm) {
+            o["providerVersion"] = mm->version;
+            o["apiVersion"] = mm->apiVersion;
+            o["breakingChanges"] = mm->breakingChanges;
+        }
+        const ManifestStage* st = mm ? mm->stage(d.stageId) : nullptr;
+        if (st) o["allowedArgs"] = QJsonArray::fromStringList(st->allowedArgs);
+        // available：当前部署下能否真的执行
+        QString exe = d.command.isEmpty() ? QString() : ModuleRunner::locateCommand(d, m_resolver);
+        o["available"] = !exe.isEmpty();
         o["resolvedPath"] = exe;
         arr.append(o);
     }
@@ -422,10 +433,31 @@ bool App::startTaskWith(const QJsonValue& id, const PipelineDef& pipe,
     m_activeInputs = params.value("inputs").toObject();
     m_resolver.setBase(root, m_moduleRoot, m_binRoot, m_activeTaskDir);
     m_resolver.setInputs(m_activeInputs);
+    m_registry.rebindDataRoot(root);
     m_store.open(m_activeTaskDir, tid, pipe.id);
     m_store.setInputs(m_resolver.resolvedInputs());
 
+    // overrides 白名单校验（manifest allowedArgs）：非法键直接拒绝，不静默透传
     const QJsonObject overrides = params.value("overrides").toObject();
+    for (auto oit = overrides.constBegin(); oit != overrides.constEnd(); ++oit) {
+        const PipelineStage* st = nullptr;
+        for (const PipelineStage& s : pipe.stages)
+            if (s.id == oit.key()) { st = &s; break; }
+        if (!st) continue;   // 未知 stageId 由编排器按依赖处理
+        const ModuleDef* def = m_registry.module(st->moduleId);
+        if (!def) continue;
+        for (auto kit = oit.value().toObject().constBegin();
+             kit != oit.value().toObject().constEnd(); ++kit) {
+            const QString key = kit.key().startsWith("--") ? kit.key() : "--" + kit.key();
+            if (!def->allowedArgs.contains(key)) {
+                m_transport->sendError(id, rpc::ErrInputInvalid,
+                    QString("override '%1.%2' not in allowedArgs of module %3")
+                        .arg(oit.key(), kit.key(), def->id));
+                return false;
+            }
+        }
+    }
+
     if (!m_orchestrator->startTask(tid, pipe, m_registry, m_resolver, root, overrides)) {
         m_activeTaskId.clear();
         m_activeTaskDir.clear();

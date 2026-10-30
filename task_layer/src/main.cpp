@@ -134,16 +134,15 @@ int main(int argc, char* argv[])
         ModuleRegistry reg;
         PipelineLoader loader;
         QString err;
-        if (!reg.loadFromFile(configDir + "/modules.json", &err) ||
-            !loader.loadFromFile(configDir + "/pipelines.json", &err)) {
+        if (!reg.loadRouting(configDir + "/modules.json", &err) ||
+            !reg.loadManifests(QDir(configDir).absolutePath() + "/../..", {}, nullptr, &err)) {
             QTextStream(stdout) << "config error: " << err << "\n";
             return 2;
         }
         QTextStream out(stdout);
         if (cmd == "modules") {
             for (const ModuleDef& d : reg.allModules()) {
-                const char* k = d.kind == ModuleKind::DllWorker ? "dll"
-                              : d.kind == ModuleKind::Internal ? "internal" : "external";
+            const char* k = d.kind == ModuleKind::DllWorker ? "dll" : "external";
                 out << d.id << "\t" << d.displayName << "\t" << k << "\n";
             }
         } else {

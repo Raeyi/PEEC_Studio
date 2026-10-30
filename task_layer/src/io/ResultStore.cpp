@@ -82,6 +82,7 @@ void ResultStore::persist()
     root["finishedAt"] = m_finished ? QDateTime::currentDateTime().toMSecsSinceEpoch() : 0;
     root["elapsedMs"] = m_elapsedMs;
     if (!m_inputs.isEmpty()) root["inputs"] = m_inputs;
+    if (!m_providers.isEmpty()) root["providers"] = m_providers;
     QJsonArray stages;
     for (const StageRecord& s : m_stages) {
         QJsonObject so;

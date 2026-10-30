@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "_comment": "handoff 阶段已移除（v1.1 布局规范：正式件由 publisher 按 manifest publishTo 落位，见 docs/DATA_LAYOUT.md D3）",
   "pipelines": {
     "peec_basic": {
       "displayName": "电磁基本链路（PEEC 四段）",
@@ -13,15 +14,14 @@
       ]
     },
     "gds_full": {
-      "displayName": "建模、网格与交接（GDS2GEO + handoff）",
-      "description": "源模型生成 → 几何准备 → 电磁网格（热网格可选）→ 交接给 EM 目录（网格/材料/设置）",
+      "displayName": "建模与网格（GDS2GEO 四阶段）",
+      "description": "源模型生成 → 几何准备 → 电磁网格（热网格可选）；正式件（Model/ 主网格+matdb）由 publisher 按 manifest 落位",
       "maxParallel": 1,
       "stages": [
         { "id": "parse", "module": "phys.model_parse", "name": "物理模型解析（gds2geo）", "dependsOn": [] },
         { "id": "prepare", "module": "gds.prepare", "name": "几何准备", "dependsOn": ["parse"] },
         { "id": "mesh_em", "module": "gds.mesh_em", "name": "电磁网格", "dependsOn": ["prepare"] },
-        { "id": "mesh_thermal", "module": "gds.mesh_thermal", "name": "热网格", "dependsOn": ["prepare"], "optional": true },
-        { "id": "handoff", "module": "internal.handoff", "name": "交接给 EM 目录", "dependsOn": ["mesh_em"] }
+        { "id": "mesh_thermal", "module": "gds.mesh_thermal", "name": "热网格", "dependsOn": ["prepare"], "optional": true }
       ]
     },
     "thermal_te": {
