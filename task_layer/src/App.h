@@ -29,6 +29,11 @@ public:
     int validateOnce(const QString& dataRoot, const QString& pipelineId,
                      const QJsonObject& inputs = QJsonObject());
 
+    // run 模式：任务可能在 app.exec() 之前就同步结束（如入口输入缺失，无子进程），
+    // 此时 QCoreApplication::exit 无效，main 需直接读取退出码
+    bool isCliTaskFinished() const { return m_cliFinished; }
+    int cliTaskExitCode() const { return m_cliCode; }
+
 signals:
     void exitRequested(int code);
 
@@ -37,6 +42,9 @@ private:
     void handleRequest(const QJsonValue& reqId, const QString& method,
                        const QJsonObject& params);
     void onNotify(const QString& method, const QJsonObject& params);
+
+    bool m_cliFinished = false;   // run 模式：任务已同步结束
+    int m_cliCode = 0;            // run 模式：任务退出码
 
     // RPC 方法实现
     void rpcPing(const QJsonValue& id);

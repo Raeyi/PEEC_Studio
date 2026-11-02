@@ -35,6 +35,7 @@
       "kind": "external",
       "provider": "gds2geo",
       "stage": "source",
+      "env": { "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe" },
       "searchDirs": ["{MODULE_ROOT}/gds2geo"]
     },
     "gds.prepare": {
@@ -42,6 +43,7 @@
       "kind": "external",
       "provider": "gds2geo",
       "stage": "prepared",
+      "env": { "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe" },
       "searchDirs": ["{MODULE_ROOT}/gds2geo"]
     },
     "gds.mesh_em": {
@@ -49,6 +51,7 @@
       "kind": "external",
       "provider": "gds2geo",
       "stage": "em",
+      "env": { "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe" },
       "searchDirs": ["{MODULE_ROOT}/gds2geo"]
     },
     "gds.mesh_thermal": {
@@ -56,7 +59,22 @@
       "kind": "external",
       "provider": "gds2geo",
       "stage": "thermal",
+      "env": { "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe" },
       "searchDirs": ["{MODULE_ROOT}/gds2geo"]
+    },
+    "thermal.extract": {
+      "displayName": "热路提取（薄层/四面体混合）",
+      "kind": "external",
+      "provider": "thermal",
+      "stage": "extract",
+      "searchDirs": ["{MODULE_ROOT}/thermal"]
+    },
+    "thermal.post": {
+      "displayName": "温度后处理（OP0 映射，可选）",
+      "kind": "external",
+      "provider": "thermal",
+      "stage": "post",
+      "searchDirs": ["{MODULE_ROOT}/thermal"]
     },
     "sim.solver": {
       "displayName": "仿真求解（MNA/ALPS，待接入）",

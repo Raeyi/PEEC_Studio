@@ -1,88 +1,170 @@
-# GDS2GEO CLI 集成包
+# GDS2GEO
 
+交付版本：**V1**。
 
-## 2026-10-29 更新：非金属底面与逐层截面
+本包用于 task_layer 集成，只交付以下六个文件：
 
-本次更新同步替换 `gds2geo.exe`、`geo_prepare.exe`、`geo2thermal.exe`、`geo2em.exe`。
-四个程序继续采用静态运行库，无须补充 DLL；Gmsh 仍使用 4.11.1，原命令行参数和四阶段文件名保持。
-
-- 热网格新增非金属底面和各金属层高度的独立 `Physical Surface`，并将对应 Tri3 写入 MSH；GEO/MSH 的组名、Physical ID、面实体和面积一致。
-- 补面由原 Tet 网格的既有面导出，保留原有金属、体网格及节点。MATDB 不新增辅助面材料，也不为这些面自动施加边界条件或热源。
-- 新准备策略为 `four-executable-6`。`thermal.json` 和热网格 receipt 显式记录 `nonmaterialSurfaces`；热 receipt 升为 schema 5，EM receipt 保持 schema 4，EM 继续忽略 D/I 介质。
-- 读取热网格时，用 `nonmaterialSurfaces` 区分非材料面组，其余材料组按 MATDB 绑定；不要把所有 Physical ID 都解释为材料 ID。具体编号由实际材料和层高确定，不应硬编码。
-- demo1 回归中，upper 非金属截面为 Physical 10001 / Surface 10，底面为 Physical 10002 / Surface 9；各新增 1884 个 Tri3。原 5112 个节点、22786 个 Tet4、1242 个金属 Tri3 保持不变。三金属层的多个独立截面也已验证。
-
-要应用新方案，需重新运行 `geo_prepare.exe` 和所需网格程序；旧准备包仍按原策略兼容读取。
-包内已有 `DATA/Model/`、`DATA/Result/`、`DATA/runtime/` 保留原字节，其中历史结果不会随 EXE 替换自动更新。
-下文安装位置和案例路径是可替换的调用示例；四步调用方式不变。
-
-## 版本记录
-
-| 日期 | 内容 |
-| --- | --- |
-| 2026-10-30 | 四个 EXE 更新至当前版本（本包 GDS2GEO_pipeline_20261030）：CLI 参数与退出码不变；新增非金属底面与各金属层逐层截面的独立 Physical Surface（热 receipt schema 5，nonmaterialSurfaces），准备策略 four-executable-6。程序自报版本仍为 0.1.0（--version），以本表为准区分交付批次。 |
-| 2026-10-29 | 首个纳入仓库的静态链接交付包（GCC/C++ 标准库/线程运行库静态链接，Gmsh 4.11.1 随包）。 |
-
-## 集成说明
-
-本包通过完整命令行参数调用四个程序，依次生成源模型、准备几何及热/电磁网格，不执行物理场求解。路径设置文件 `gds2geo_setting.json` 已移除；下述完整显式流程不读取也不生成该文件。
-
-四个 EXE 与 `gmsh.exe`（4.11.1）放在同一安装目录，可由宿主软件直接启动。当前正式交付将 GCC、C++ 标准库和线程运行库静态链接到四个 EXE，无须附带 `libgcc_s_seh-1.dll`、`libstdc++-6.dll`、`libwinpthread-1.dll`；仍依赖 Windows 系统 DLL，网格阶段仍需 Gmsh 4.11.1。安装目录可以只读；输入、source/prepared 交接包、网格结果和运行记录使用外部案例工作区，正式输出及对应数据共享锁位置须可写。
-
-历史动态版或 `shared` 兼容包仍需上述三份匹配 DLL。升级时一并替换四个 EXE 并保留 Gmsh，不能直接删除旧动态版的 DLL 来代替静态构建。
-
-包中已有的 `DATA/Model/`、`DATA/Result/`、`DATA/runtime/` 保留为示例与历史记录，不是本 CLI 流程自动选择的路径。使用既有示例时，先将所需原始 GDS 和工艺文件复制到自己的案例输入目录；不要混用历史结果与新结果。
-
-安装包内原有的 `DATA/runtime/` 可以继续保留。只要四个 EXE 都传入外部 `--runtime-dir`，且原始输入、source/prepared 交接包和输出也使用外部案例目录，运行就不会使用包内的 `DATA/runtime/`。它不是集成交付的必需目录，可在确认相关程序全部退出后选择不随包交付。
-
-## 四步完整调用
-
-以下示例假定程序安装在 `C:/Tools/GDS2GEO_pipeline_20261028/`，案例输入在 `D:/Cases/demo/Model/`。将这些绝对路径换成实际位置后，可从任意工作目录运行：
-
-```powershell
-& "C:/Tools/GDS2GEO_pipeline_20261028/gds2geo.exe" --runtime-dir "D:/Cases/demo/runtime" source --gds "D:/Cases/demo/Model/model.gds" --tech "D:/Cases/demo/Model/model_info.csv" --output-dir "D:/Cases/demo/Result/source"
-if ($LASTEXITCODE -ne 0) { throw 'gds2geo failed' }
-& "C:/Tools/GDS2GEO_pipeline_20261028/geo_prepare.exe" --runtime-dir "D:/Cases/demo/runtime" --input-dir "D:/Cases/demo/Result/source" --output-dir "D:/Cases/demo/Result/prepared"
-if ($LASTEXITCODE -ne 0) { throw 'geo_prepare failed' }
-& "C:/Tools/GDS2GEO_pipeline_20261028/geo2thermal.exe" --runtime-dir "D:/Cases/demo/runtime" --input-dir "D:/Cases/demo/Result/prepared" --output-dir "D:/Cases/demo/Result/thermal"
-if ($LASTEXITCODE -ne 0) { throw 'geo2thermal failed' }
-& "C:/Tools/GDS2GEO_pipeline_20261028/geo2em.exe" --runtime-dir "D:/Cases/demo/runtime" --input-dir "D:/Cases/demo/Result/prepared" --output-dir "D:/Cases/demo/Result/em"
-if ($LASTEXITCODE -ne 0) { throw 'geo2em failed' }
+```text
+gds2geo/
+  gds2geo.exe
+  geo_prepare.exe
+  geo2em.exe
+  geo2thermal.exe
+  README.md
+  module.manifest.json
 ```
 
-每步退出码必须为 `0` 后再运行下游。两个网格程序按示例串行运行，可只选择所需的一种。任一步失败时停止后续调用，保留完整输出并修正原因；磁盘上仍存在的旧结果不能证明本次成功。
+目录名为小写 `gds2geo`，与 manifest.id 相同。四程序采用 Windows x64 Release 静态运行库构建，
+无须另配 MinGW 运行库 DLL，仍依赖 Windows 系统 DLL。安装目录可以只读，
+输入、结果及运行记录全部使用外部算例 dataRoot。本模块生成几何与网格，不执行物理场求解。
 
-`--tech` 可改成实际 `.xtf` 文件；CSV 与 XTF 只选择一份。GDS 使用自身单位，CSV 的 Height/Thickness 按 mm 解释，XTF v2/v3 按 LengthUnit 解释，正式 GEO/MSH 坐标为 mm。GDS 多顶层时，给第一步增加 `--top-cell 实际单元名`；XTF 默认 `strict-slots`，需要 `embedded-top` 时须显式传入 `--stack-mode embedded-top`，CSV 不支持该模式。
+## 平台运行依赖
 
-四个程序均须为支持 `--runtime-dir` 的新版本，升级时一起替换。显式传入的 `--gds`、`--tech`、`--input-dir`、`--output-dir`、`--runtime-dir` 相对路径均按进程当前工作目录解析，宿主集成应统一传入绝对路径；正式输出由各步 `--output-dir` 指定。
+Gmsh **4.11.1** 由平台另外安装，不在本六文件包内。只有 EM 和 thermal 网格阶段调用它。
+平台应给子进程配置 `GDS2GEO_GMSH_EXECUTABLE` 环境变量，值为实际 gmsh.exe 的绝对路径；
+也可把该版本所在目录加入子进程 `PATH`。版本不匹配明确失败，不自动改用其他版本。
+四主程序本身不依赖 PowerShell；下方 PowerShell 代码仅供平台参考。
 
-## 宿主进程调用
+内部版本：GDS2GEO/MATDB 0.1.0、CLI11 2.6.2、nlohmann/json 3.12.0、Clipper2 2.0.1、
+tinyxml2 11.0.0。交付批次由 manifest.version 记录，与源码库版本分开。
 
-上面每行开头的 `&` 是 PowerShell 调用运算符。通过 `.NET ProcessStartInfo` 集成时，将绝对 EXE 路径放入 `FileName`，设置 `UseShellExecute = false`，将选项名及其值逐项加入 `ArgumentList`；不要把 `&`、PowerShell 代码或路径外层的命令行引号当作 EXE 参数。需要捕获输出时，设置 `RedirectStandardOutput = true` 和 `RedirectStandardError = true`，在运行期间并发异步读取并保存 stdout/stderr，避免管道写满阻塞；等待进程结束、完成两路读取并检查真实退出码后，再启动下一步。
+## 输入、阶段与输出
 
-本包不使用无参运行或双击默认模式。当前二进制仍保留原有兼容入口：无参数或仅传 `--runtime-dir` 时仍会进入默认路径流程；缺少设置文件时回退到 EXE 旁的 `input/`、`output/`。集成调用请按示例完整指定输入、输出和运行目录，以固定所有数据位置。后三步虽支持省略 `--output-dir` 后使用默认目标目录，本集成示例始终显式提供它。删除设置文件没有在编译层面禁用自动模式。
+本交付接口仅支持 GDS + CSV。UI 把固定输入写入 `<dataRoot>/Model/model.gds` 和
+`<dataRoot>/Model/model_info.csv`。不以 XTF 替代该 CSV，不依赖安装目录中的输入或设置。
+GDS 使用自身 DBU；CSV 的 Height/Thickness 为 mm，全部正式 GEO/MSH 坐标统一为 mm。
+多个顶层单元时，平台为 source 增加 `--top-cell NAME`。
 
-## 结果与 JSON 交接文件
+| 必需 stage ID | 程序 | 输出目录（相对 dataRoot） | 必需文件 |
+| --- | --- | --- | --- |
+| source | gds2geo.exe source | Result/gds2geo/source | model.geo、model.json、matdb.json |
+| prepared | geo_prepare.exe | Result/gds2geo/prepared | em.geo、em.json、thermal.geo、thermal.json、matdb.json |
+| em | geo2em.exe | Result/gds2geo/em | model_em.msh、model_em.msh.json、matdb.json |
+| thermal | geo2thermal.exe | Result/gds2geo/thermal | model_thermal.msh、model_thermal.msh.json、matdb.json |
 
-| 阶段 | 输出文件组 |
+平台“一键建模”必须**串行执行 source → prepared → em → thermal**，任一步失败立即停止。
+四步全部成功、两份网格与当前 source/prepared 同代、产物完整且所需发布动作成功后，
+才可把整项任务标记为成功。同一算例运行期间，平台应避免 UI 改写输入或启动另一项建模。
+两个网格阶段均为必需，不得只完成一种网格便报告成功。
+
+所有配套 JSON 都是算法合同，必须保留，不能改名、删除或跨批次拼接。
+当前准备策略为 `four-executable-7`，网格为 **MSH 4.1 ASCII**（文件头 `4.1 0 8`），
+MATDB 为 schema 3，`*.msh.json` 为 schema 6。receipt 绑定输入 GEO/JSON/MATDB 与输出 MSH 的 SHA-256。
+MSH 保留实际面/体 Elementary 实体、有向体面边界、未分 Physical 的真实面；不建立 Physical 0。
+
+manifest 中两个网格工件沿用平台示例的 `schemaVersion: "4"`；本包约定它表示 MSH 主格式版本，
+不表示 receipt 版本。实际 MSH 4.1、MATDB 3、receipt 6 在 capabilities 另行明确；
+该约定及下游对 4.1 的读取能力仍须平台实际联调确认。
+
+## 可复制的串行调用参考
+
+替换开头三个绝对路径后，可在 PowerShell 5.1 或 7 中执行。此代码写在说明中供平台参考，
+平台也可直接以进程 API 顺序启动四个 EXE，并检查真实退出码。
+
+<!-- BEGIN GDS2GEO_ONE_CLICK -->
+```powershell
+$ModuleDir = 'C:/Modules/gds2geo'
+$DataRoot = 'D:/Cases/demo'
+$GmshExe = 'C:/Tools/Gmsh-4.11.1/gmsh.exe'
+$env:GDS2GEO_GMSH_EXECUTABLE = $GmshExe
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
+foreach ($name in @('Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Management')) {
+    Import-Module ([IO.Path]::Combine($PSHOME, 'Modules', $name, "$name.psd1")) -ErrorAction Stop
+}
+$runtime = Join-Path $DataRoot 'Result/logs/gds2geo'
+$result = Join-Path $DataRoot 'Result/gds2geo'
+$source = Join-Path $result 'source'
+$prepared = Join-Path $result 'prepared'
+
+& "$ModuleDir/gds2geo.exe" --runtime-dir $runtime source --gds "$DataRoot/Model/model.gds" --tech "$DataRoot/Model/model_info.csv" --output-dir $source
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& "$ModuleDir/geo_prepare.exe" --runtime-dir $runtime --input-dir $source --output-dir $prepared
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& "$ModuleDir/geo2em.exe" --runtime-dir $runtime --input-dir $prepared --output-dir "$result/em"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& "$ModuleDir/geo2thermal.exe" --runtime-dir $runtime --input-dir $prepared --output-dir "$result/thermal"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+foreach ($relative in @(
+    'source/model.geo', 'source/model.json', 'source/matdb.json',
+    'prepared/em.geo', 'prepared/em.json', 'prepared/thermal.geo', 'prepared/thermal.json', 'prepared/matdb.json',
+    'em/model_em.msh', 'em/model_em.msh.json', 'em/matdb.json',
+    'thermal/model_thermal.msh', 'thermal/model_thermal.msh.json', 'thermal/matdb.json'
+)) {
+    $file = Join-Path $result $relative
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) {
+        throw "Required output is missing or empty: $relative"
+    }
+}
+$s = Get-Content -LiteralPath "$source/model.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+$p = Get-Content -LiteralPath "$prepared/em.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+$t = Get-Content -LiteralPath "$prepared/thermal.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+$em = Get-Content -LiteralPath "$result/em/model_em.msh.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+$thermal = Get-Content -LiteralPath "$result/thermal/model_thermal.msh.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($s.sourceFingerprint -notmatch '^[0-9a-f]{64}$' -or $p.preparationFingerprint -notmatch '^[0-9a-f]{64}$') {
+    throw 'Invalid source or preparation fingerprint.'
+}
+foreach ($document in @($p, $t, $em, $thermal)) {
+    if ($document.sourceFingerprint -cne $s.sourceFingerprint -or
+        $document.preparationFingerprint -cne $p.preparationFingerprint) {
+        throw 'Source, prepared, EM and thermal outputs are from different generations.'
+    }
+}
+Write-Host 'source, prepared, em and thermal all completed.'
+```
+<!-- END GDS2GEO_ONE_CLICK -->
+
+平台须并发异步读取 stdout/stderr，避免管道写满阻塞；等待每个进程退出并保存完整诊断。
+上述参考检查产物完整性及同代关系，程序内部仍执行几何、材料、网格及摘要深检。
+
+## 主流程参数
+
+| 程序/参数 | 说明 |
 | --- | --- |
-| source | `model.geo`、`model.json`、`matdb.json` |
-| prepared | `thermal.geo`、`thermal.json`、`em.geo`、`em.json`、`matdb.json` |
-| thermal | `model_thermal.msh`、`model_thermal.msh.json`、`matdb.json` |
-| em | `model_em.msh`、`model_em.msh.json`、`matdb.json` |
+| 全部：`-h, --help` / `--version` | 显示帮助/源码版本，返回 0，不创建运行数据 |
+| 全部：`--runtime-dir PATH` | 平台必传绝对路径 `<dataRoot>/Result/logs/gds2geo`；日志、诊断及私有暂存 |
+| gds2geo：`source` | 源模型主流程子命令 |
+| source：`--gds PATH` / `--tech PATH` / `--output-dir PATH` | 必填绝对路径；固定 GDS、CSV 输入及 source 输出目录 |
+| source：`--top-cell NAME` | 可选；省略时要求 GDS 顶层唯一 |
+| source：`--matdb PATH` | 可选完整原生材料 seed；源 Volume ID/type 必须匹配，常规平台链不传 |
+| source：`--stack-mode strict-slots` | CSV 只允许默认 strict-slots，无须传入 |
+| geo_prepare：`--input-dir PATH` / `--output-dir PATH` | 平台必传绝对 source/prepared 目录 |
+| geo2em/geo2thermal：`--input-dir PATH` / `--output-dir PATH` | 平台必传绝对 prepared 和各自 em/thermal 目录 |
 
-移除的只是路径设置 JSON。模型元数据、MATDB 和网格 receipt 仍是必需的 JSON 文件，必须与所属阶段的 GEO/MSH 成组保留，不改成 TXT，也不跨代拼接。消费端会校验几何、材料和文件摘要；单独改名、编辑或重算普通摘要不能替代重新生成配套结果。
+无参双击、EXE 相对 input/output 回退及路径设置历史模式已在 manifest 声明 deprecated，
+不属于本交付接口。保留的开发/历史兼容子命令不登记为本包 stage。
+CSV 可提供 ThermalConductivity、Density、SpecificHeat，单位为 W/(m*K)、kg/m^3、J/(kg*K)；
+程序不会凭材料名字猜测缺失物性。
 
-source 三文件足以供第二步使用，无须重新读取原 GDS/工艺。热网格只需要本目标 `thermal.geo`、`thermal.json` 和 prepared 的 `matdb.json`；EM 同理。各阶段分别发布文件组，失败保留上一组可用正式结果。上游重建不会自动重跑下游，应重新生成所需后续阶段。
+## 退出码与恢复
 
-当前准备策略为 `four-executable-6`：共用 500 nm 有界轮廓近似；原厚度严格小于 1 µm 的 C 导体取原 bottom 面，MATDB 保留厚度，整体 Z 不压缩。热保留介质回填，EM 在完整材料归属后剔除 D/I，不补空气域。网格使用自由 Tet4 与材料 Tri3，纯片 EM 可只有 Tri3；热网格还保存非金属底面及逐层截面的独立Physical组，GEO/MSH一致；它们不是MATDB材料，不自动施加边界条件。热receipt为schema5并记录nonmaterialSurfaces，EM保持schema4。本包不计算温度、场或 S 参数。
+四阶段使用文本 stdout/stderr，`errorContract.type` 为 `none`。task_layer 把非零退出归为
+`QS-TL-MOD-EXEC`，同时保留实际 exitCode；本模块没有自行定义额外 QS 细分码。
 
-## 日志、暂存与锁
+| 退出码 | 范围及触发条件 | 可恢复性与处置 |
+| --- | --- | --- |
+| 0 | 四阶段成功；帮助/版本正常返回也为 0 | 平台须核查产物；四阶段全部成功后才能完成任务 |
+| 2 | 四阶段：参数/路径错误、运行目录不可用、输入缺失或初检拒绝、源/目标包加载失败 | 修正固定输入、CSV、绝对路径或权限；必要时从上游重建 |
+| 5 | 四阶段：几何/材料/接触政策拒绝、互斥量忙或 abandoned、Gmsh 缺失/错版/失败/超时、网格验收、写入/事务发布失败 | 阅读原始错误；等待占用者退出，或修正输入、资源、权限及外置 Gmsh 后重跑 |
+| 6 | source：CLI 顶层捕获的未分类标准异常/内部错误 | 保留输入、版本和日志交开发排查，不反复强行重试 |
 
-四个 EXE 每次调用都应传入本案例的 `--runtime-dir`。指定目录不存在时，程序会自动创建，宿主须有创建目录及写入权限；不必提前建立空文件夹。运行时仍需要这个可写目录保存日志、程序私有锁和暂存文件。该参数不设置输入或输出路径，输入与输出仍由各步的完整参数指定；省略它也不会自动关闭运行记录或暂存功能。
+`5` 不是专用的磁盘错误或超时码。Windows 入口前启动失败、操作系统异常终止等状态不属于业务退出码。
+每阶段分别事务发布，失败保留该阶段的上一组有效文件；后续失败不会回滚已经成功的上游。
+旧下游文件存在不代表本轮成功，应修正原因并重跑完整四阶段。
 
-示例中的运行记录写入 `D:/Cases/demo/runtime/`，四份日志分别为 `gds2geo.log`、`geo_prepare.log`、`geo2thermal.log`、`geo2em.log`，每次覆盖本程序上次日志。源导入尝试保存在该目录的 `source-attempts/`；程序私有锁与 `work/.pending/` 暂存也使用此运行目录。正常退出会清理本次私有暂存，日志和诊断供排错保留。`--help`、`--version` 不创建运行目录。
+日志位于 Result/logs/gds2geo 下，四程序各写自身 `.log`，覆盖其上次调用；
+源导入诊断在同目录 source-attempts/，平台应另外保留每任务 stdout/stderr。
+Windows 程序级及数据共享互斥使用系统命名互斥量，不创建 `.lock` 文件；
+保证范围为同一主机，不承诺跨主机共享目录协调，不得与旧版文件锁程序混用同一算例。
 
-数据包共享锁由数据规范路径确定，不随 `--runtime-dir` 改变。上述普通案例布局会在 `D:/Cases/demo/Result/runtime/` 保存各阶段数据锁，例如 `source.gds2geo-model.lock`；具有 `DATA/Setting/` 的既有布局仍沿用按 DATA 层级定位数据锁的规则。即使两个进程传入不同运行目录，访问同一数据包仍须共享互斥。source/prepared 也应放在外部案例工作区，不能仅靠运行目录参数消费整棵只读安装树内的交接包。
+## 平台发布与验收
 
-空锁文件退出后可保留，不表示进程仍在运行；不要在运行期间删除锁文件。日志、临时目录或共享锁不可写时，根据实际诊断修正工作区权限，不通过删除元数据绕过校验。失败退出码和常见诊断见 [ERROR_CODES.md](ERROR_CODES.md)。
+模块只写自己的 Result/gds2geo 阶段目录和运行目录，不读写 Result/tasks，不向 Model/Setting 复制正式件。
+task_layer publisher 按 publishTo 把 EM MSH 和配套 MATDB 发布到 Model/model_em.msh、Model/matdb.json；
+Model 中只保留一份 EM 主网格，热网格留在 thermal 目录。publisher 失败属于平台 `QS-TL-IO-ERROR`。
+端口、求解配置与 UI 行为由平台负责。本六文件包不附带 task_layer 或平台自测工具。
+
+平台验收应包含：四阶段串行完成、两份同代 MSH 4.1/MATDB3/receipt6 完整、
+只读安装目录运行、无 `.lock` 文件、任一步失败整项任务失败并保留有效旧阶段产物，
+以及实际 publisher 和下游求解器联调。平台注册和完整联调需以平台方实测结果为准。

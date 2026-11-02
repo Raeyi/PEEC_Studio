@@ -80,14 +80,24 @@
 - 完整错误对象由 compact_em 自己负责写全，任务层**不重组、不改写字段**；UI 若要展示中文提示，从 `task.stage.log` 对应 JSON 行解析，或直接读 jsonl。
 - 完整码表见 `compact_em/ERROR_CODES.md`（本地增量 + 规范码边界）。
 
-### 3.2 gds2geo（无 QS 契约）
+### 3.2 gds2geo（无 QS 契约，1102 版起）
 
-- gds2geo 当前没有 QS 编码、统一 JSON stderr 或 trace_id 合同；诊断为带程序名的文本 + 进程退出码。
-- 因此任务层对 gds2geo 固定上报 `QS-TL-MOD-EXEC`，并附带 `exitCode`：`2` = CLI/输入/配置类，`5` = 执行类（细分语义见 `gds2geo/ERROR_CODES.md`）。
-- 详细诊断由任务层经 `--runtime-dir` 写到算例的 `Result/logs/gds2geo/`；数据包锁过渡期在 `Result/gds2geo/runtime/`（规范位置 dataRoot 的 `.locks/`）；任务层的 `task.log`/`state.json` 在 `Result/tasks/<taskId>/`。
+- gds2geo 没有 QS 编码、统一 JSON stderr 或 trace_id 合同；诊断为带程序名的文本 + 进程退出码。1102 版为**严格串行** source→prepared→em→thermal 四阶段，em/thermal 两份网格均为必需；热网格保留在 `Result/gds2geo/thermal/`（不进 `Model/`，保持 I1 单主网格不变式）。
+- 因此任务层对 gds2geo 固定上报 `QS-TL-MOD-EXEC` + `exitCode`：`0` = 成功，`2` = CLI/输入/配置类，`5` = 执行类，`6` = 内部错误（仅 source 阶段）。语义以 `gds2geo/README.md` 的退出码表为准（1102 起交付不再单独提供 ERROR_CODES.md）。
+- **gmsh 依赖**：1102 版不随包分发 gmsh，要求 **4.11.1 精确匹配**（版本不符硬失败）。平台须在子进程环境注入绝对路径 `GDS2GEO_GMSH_EXECUTABLE`；task_layer 经 modules.json 的 `env` 字段完成注入（当前指向 `{MODULE_ROOT}/gds2geo/gmsh.exe`，后续 gmsh 上移到项目根目录时只改这一处配置）。
+- **锁机制**：1102 版改用 Windows 命名互斥量，**不再产生 `.lock` 文件**；不得与旧版文件锁程序混用同一算例（同一 dataRoot 上 1102 与旧版 gds2geo 不得共用）。
+- 详细诊断由各程序经 `--runtime-dir` 写到 `Result/logs/gds2geo/`（每程序一份 `.log` + source 的 attempts 记录）；任务层的 `task.log`/`state.json` 在 `Result/tasks/<taskId>/`。
 - 《物理模块错误码清单.xlsx》中的 G2G-001~166 建议码**尚未接入 gds2geo 程序**，属规划项；接入前任务层不会看到这些码。
 
-### 3.3 兜底
+### 3.3 thermal（有 QS 契约，QS-TH-*）
+
+- thermal 2026.10.30-native-1.0 的 `errorContract` 为 `qs-json-stderr`：失败时在 stderr 输出结构化 JSON（字段 `code`（`QS-TH-*`）、`severity`、`message` 等）。
+- 任务层按与 compact_em 相同的机制从输出尾部提取最后一条 QS 码作为 `errorCode` 原样上报（实测码：`QS-TH-IO-FILE`（exit=3 文件缺失/不可读）、`QS-TH-NUM-COVERAGE`（exit=4 材料覆盖 gap/overlap）等，完整表见 `thermal/ERROR_CODES.md`）。
+- extract 阶段必需件：热网格（经流水线 stage `artifacts` 路由，默认 `Result/gds2geo/thermal/model_thermal.msh`）、`Model/matdb.json`（gds_full em 阶段 publisher 落位）、`Setting/set.json`（含 `thermal` 对象）、`Model/port_thermal.json`（UI 维护，meshFile/meshSha256 绑定实际网格）。
+- post 阶段的 `Model/thermal.op0` 与 `Model/thermal_run.json` 是**显式 CLI 输入而非 manifest 公共前置**；task_layer 按 pipelines.json 的 stage `requires` 字段在启动前做存在性检查，缺失则整段以 `QS-TL-SKIP-NOINPUT` 跳过（不阻断 extract 产物）。
+- 算法范围：仅三层堆叠模型（中部线性四面体 + 平行 XY 薄层），薄层 `material_footprints` 必须完整铺满其 `reference_surfaces`（无 gap/overlap，否则 exit=4）；uniform 功率 + 全局底面定温 + 其余绝热。
+
+### 3.4 兜底
 
 任何后端非 0 退出且提取不到 QS 码时，一律 `QS-TL-MOD-EXEC` + `exitCode` + 原始输出（`task.stage.log`），不做文本猜测。
 
@@ -97,6 +107,7 @@
 | --- | --- |
 | QS-UI-* | 不归任务层管（前端自判，不发请求） |
 | QS-IO-* / QS-FMT-* / QS-VAL-* / QS-MESH-* / QS-MAT-* / QS-BC-* / QS-SRC-* / QS-SOLV-* / QS-POST-* / QS-COMM-* / QS-INTERNAL-* | 由 compact_em 产生并透传；gds2geo 规划中 |
+| QS-TH-* | 由 thermal 产生并透传（qs-json-stderr，见 3.3） |
 | QS-TL-* | 任务层自有域，本表第二节为唯一登记处 |
 
 新增 `QS-TL-*` 码的流程：先在 `TaskOrchestrator.cpp` / `ModuleRunner.cpp` 落地实际抛出点，再回填本表（含触发条件、可恢复性、处置），最后同步 `UI_API.md` §6.2。禁止只改文档不改代码。

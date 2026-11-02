@@ -17,6 +17,18 @@
 
 namespace task {
 
+namespace {
+// 流水线 stage 的 artifacts 覆盖 → 按 moduleId 归组（跨模块工件路由注入 rebind）
+QMap<QString, QMap<QString, QString>> artifactOverridesOf(const PipelineDef& pipe)
+{
+    QMap<QString, QMap<QString, QString>> ov;
+    for (const PipelineStage& s : pipe.stages)
+        for (auto it = s.artifacts.constBegin(); it != s.artifacts.constEnd(); ++it)
+            ov[s.moduleId][it.key()] = it.value();
+    return ov;
+}
+} // namespace
+
 App::App(const QString& configDir, const QString& moduleRoot, const QString& binRoot,
          QObject* parent)
     : QObject(parent), m_configDir(configDir), m_moduleRoot(moduleRoot),
@@ -104,7 +116,8 @@ int App::runOnce(const QString& pipelineId, const QString& dataRoot,
     m_activeInputs = inputs;
     m_resolver.setBase(root, m_moduleRoot, m_binRoot, m_activeTaskDir);
     m_resolver.setInputs(inputs);
-    m_registry.rebindDataRoot(root);   // manifest args/契约路径展开到本任务 dataRoot
+    const QMap<QString, QMap<QString, QString>> ov = artifactOverridesOf(*pipe);
+    m_registry.rebindDataRoot(root, &ov);   // 展开 args/契约路径（含 stage artifacts 路由）
     m_store.open(m_activeTaskDir, taskId, pipelineId);
     m_store.setInputs(m_resolver.resolvedInputs());
 
@@ -147,7 +160,10 @@ QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineI
               QDir(root).filePath("Result/tasks/_validate"));
     r.setInputs(inputs);
     // 校验用临时 rebind：把契约路径展开到本 dataRoot（不改活动任务状态）
-    m_registry.rebindDataRoot(root);
+    QMap<QString, QMap<QString, QString>> vov;
+    if (!pipelineId.isEmpty() && m_loader.pipeline(pipelineId))
+        vov = artifactOverridesOf(*m_loader.pipeline(pipelineId));
+    m_registry.rebindDataRoot(root, vov.isEmpty() ? nullptr : &vov);
 
     // 只校验"入口阶段"（无 dependsOn）的输入契约：这是"这条流水线能否启动"的判据。
     QStringList entryModuleIds;
@@ -273,7 +289,11 @@ void App::onNotify(const QString& method, const QJsonObject& params)
         m_activeTaskId.clear();
         m_activeTaskDir.clear();
         const bool isCli = m_lastTaskId.startsWith("cli_");
-        if (isCli) emit exitRequested(status == "done" ? 0 : 1);
+        if (isCli) {
+            m_cliFinished = true;
+            m_cliCode = (status == "done") ? 0 : 1;
+            emit exitRequested(m_cliCode);
+        }
     }
 
     // 转发给 UI（serve 模式）
@@ -353,6 +373,10 @@ void App::rpcListPipelines(const QJsonValue& id)
             QJsonArray deps;
             for (const QString& d : s.dependsOn) deps.append(d);
             so["dependsOn"] = deps;
+            QJsonObject arts;
+            for (auto ait = s.artifacts.constBegin(); ait != s.artifacts.constEnd(); ++ait)
+                arts[ait.key()] = ait.value();
+            if (!arts.isEmpty()) so["artifacts"] = arts;
             stages.append(so);
         }
         o["stages"] = stages;
@@ -433,7 +457,8 @@ bool App::startTaskWith(const QJsonValue& id, const PipelineDef& pipe,
     m_activeInputs = params.value("inputs").toObject();
     m_resolver.setBase(root, m_moduleRoot, m_binRoot, m_activeTaskDir);
     m_resolver.setInputs(m_activeInputs);
-    m_registry.rebindDataRoot(root);
+    const QMap<QString, QMap<QString, QString>> ov = artifactOverridesOf(pipe);
+    m_registry.rebindDataRoot(root, &ov);
     m_store.open(m_activeTaskDir, tid, pipe.id);
     m_store.setInputs(m_resolver.resolvedInputs());
 

@@ -1,103 +1,272 @@
 {
   "manifestVersion": 1,
   "id": "gds2geo",
-  "name": "GDS2GEO 建模与网格",
-  "version": "2026.10.30",
+  "name": "GDS2GEO",
+  "version": "V1",
   "apiVersion": 1,
   "cli": {
-    "executables": ["gds2geo.exe", "geo_prepare.exe", "geo2em.exe", "geo2thermal.exe"]
+    "executables": [
+      "gds2geo.exe",
+      "geo_prepare.exe",
+      "geo2em.exe",
+      "geo2thermal.exe"
+    ],
+    "deprecatedModes": [
+      "no-arg-default",
+      "exe-relative-fallback",
+      "exe-relative-settings"
+    ]
   },
   "stages": [
     {
       "id": "source",
       "executable": "gds2geo.exe",
       "argsTemplate": [
-        "--runtime-dir", "{runtimeDir}",
+        "--runtime-dir",
+        "{runtimeDir}",
         "source",
-        "--gds", "{dataRoot}/Model/model.gds",
-        "--tech", "{dataRoot}/Model/model_info.csv",
-        "--output-dir", "{dataRoot}/Result/gds2geo/source"
+        "--gds",
+        "{dataRoot}/Model/model.gds",
+        "--tech",
+        "{dataRoot}/Model/model_info.csv",
+        "--output-dir",
+        "{dataRoot}/Result/gds2geo/source"
       ],
-      "allowedArgs": ["--top-cell", "--stack-mode"],
-      "exitCodes": { "0": "ok", "2": "input_or_config", "5": "execution" },
-      "errorContract": { "type": "none" }
+      "allowedArgs": [
+        "--top-cell"
+      ],
+      "optional": false,
+      "exitCodes": {
+        "0": "ok",
+        "2": "input_or_config",
+        "5": "execution",
+        "6": "internal"
+      },
+      "errorContract": {
+        "type": "none"
+      },
+      "consumesInternal": [],
+      "producesInternal": [
+        "gds2geo/source.geo",
+        "gds2geo/source.json",
+        "gds2geo/source.matdb"
+      ]
     },
     {
       "id": "prepared",
       "executable": "geo_prepare.exe",
       "argsTemplate": [
-        "--runtime-dir", "{runtimeDir}",
-        "--input-dir", "{dataRoot}/Result/gds2geo/source",
-        "--output-dir", "{dataRoot}/Result/gds2geo/prepared"
+        "--runtime-dir",
+        "{runtimeDir}",
+        "--input-dir",
+        "{dataRoot}/Result/gds2geo/source",
+        "--output-dir",
+        "{dataRoot}/Result/gds2geo/prepared"
       ],
-      "exitCodes": { "0": "ok", "2": "input_or_config", "5": "execution" },
-      "errorContract": { "type": "none" }
+      "allowedArgs": [],
+      "optional": false,
+      "exitCodes": {
+        "0": "ok",
+        "2": "input_or_config",
+        "5": "execution"
+      },
+      "errorContract": {
+        "type": "none"
+      },
+      "consumesInternal": [
+        "gds2geo/source.geo",
+        "gds2geo/source.json",
+        "gds2geo/source.matdb"
+      ],
+      "producesInternal": [
+        "gds2geo/prepared.em.geo",
+        "gds2geo/prepared.em.json",
+        "gds2geo/prepared.thermal.geo",
+        "gds2geo/prepared.thermal.json",
+        "gds2geo/prepared.matdb"
+      ]
     },
     {
       "id": "em",
       "executable": "geo2em.exe",
       "argsTemplate": [
-        "--runtime-dir", "{runtimeDir}",
-        "--input-dir", "{dataRoot}/Result/gds2geo/prepared",
-        "--output-dir", "{dataRoot}/Result/gds2geo/em"
+        "--runtime-dir",
+        "{runtimeDir}",
+        "--input-dir",
+        "{dataRoot}/Result/gds2geo/prepared",
+        "--output-dir",
+        "{dataRoot}/Result/gds2geo/em"
       ],
-      "exitCodes": { "0": "ok", "5": "execution" },
-      "errorContract": { "type": "none" }
+      "allowedArgs": [],
+      "optional": false,
+      "exitCodes": {
+        "0": "ok",
+        "2": "input_or_config",
+        "5": "execution"
+      },
+      "errorContract": {
+        "type": "none"
+      },
+      "consumesInternal": [
+        "gds2geo/prepared.em.geo",
+        "gds2geo/prepared.em.json",
+        "gds2geo/prepared.matdb"
+      ],
+      "producesInternal": [
+        "gds2geo/em.mesh",
+        "gds2geo/em.receipt",
+        "gds2geo/em.matdb"
+      ]
     },
     {
       "id": "thermal",
       "executable": "geo2thermal.exe",
-      "optional": true,
       "argsTemplate": [
-        "--runtime-dir", "{runtimeDir}",
-        "--input-dir", "{dataRoot}/Result/gds2geo/prepared",
-        "--output-dir", "{dataRoot}/Result/gds2geo/thermal"
+        "--runtime-dir",
+        "{runtimeDir}",
+        "--input-dir",
+        "{dataRoot}/Result/gds2geo/prepared",
+        "--output-dir",
+        "{dataRoot}/Result/gds2geo/thermal"
       ],
-      "exitCodes": { "0": "ok", "5": "execution" },
-      "errorContract": { "type": "none" }
+      "allowedArgs": [],
+      "optional": false,
+      "exitCodes": {
+        "0": "ok",
+        "2": "input_or_config",
+        "5": "execution"
+      },
+      "errorContract": {
+        "type": "none"
+      },
+      "consumesInternal": [
+        "gds2geo/prepared.thermal.geo",
+        "gds2geo/prepared.thermal.json",
+        "gds2geo/prepared.matdb"
+      ],
+      "producesInternal": [
+        "gds2geo/thermal.mesh",
+        "gds2geo/thermal.receipt",
+        "gds2geo/thermal.matdb"
+      ]
     }
   ],
   "artifacts": {
     "produced": [
-      { "ref": "gds2geo/source.geo", "path": "Result/gds2geo/source/model.geo" },
-      { "ref": "gds2geo/source.json", "path": "Result/gds2geo/source/model.json" },
-      { "ref": "gds2geo/source.matdb", "path": "Result/gds2geo/source/matdb.json", "schemaVersion": "3" },
-      { "ref": "gds2geo/prepared.em.geo", "path": "Result/gds2geo/prepared/em.geo" },
-      { "ref": "gds2geo/prepared.em.json", "path": "Result/gds2geo/prepared/em.json" },
-      { "ref": "gds2geo/prepared.matdb", "path": "Result/gds2geo/prepared/matdb.json", "schemaVersion": "3" },
-      { "ref": "gds2geo/prepared.thermal.geo", "path": "Result/gds2geo/prepared/thermal.geo" },
-      { "ref": "gds2geo/prepared.thermal.json", "path": "Result/gds2geo/prepared/thermal.json" },
-      { "ref": "gds2geo/mesh.em", "path": "Result/gds2geo/em/model_em.msh",
-        "schemaVersion": "4", "units": { "length": "mm" }, "publishTo": "Model/model_em.msh" },
-      { "ref": "gds2geo/matdb.model", "path": "Result/gds2geo/em/matdb.json",
-        "schemaVersion": "3", "publishTo": "Model/matdb.json" },
-      { "ref": "gds2geo/receipt.em", "path": "Result/gds2geo/em/model_em.msh.json",
-        "schemaVersion": "4" },
-      { "ref": "gds2geo/mesh.thermal", "path": "Result/gds2geo/thermal/model_thermal.msh",
-        "schemaVersion": "4", "units": { "length": "mm" } },
-      { "ref": "gds2geo/matdb.thermal", "path": "Result/gds2geo/thermal/matdb.json",
-        "schemaVersion": "3" },
-      { "ref": "gds2geo/receipt.thermal", "path": "Result/gds2geo/thermal/model_thermal.msh.json",
-        "schemaVersion": "5" }
+      {
+        "ref": "gds2geo/mesh.em",
+        "path": "Result/gds2geo/em/model_em.msh",
+        "schemaVersion": "4",
+        "units": {
+          "length": "mm"
+        },
+        "publishTo": "Model/model_em.msh"
+      },
+      {
+        "ref": "gds2geo/matdb.model",
+        "path": "Result/gds2geo/em/matdb.json",
+        "schemaVersion": "3",
+        "publishTo": "Model/matdb.json"
+      },
+      {
+        "ref": "gds2geo/receipt.em",
+        "path": "Result/gds2geo/em/model_em.msh.json",
+        "schemaVersion": "6"
+      },
+      {
+        "ref": "gds2geo/mesh.thermal",
+        "path": "Result/gds2geo/thermal/model_thermal.msh",
+        "schemaVersion": "4",
+        "units": {
+          "length": "mm"
+        }
+      },
+      {
+        "ref": "gds2geo/matdb.thermal",
+        "path": "Result/gds2geo/thermal/matdb.json",
+        "schemaVersion": "3"
+      },
+      {
+        "ref": "gds2geo/receipt.thermal",
+        "path": "Result/gds2geo/thermal/model_thermal.msh.json",
+        "schemaVersion": "6"
+      }
     ],
     "consumed": [
-      { "ref": "user/layout.gds", "path": "Model/model.gds",
-        "accept": { "extensions": [".gds"] } },
-      { "ref": "user/techfile", "path": "Model/model_info.csv",
-        "accept": { "extensions": [".csv", ".xtf"], "oneOf": true } }
+      {
+        "ref": "user/layout.gds",
+        "path": "Model/model.gds",
+        "accept": {
+          "extensions": [
+            ".gds"
+          ]
+        }
+      },
+      {
+        "ref": "user/techfile",
+        "path": "Model/model_info.csv",
+        "accept": {
+          "extensions": [
+            ".csv"
+          ]
+        }
+      }
     ]
   },
   "dependsOn": {
     "modules": [],
-    "artifacts": ["user/layout.gds", "user/techfile"],
+    "artifacts": [
+      "user/layout.gds",
+      "user/techfile"
+    ],
     "environment": {
-      "gmsh": { "version": "4.11.1", "requiredBy": ["mesh_em", "mesh_thermal"] }
+      "gmsh": {
+        "version": "4.11.1",
+        "requiredBy": [
+          "em",
+          "thermal"
+        ]
+      }
     }
   },
   "capabilities": {
     "dataLayout": "peec-data/v1",
-    "breakingChanges": [
-      { "version": "2026.10.30", "note": "热 receipt 升 schema 5（nonmaterialSurfaces）；准备策略 four-executable-6。注意：当前 CLI 尚无 --data-root 参数，路径经 argsTemplate 显式传入（ONBOARDING §三 迁移项）" }
+    "breakingChanges": [],
+    "technologyFormats": [
+      "csv"
+    ],
+    "requiredStages": [
+      "source",
+      "prepared",
+      "em",
+      "thermal"
+    ],
+    "meshFormat": "4.1 ASCII",
+    "meshSchemaVersionMeaning": "MSH major format version; not the mesh receipt schemaVersion",
+    "materialSchemaVersion": 3,
+    "meshReceiptSchemaVersion": 6,
+    "lockMechanism": "Windows named mutex; no lock files",
+    "externalDependencies": {
+      "gmsh": {
+        "version": "4.11.1",
+        "bundled": false,
+        "configuration": [
+          "GDS2GEO_GMSH_EXECUTABLE absolute path",
+          "PATH"
+        ],
+        "requiredBy": [
+          "em",
+          "thermal"
+        ]
+      }
+    },
+    "deliveryFiles": [
+      "gds2geo.exe",
+      "geo_prepare.exe",
+      "geo2em.exe",
+      "geo2thermal.exe",
+      "README.md",
+      "module.manifest.json"
     ]
   }
 }

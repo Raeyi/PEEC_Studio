@@ -1,0 +1,201 @@
+{
+  "manifestVersion": 1,
+  "id": "thermal",
+  "name": "薄层与四面体混合热路提取及温度后处理",
+  "version": "2026.10.30-native-1.0",
+  "apiVersion": 1,
+  "minApiVersion": 1,
+  "cli": {
+    "executables": [
+      "ThermalExtract.exe",
+      "TemperatureProcess.exe"
+    ],
+    "dataRootArg": "--data-root",
+    "deprecatedModes": []
+  },
+  "stages": [
+    {
+      "id": "extract",
+      "executable": "ThermalExtract.exe",
+      "argsTemplate": [
+        "--data-root",
+        "{dataRoot}",
+        "--runtime-dir",
+        "{runtimeDir}",
+        "--mesh",
+        "{artifact:user/thermal.mesh}",
+        "--materials",
+        "{artifact:user/thermal.materials}",
+        "--settings",
+        "{artifact:user/solver.set}",
+        "--ports",
+        "{artifact:thermal/ports.def}"
+      ],
+      "allowedArgs": [
+        "--mesh",
+        "--materials",
+        "--settings",
+        "--ports"
+      ],
+      "optional": false,
+      "exitCodes": {
+        "0": "ok",
+        "2": "input_or_configuration",
+        "3": "file_io",
+        "4": "numerical_validation",
+        "5": "runtime_services",
+        "6": "pipeline_locked"
+      },
+      "errorContract": {
+        "type": "qs-json-stderr"
+      },
+      "producesInternal": [
+        "thermal/temperature.map",
+        "thermal/extraction.binding"
+      ]
+    },
+    {
+      "id": "post",
+      "executable": "TemperatureProcess.exe",
+      "argsTemplate": [
+        "--data-root",
+        "{dataRoot}",
+        "--runtime-dir",
+        "{runtimeDir}",
+        "--mesh",
+        "{artifact:user/thermal.mesh}",
+        "--materials",
+        "{artifact:user/thermal.materials}",
+        "--settings",
+        "{artifact:user/solver.set}",
+        "--ports",
+        "{artifact:thermal/ports.def}",
+        "--op0",
+        "{dataRoot}/Model/thermal.op0",
+        "--result-binding",
+        "{dataRoot}/Model/thermal_run.json"
+      ],
+      "allowedArgs": [
+        "--mesh",
+        "--materials",
+        "--settings",
+        "--ports",
+        "--op0",
+        "--result-binding"
+      ],
+      "optional": true,
+      "exitCodes": {
+        "0": "ok",
+        "2": "input_or_configuration",
+        "3": "file_io",
+        "4": "numerical_validation",
+        "5": "runtime_services",
+        "6": "pipeline_locked"
+      },
+      "errorContract": {
+        "type": "qs-json-stderr"
+      },
+      "consumesInternal": [
+        "thermal/temperature.map",
+        "thermal/extraction.binding"
+      ]
+    }
+  ],
+  "artifacts": {
+    "produced": [
+      {
+        "ref": "thermal/netlist.dc",
+        "path": "Result/thermal/extract/ThermalNetList.sp",
+        "schemaVersion": "1"
+      },
+      {
+        "ref": "thermal/netlist.rc",
+        "path": "Result/thermal/extract/ThermalNetList_RC.sp",
+        "schemaVersion": "1"
+      },
+      {
+        "ref": "thermal/extract.report",
+        "path": "Result/thermal/extract/extraction_report.json",
+        "schemaVersion": "1"
+      },
+      {
+        "ref": "thermal/temperature.nodes",
+        "path": "Result/thermal/post/NodeTemperatureAtOperatingPoint.csv",
+        "schemaVersion": "1"
+      },
+      {
+        "ref": "thermal/temperature.mesh",
+        "path": "Result/thermal/post/VolumeTemperatureAtOperatingPoint.msh",
+        "schemaVersion": "4.1"
+      },
+      {
+        "ref": "thermal/temperature.maximum",
+        "path": "Result/thermal/post/MaximumTemperature.txt",
+        "schemaVersion": "1"
+      }
+    ],
+    "consumed": [
+      {
+        "ref": "user/thermal.mesh",
+        "path": "Model/model_thermal.msh",
+        "accept": {
+          "extensions": [
+            ".msh"
+          ]
+        }
+      },
+      {
+        "ref": "user/thermal.materials",
+        "path": "Model/matdb.json",
+        "accept": {
+          "schemaVersion": {
+            "min": 3,
+            "max": 3
+          }
+        }
+      },
+      {
+        "ref": "user/solver.set",
+        "path": "Setting/set.json",
+        "accept": {
+          "schemaVersion": {
+            "min": 1,
+            "max": 1
+          }
+        }
+      },
+      {
+        "ref": "thermal/ports.def",
+        "path": "Model/port_thermal.json",
+        "maintainedBy": [
+          "ui"
+        ],
+        "accept": {
+          "schemaVersion": {
+            "min": 1,
+            "max": 1
+          },
+          "fields": [
+            "meshFile",
+            "meshSha256",
+            "sources",
+            "fixed_temperature"
+          ]
+        }
+      }
+    ]
+  },
+  "dependsOn": {
+    "modules": [],
+    "artifacts": [
+      "user/thermal.mesh",
+      "user/thermal.materials",
+      "user/solver.set",
+      "thermal/ports.def"
+    ]
+  },
+  "capabilities": {
+    "dataLayout": "peec-data/v1",
+    "breakingChanges": []
+  }
+}

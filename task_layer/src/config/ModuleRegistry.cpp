@@ -1,5 +1,6 @@
 #include "config/ModuleRegistry.h"
 
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -41,6 +42,9 @@ bool ModuleRegistry::parseRouting(const QJsonObject& obj, QString* error)
         for (const QJsonValue& v : o.value("searchDirs").toArray())
             r.searchDirs << v.toString();
         r.workerHost = o.value("workerHost").toString();
+        const QJsonObject envObj = o.value("env").toObject();
+        for (auto eit = envObj.constBegin(); eit != envObj.constEnd(); ++eit)
+            r.env.insert(eit.key(), eit.value().toString());
         if (r.provider.isEmpty() || r.stageId.isEmpty()) {
             *error = QString("module '%1': v2 routing requires 'provider' and 'stage'")
                          .arg(it.key());
@@ -137,6 +141,7 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
         def.stageId = r.stageId;
         def.searchDirs = r.searchDirs;
         def.workerHost = r.workerHost;
+        def.env = r.env;
 
         const ModuleManifest* mm = m_manifests.contains(r.provider) ? &m_manifests[r.provider] : nullptr;
         if (!mm) {
@@ -155,6 +160,7 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
                 def.traceLog = st->traceLog;
                 def.timeoutSec = 0;
                 // argsTemplate 保留模板形态，rebindDataRoot 时展开
+                def.argsTemplate = st->argsTemplate;
                 def.args = st->argsTemplate;
             }
         }
@@ -162,13 +168,21 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
         // 4) 契约派生：consumed → requiredInputs（user/* 与跨模块对外 ref）
         //    produced → outputChecks + publishes
         if (mm) {
+            // 内部件集合：各 stage 的 consumesInternal / producesInternal。
+            // required inputs = manifest 级 consumed 中不属于内部件的 ref。
+            // （旧版按 owner==id 过滤，会漏掉 owner 恰为模块 id 但由 UI/上游维护的件，
+            //   如 thermal/ports.def：owner=thermal 但 maintainedBy=ui，必须进浅检）
+            QSet<QString> internal;
+            for (const ManifestStage& ms : mm->stages) {
+                for (const QString& x : ms.consumesInternal) internal.insert(x);
+                for (const QString& x : ms.producesInternal) internal.insert(x);
+            }
             for (const ManifestArtifact& a : mm->consumed) {
-                const int slash = a.ref.indexOf('/');
-                const QString owner = slash > 0 ? a.ref.left(slash) : QString();
-                if (owner == mm->id) continue;          // 内部自产自用不进浅检
-                // 只把本 stage 相关的当 required：无法精确区分时取全部对外 consumed
-                // （保守策略：入口阶段校验由 App 按 pipeline 入口过滤）
+                if (internal.contains(a.ref)) continue;  // 内部自产自用不进浅检
+                // 全部对外 consumed 挂到本 stage（保守策略：入口阶段校验由 App 按
+                // pipeline 入口过滤；stage 内深检由模块自身完成）
                 def.contract.requiredInputs << a.path;   // 暂存 POSIX 相对路径
+                def.consumedRefs.insert(a.ref, a.path);
             }
             // produced → 本 stage 的 outputChecks + publishes：
             // 按 DATA_LAYOUT D2（Result/<providerId>/<stageId>/ 与 stage 一一对应）
@@ -190,20 +204,57 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
     return !m_modules.isEmpty();
 }
 
-void ModuleRegistry::rebindDataRoot(const QString& dataRoot)
+void ModuleRegistry::rebindDataRoot(const QString& dataRoot,
+                                    const QMap<QString, QMap<QString, QString>>* artifactOverrides)
 {
     m_dataRoot = dataRoot;
     for (auto mit = m_modules.begin(); mit != m_modules.end(); ++mit) {
         ModuleDef& def = mit.value();
         if (def.command.isEmpty()) continue;
 
-        // args 模板展开：{dataRoot} / {runtimeDir}；{artifact:<ref>} 暂不支持跨任务注入
-        // （当前流水线内上游产物位置固定，直接由模板字面量表达）
-        const QString runtimeDir = toNative(
-            "Result/logs/" + def.provider, dataRoot);
+        const QMap<QString, QString> ov = artifactOverrides
+            ? artifactOverrides->value(def.id)
+            : QMap<QString, QString>();
+        const QString runtimeDir = toNative("Result/logs/" + def.provider, dataRoot);
+        const ModuleManifest* mm = m_manifests.contains(def.provider)
+            ? &m_manifests[def.provider] : nullptr;
+
+        // args 模板展开（每次从原始模板展开）：
+        //   {dataRoot} / {runtimeDir} / {moduleDir} / {artifact:<ref>}
+        // {artifact:<ref>} 路由优先级：
+        //   ① 流水线 stage 的 artifacts 覆盖（跨模块工件路由，如热网格指向
+        //      Result/gds2geo/thermal/ 而不是 Model/，保持 Model/ 单主网格不变式 I1）
+        //   ② 本模块 manifest consumed 声明（UI/用户维护件的规范位置）
+        //   ③ 本模块 produced ④ 其他模块 produced（跨模块 ref，如 gds2geo/mesh.thermal）
         QStringList out;
-        for (const QString& a : def.args) {
+        for (const QString& a : def.argsTemplate) {
             QString v = a;
+            const int ab = v.indexOf("{artifact:");
+            if (ab >= 0 && v.endsWith("}")) {
+                const QString ref = v.mid(ab + 10, v.size() - ab - 11);
+                QString raw;
+                if (ov.contains(ref)) {
+                    raw = ov.value(ref);
+                } else if (def.consumedRefs.contains(ref)) {
+                    raw = def.consumedRefs.value(ref);
+                } else if (mm && mm->artifact(ref)) {
+                    raw = mm->artifact(ref)->path;
+                }
+                if (raw.isEmpty()) {
+                    for (const ModuleManifest& m2 : m_manifests)
+                        if (const ManifestArtifact* pa = m2.artifact(ref)) {
+                            raw = pa->path;
+                            break;
+                        }
+                }
+                if (!raw.isEmpty()) {
+                    v = raw;
+                } else {
+                    // 保留字面量让模块以清晰报错失败，任务层不静默改写
+                    qWarning("[config] module %s: {artifact:%s} unresolved",
+                             qPrintable(def.id), qPrintable(ref));
+                }
+            }
             v.replace("{dataRoot}", dataRoot);
             v.replace("{runtimeDir}", runtimeDir);
             v.replace("{moduleDir}", m_packageDirs.value(def.provider));
@@ -212,12 +263,11 @@ void ModuleRegistry::rebindDataRoot(const QString& dataRoot)
         }
         def.args = out;
 
+        // requiredInputs：从 consumedRefs 重建并应用路由覆盖，
+        // 保证执行前浅检的路径与 args 实际传给模块的路径一致
         QStringList req, chk;
-        for (const QString& p : def.contract.requiredInputs) {
-            // Only convert relative (POSIX) paths; skip already-absolute ones (idempotent rebind)
-            if (QFileInfo(p).isAbsolute()) req << p;
-            else req << toNative(p, dataRoot);
-        }
+        for (auto it = def.consumedRefs.constBegin(); it != def.consumedRefs.constEnd(); ++it)
+            req << toNative(ov.contains(it.key()) ? ov.value(it.key()) : it.value(), dataRoot);
         for (const QString& p : def.contract.outputChecks) {
             if (QFileInfo(p).isAbsolute()) chk << p;
             else chk << toNative(p, dataRoot);

@@ -18,18 +18,22 @@
       "description": "源模型生成 → 几何准备 → 电磁网格（热网格可选）；正式件（Model/ 主网格+matdb）由 publisher 按 manifest 落位",
       "maxParallel": 1,
       "stages": [
-        { "id": "parse", "module": "phys.model_parse", "name": "物理模型解析（gds2geo）", "dependsOn": [] },
-        { "id": "prepared", "module": "gds.prepare", "name": "几何准备", "dependsOn": ["parse"] },
+        { "id": "source", "module": "phys.model_parse", "name": "源模型解析（gds2geo）", "dependsOn": [] },
+        { "id": "prepared", "module": "gds.prepare", "name": "几何准备", "dependsOn": ["source"] },
         { "id": "em", "module": "gds.mesh_em", "name": "电磁网格", "dependsOn": ["prepared"] },
-        { "id": "thermal", "module": "gds.mesh_thermal", "name": "热网格", "dependsOn": ["prepared"], "optional": true }
+        { "id": "thermal", "module": "gds.mesh_thermal", "name": "热网格（1102 起必需）", "dependsOn": ["prepared"] }
       ]
     },
-    "thermal_te": {
-      "displayName": "热路与热电耦合（预留）",
-      "description": "热路提取 + 电热耦合（模块接入后启用）",
+    "thermal_basic": {
+      "displayName": "热基本链路（thermal 两段）",
+      "description": "热路提取 → 温度后处理（可选）。热网格经 stage artifacts 路由到 gds2geo 热链产物（Result/gds2geo/thermal/），材料用 publisher 落位的 Model/matdb.json；UI 提供 Model/port_thermal.json 与 Setting/set.json（含 thermal 对象）",
       "maxParallel": 1,
       "stages": [
-        { "id": "thermal", "module": "peec.model_extract", "name": "热路提取（占位）", "dependsOn": [] }
+        { "id": "extract", "module": "thermal.extract", "name": "热路提取", "dependsOn": [],
+          "artifacts": { "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh" } },
+        { "id": "post", "module": "thermal.post", "name": "温度后处理（OP0 映射）", "dependsOn": ["extract"], "optional": true,
+          "artifacts": { "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh" },
+          "requires": ["Model/thermal.op0", "Model/thermal_run.json"] }
       ]
     }
   }

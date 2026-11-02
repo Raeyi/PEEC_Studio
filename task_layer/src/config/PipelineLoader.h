@@ -16,6 +16,8 @@ struct PipelineStage {
     QStringList dependsOn;   // 依赖的阶段 id（空 = 无依赖）
     bool optional = false;   // 可选阶段：输入缺失或失败时不阻断主链
     QJsonObject params;      // 传给模块的参数（覆盖模块 args 中的变量）
+    QMap<QString, QString> artifacts;  // <ref> -> dataRoot 相对路径（跨模块工件路由）
+    QStringList optionalInputs;        // 可选阶段的存在性前置（dataRoot 相对路径）：缺失则跳过
 };
 
 struct PipelineDef {

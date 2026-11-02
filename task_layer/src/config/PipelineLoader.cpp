@@ -100,6 +100,11 @@ bool PipelineLoader::parsePipeline(const QString& id, const QJsonObject& obj, QS
         s.name = so.value("name").toString(s.id);
         s.optional = so.value("optional").toBool(false);
         s.params = so.value("params").toObject();
+        const QJsonObject arts = so.value("artifacts").toObject();
+        for (auto ait = arts.constBegin(); ait != arts.constEnd(); ++ait)
+            s.artifacts.insert(ait.key(), ait.value().toString());
+        for (const QJsonValue& rv : so.value("requires").toArray())
+            s.optionalInputs << rv.toString();
         for (const QJsonValue& d : so.value("dependsOn").toArray())
             s.dependsOn << d.toString();
         if (s.id.isEmpty() || s.moduleId.isEmpty()) {

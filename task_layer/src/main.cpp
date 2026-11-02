@@ -118,6 +118,9 @@ int main(int argc, char* argv[])
         });
         const int rc = taskApp.runOnce(pipelineId, dataRoot, overrides);
         if (rc != 0) return rc;          // 未能启动：不要把事件循环跑起来（否则会挂死）
+        if (taskApp.isCliTaskFinished())
+            return taskApp.cliTaskExitCode();  // 任务已同步结束（事件循环未启动，
+                                                // QCoreApplication::exit 无效）
         return app.exec();
     }
 

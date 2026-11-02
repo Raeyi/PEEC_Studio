@@ -1,6 +1,7 @@
 #include "orchestrator/TaskOrchestrator.h"
 
 #include <QDateTime>
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
 
@@ -204,16 +205,23 @@ void TaskOrchestrator::launchStage(const PipelineStage& s)
         return;
     }
 
-    // 可选阶段：必需输入缺失则跳过，不阻断主链（其下游按 blocked 处理）
+    // 可选阶段：必需输入或阶段 requires 前置文件缺失则跳过，不阻断主链（其下游按 blocked 处理）。
+    // requires 用于 manifest 未声明的阶段专属输入（如 thermal post 的 OP0/thermal_run.json：
+    // 按模块契约它们是显式 CLI 参数而非公共前置工件，平台须在启动前做存在性检查）。
     if (s.optional) {
-        bool inputMissing = false;
+        QStringList missing;
         const QStringList req = m_resolver.resolveList(def->contract.requiredInputs);
-        for (const QString& r : req) {
-            if (!QFileInfo::exists(r)) { inputMissing = true; break; }
+        for (const QString& r : req)
+            if (!QFileInfo::exists(r)) missing << r;
+        for (const QString& p : s.optionalInputs) {
+            QString ap = m_dataRoot + "/" + p;
+            ap.replace('/', QDir::separator());
+            if (!QFileInfo::exists(QDir::cleanPath(ap))) missing << QDir::cleanPath(ap);
         }
-        if (inputMissing) {
+        if (!missing.isEmpty()) {
             setStageStatus(s, StageStatus::Skipped, "QS-TL-SKIP-NOINPUT",
-                           "optional stage skipped: required inputs missing");
+                           QString("optional stage skipped: inputs missing: %1")
+                               .arg(missing.join("; ")));
             return;
         }
     }

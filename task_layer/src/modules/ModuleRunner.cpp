@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 #include <QPointer>
 #include <QRegularExpression>
+#include <QProcessEnvironment>
 #include <QTimer>
 
 #include "io/InputValidator.h"
@@ -271,6 +272,14 @@ void ModuleRunner::launch(const ModuleDef& def, const QStringList& args,
             this, &ModuleRunner::onProcessFinished);
     connect(m_proc, &QProcess::errorOccurred,
             this, &ModuleRunner::onProcessError);
+
+    // 环境变量注入（modules.json 的 env 字段；值支持 {MODULE_ROOT} 等路径变量展开）
+    if (!def.env.isEmpty()) {
+        QProcessEnvironment e = QProcessEnvironment::systemEnvironment();
+        for (auto eit = def.env.constBegin(); eit != def.env.constEnd(); ++eit)
+            e.insert(eit.key(), m_resolver.resolve(eit.value()));
+        m_proc->setProcessEnvironment(e);
+    }
 
     emit stageOutput(stageId, QString("[launch] %1 %2").arg(exe, realArgs.join(' ')));
     m_proc->start(exe, realArgs);
