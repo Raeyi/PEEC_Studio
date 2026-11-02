@@ -1,8 +1,8 @@
 # GDS2GEO
 
-交付版本：**V1**。
+交付版本：**V1.1**（2026-11-02，按平台 `docs_1.2` 重打包）。
 
-本包用于 task_layer 集成，只交付以下六个文件：
+本包用于 task_layer 集成，按程序、README、错误码、manifest 四类交付，共八个文件：
 
 ```text
 gds2geo/
@@ -10,7 +10,9 @@ gds2geo/
   geo_prepare.exe
   geo2em.exe
   geo2thermal.exe
+  gmsh.exe
   README.md
+  ERROR_CODES.md
   module.manifest.json
 ```
 
@@ -20,13 +22,19 @@ gds2geo/
 
 ## 平台运行依赖
 
-Gmsh **4.11.1** 由平台另外安装，不在本六文件包内。只有 EM 和 thermal 网格阶段调用它。
-平台应给子进程配置 `GDS2GEO_GMSH_EXECUTABLE` 环境变量，值为实际 gmsh.exe 的绝对路径；
-也可把该版本所在目录加入子进程 `PATH`。版本不匹配明确失败，不自动改用其他版本。
+随包提供 Gmsh **4.11.1**，只有 EM 和 thermal 网格阶段调用它。主程序优先使用同目录的
+`gmsh.exe`；保留完整八文件即可运行，不需要另行安装 Gmsh。历史外置模式还支持
+`GDS2GEO_GMSH_EXECUTABLE` 绝对路径或 `PATH`；同目录随附程序优先，版本不匹配明确失败。
 四主程序本身不依赖 PowerShell；下方 PowerShell 代码仅供平台参考。
 
 内部版本：GDS2GEO/MATDB 0.1.0、CLI11 2.6.2、nlohmann/json 3.12.0、Clipper2 2.0.1、
 tinyxml2 11.0.0。交付批次由 manifest.version 记录，与源码库版本分开。
+本次四个主 EXE 与 V1 相同，内部源码版本仍为 0.1.0；`docs_1.2` 是平台文档版本，
+不是本模块版本。manifestVersion/apiVersion 保持 1。
+
+案例另见同批次 `gds2geo_cases_20261102.zip`，不放进模块包。解压案例后，将下方
+`$DataRoot` 指向案例目录、`$ModuleDir` 指向本模块目录即可本地自测。案例 README
+列出输入来源、预期产物与已验证网格统计；不随模块交付运行脚本、examples、templates 或 DATA。
 
 ## 输入、阶段与输出
 
@@ -58,14 +66,15 @@ manifest 中两个网格工件沿用平台示例的 `schemaVersion: "4"`；本�
 
 ## 可复制的串行调用参考
 
-替换开头三个绝对路径后，可在 PowerShell 5.1 或 7 中执行。此代码写在说明中供平台参考，
+替换开头两个绝对路径后，可在 PowerShell 5.1 或 7 中执行。Gmsh 从模块目录取用。
+此代码写在说明中供平台参考，
 平台也可直接以进程 API 顺序启动四个 EXE，并检查真实退出码。
 
 <!-- BEGIN GDS2GEO_ONE_CLICK -->
 ```powershell
 $ModuleDir = 'C:/Modules/gds2geo'
 $DataRoot = 'D:/Cases/demo'
-$GmshExe = 'C:/Tools/Gmsh-4.11.1/gmsh.exe'
+$GmshExe = Join-Path $ModuleDir 'gmsh.exe'
 $env:GDS2GEO_GMSH_EXECUTABLE = $GmshExe
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -141,6 +150,7 @@ CSV 可提供 ThermalConductivity、Density、SpecificHeat，单位为 W/(m*K)�
 
 四阶段使用文本 stdout/stderr，`errorContract.type` 为 `none`。task_layer 把非零退出归为
 `QS-TL-MOD-EXEC`，同时保留实际 exitCode；本模块没有自行定义额外 QS 细分码。
+完整登记与恢复处置另见 `ERROR_CODES.md`。
 
 | 退出码 | 范围及触发条件 | 可恢复性与处置 |
 | --- | --- | --- |
@@ -162,8 +172,10 @@ Windows 程序级及数据共享互斥使用系统命名互斥量，不创建 `.
 
 模块只写自己的 Result/gds2geo 阶段目录和运行目录，不读写 Result/tasks，不向 Model/Setting 复制正式件。
 task_layer publisher 按 publishTo 把 EM MSH 和配套 MATDB 发布到 Model/model_em.msh、Model/matdb.json；
-Model 中只保留一份 EM 主网格，热网格留在 thermal 目录。publisher 失败属于平台 `QS-TL-IO-ERROR`。
-端口、求解配置与 UI 行为由平台负责。本六文件包不附带 task_layer 或平台自测工具。
+Model 中只保留一份 EM 主网格，热网格留在 thermal 目录，符合 DATA_LAYOUT 的单主网格约定。
+publisher 失败属于平台 `QS-TL-IO-ERROR`。
+端口、`source_em.json` / `source_thermal.json`、预留 `boundary_*.json`、求解配置与 UI 行为
+由平台负责，本模块不读写这些文件。本八文件包不附带 task_layer 或平台自测工具。
 
 平台验收应包含：四阶段串行完成、两份同代 MSH 4.1/MATDB3/receipt6 完整、
 只读安装目录运行、无 `.lock` 文件、任一步失败整项任务失败并保留有效旧阶段产物，

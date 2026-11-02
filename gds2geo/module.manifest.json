@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "gds2geo",
   "name": "GDS2GEO",
-  "version": "V1",
+  "version": "V1.1",
   "apiVersion": 1,
   "cli": {
     "executables": [
@@ -249,8 +249,9 @@
     "externalDependencies": {
       "gmsh": {
         "version": "4.11.1",
-        "bundled": false,
+        "bundled": true,
         "configuration": [
+          "gmsh.exe beside the four stage executables (preferred)",
           "GDS2GEO_GMSH_EXECUTABLE absolute path",
           "PATH"
         ],
@@ -265,7 +266,9 @@
       "geo_prepare.exe",
       "geo2em.exe",
       "geo2thermal.exe",
+      "gmsh.exe",
       "README.md",
+      "ERROR_CODES.md",
       "module.manifest.json"
     ]
   }
