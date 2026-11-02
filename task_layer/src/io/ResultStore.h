@@ -37,7 +37,7 @@ public:
     void appendLog(const QString& line);      // 追加到 task.log，同时返回给 UI 的通知由调用方发
     void setStage(const StageRecord& rec);    // 更新/插入阶段记录并落盘
     void finish(const QString& status, const QString& summary, qint64 elapsedMs);
-    // UI 动态输入（如 port.json 路径），落盘便于任务追溯
+    // UI 动态输入（如 source_em.json 路径），落盘便于任务追溯
     void setInputs(const QJsonObject& inputs) { m_inputs = inputs; persist(); }
     // providers version snapshot: which module versions produced this task (traceability)
     void setProviders(const QJsonObject& providers) { m_providers = providers; persist(); }

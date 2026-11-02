@@ -189,7 +189,10 @@ void ManifestLoader::selfCheck(const ModuleManifest& m, const QString& packageDi
     // 包内残留可读写 DATA/（警告级）
     const QDir dataDir(QDir(packageDir).filePath("DATA"));
     if (dataDir.exists())
-        warn("package contains DATA/ directory (should be examples/ only, see ONBOARDING §三)");
+        warn("package contains DATA/ directory (cases must ship outside the package, see ONBOARDING §1.1)");
+    // v1.2：包内不应携带案例目录（examples/ 等）；过渡期仅警告（ONBOARDING §一）
+    if (QFileInfo(QDir(packageDir).filePath("examples")).exists())
+        warn("package contains examples/ directory (cases must ship outside the package, see ONBOARDING §1.1)");
 }
 
 bool ManifestLoader::validateAggregate(const QMap<QString, ModuleManifest>& manifests,

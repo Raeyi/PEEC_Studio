@@ -1,6 +1,7 @@
 # PEEC Studio 数据布局规范（DATA_LAYOUT）
 
-v1.1 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径与目录的唯一事实源；manifest 中所有 path 以本文件为基准；冲突时以本文件为准。
+v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径与目录的唯一事实源；manifest 中所有 path 以本文件为基准；冲突时以本文件为准。
+变更（v1.2）：`port_em.json` → `source_em.json`、`port_thermal.json` → `source_thermal.json`；新增预留件 `boundary_em.json`、`boundary_thermal.json`（均 UI 输入）；模块包不再携带 examples//templates/（案例改为包外单独交付，见 ONBOARDING §1.1）。
 
 ## 一、总则
 
@@ -18,8 +19,10 @@ v1.1 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径
 │   ├── model_info.csv|.xtf   [UI]       工艺（二选一，固定名）
 │   ├── <主网格>.msh           [gds2geo]  EM 主网格正式件（Model 下 *.msh 恰好一份）
 │   ├── matdb.json            [gds2geo]  材料库正式件
-│   ├── port_em.json          [UI]       EM 端口绑定（compact_em 消费）
-│   └── port_thermal.json     [UI]       热端口绑定（热模块消费，预留）
+│   ├── source_em.json         [UI]       EM 源定义（compact_em 消费；v1.1 名 port_em.json）
+│   ├── source_thermal.json    [UI]       热源定义（热模块消费，预留；v1.1 名 port_thermal.json）
+│   ├── boundary_em.json       [UI]       EM 边界定义（预留，暂无消费方）
+│   └── boundary_thermal.json  [UI]       热边界定义（预留，暂无消费方）
 ├── Setting\          【配置】跨任务持久
 │   └── set.json              [UI 或 compact_em 模板]  求解设置（JSON，schemaVersion 1）
 ├── Result\
@@ -42,7 +45,7 @@ v1.1 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径
 ```
 
 注：
-- 模块交付包内**不含**输入文件与 DATA/；UI 选取的输入直接写入 `<dataRoot>\Model\`。包内可选 `examples/` 仅为模块团队本地自测样品（只读），与 UI 流程无关。
+- 模块交付包**只含四件套**（manifest / exe / README / ERROR_CODES），不含输入文件、DATA/ 或 examples//templates/：UI 选取的输入直接写入 `<dataRoot>\Model\`，自测案例改为**包外案例包单独交付**（ONBOARDING §1.1），平台方归档 `dev/cases/<模块>/`。
 - `Result/tasks/` 下的 `state.json` 是 **task_layer 的任务编排记录**（阶段状态/errorCode/outputs/providers 版本快照），模块不写、不读、不依赖其内容做调度判断。详见 §七。
 
 ## 三、分区规则
@@ -51,7 +54,7 @@ v1.1 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径
 |---|---|
 | D1 | `Result/<providerId>/` 模块独占；providerId = manifest 的 id（= 模块包目录名，小写） |
 | D2 | 模块内二级目录 = 子阶段名（manifest.stages[].id），一一对应 |
-| D3 | `Model/` 是唯一跨模块共享区；port 文件按链路命名（port_em.json / port_thermal.json），各消费方只认自己那份 |
+| D3 | `Model/` 是唯一跨模块共享区；源/边界文件按链路命名（source_em.json / source_thermal.json，boundary_em.json / boundary_thermal.json 预留），各消费方只认自己那份 |
 | D4 | 模块诊断日志 → `Result/logs/<providerId>/`；任务编排记录 → `Result/tasks/`（task_layer 所有） |
 | D5 | 锁集中 `.locks/`，命名 `<providerId>.*.lock`；运行中禁止手工删除 |
 | D6 | 模块阶段自证文件统一命名 `stage_receipt.json`（可选，放各自阶段目录内）；取代历史上的 extract.state / solve.state |
@@ -63,8 +66,10 @@ v1.1 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径
 |---|---|---|
 | `Model/model.gds`、`model_info.*` | UI | gds2geo |
 | `Model/*.msh`、`matdb.json` | task_layer publisher（源：gds2geo） | compact_em、UI（渲染） |
-| `Model/port_em.json` | UI | compact_em（sha 校验） |
-| `Model/port_thermal.json` | UI | 热模块（预留） |
+| `Model/source_em.json` | UI | compact_em（sha 校验） |
+| `Model/source_thermal.json` | UI | 热模块（预留） |
+| `Model/boundary_em.json` | UI | 预留（暂无消费方） |
+| `Model/boundary_thermal.json` | UI | 预留（暂无消费方） |
 | `Setting/set.json` | UI 或 compact_em 模板 | compact_em |
 | `Result/gds2geo/**` | gds2geo | 其下游阶段、task_layer publisher |
 | `Result/compact_em/**` | compact_em | 其下游阶段、UI |
@@ -87,14 +92,14 @@ v1.1 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径
 
 ## 六、命名与不变式
 
-固定名工件（名字定死，模块不得改）：`model.gds`、`model_info.csv/.xtf`、`matdb.json`、`port_em.json`、`port_thermal.json`、`set.json`、`stage_receipt.json`。
+固定名工件（名字定死，模块不得改）：`model.gds`、`model_info.csv/.xtf`、`matdb.json`、`source_em.json`、`source_thermal.json`、`boundary_em.json`、`boundary_thermal.json`、`set.json`、`stage_receipt.json`。
 模块内部自由区：`Result/<providerId>/<stageId>/` 之内中间产物命名自定，须以 internal ref 登记（MANIFEST_SPEC §五）。
 
 | # | 不变式 | 违反时报 |
 |---|---|---|
 | I1 | peec_basic 入口时 `Model/*.msh` 数量 == 1 | QS-FMT-INPUT-AMBIGUOUS / 预检 warning |
 | I2 | 建模链产物坐标单位 = mm（set.json 的 DIM=1000 依赖此条） | 模块自检 |
-| I3 | `port_em.json.meshSha256` == 当前主网格实际 SHA-256 | QS-IO-FILE-CORRUPTED / 预检 |
+| I3 | `source_em.json.meshSha256` == 当前主网格实际 SHA-256（过渡期旧名 port_em.json 同样适用） | QS-IO-FILE-CORRUPTED / 预检 |
 | I4 | receipt schemaVersion 在消费者 accept 区间内 | 消费者自报 QS-FMT-* |
 | I5 | 锁文件存在 ≠ 错误；运行中不得删除 `.locks/` 内文件 | — |
 | I6 | `Setting/set.json` 存在且 schemaVersion 在消费者 accept 区间内 | 消费者自报 / 预检 |
@@ -165,18 +170,19 @@ v1.1 · 2026-10-30 · 适用：所有计算层模块与 UI、task_layer。路径
 - 键名与原 set.txt 一致（大写蛇形），值为 JSON number/string/bool；
 - `schemaVersion` 必填；新增键向后兼容（消费者忽略未知键），删键/改语义 → schemaVersion +1；
 - 过渡期：compact_em 下一版 CLI 同时接受 `set.json`（新）与 `set.txt`（旧，deprecated）；两个文件同时存在时 **set.json 优先**并打 warning；
-- 模板文件：`templates/default_set.json`（模块包内），task_layer defaultTemplate 机制复制用。
+- set.json 样例随案例包提供（ONBOARDING §1.1）；`templates/` 不再随包携带（v1.1 的 defaultTemplate 机制从未实现，一并废止）。
 
 ## 九、禁止事项
 
 1. 写非自己声明的目录（拦截码 `QS-TL-CFG-LAYOUT-VIOLATION`）；
 2. 代码硬编码其他模块的目录名/providerId 字符串；
 3. 假设 dataRoot 之外路径存在；
-4. 交付包携带可读写 `DATA/`（测试数据降级只读 `examples/`）;
+4. 交付包携带可读写 `DATA/` 或测试案例（`examples/` 等）——案例包外单独交付（ONBOARDING §1.1）;
 5. UI 改写 `Result/` 内文件（UI 只写 `Model/`、`Setting/` 中归它的文件）；
 6. 模块写 `Result/tasks/` 下任何文件；
 7. 模块自行往 `Model/`、`Setting/` 复制正式件（publisher 职责归 task_layer）。
 
 ## 十、版本
 
-本规范带版本（当前 v1.1），manifest 的 `capabilities.dataLayout` 声明遵循版本。破坏性变更（移动契约件/改固定名/改 set 格式）→ 版本 +1，窗口期内全模块适配；新增模块或自由区目录不升版本。
+本规范带版本（当前 v1.2），manifest 的 `capabilities.dataLayout` 声明遵循版本。破坏性变更（移动契约件/改固定名/改 set 格式）→ 版本 +1，窗口期内全模块适配；新增模块或自由区目录不升版本。
+版本记录：v1.1（2026-10-30）→ v1.2（2026-11-02）：port_* → source_* 改名、新增 boundary_* 预留件、包内 examples//templates/ 改为包外案例包交付。

@@ -171,7 +171,7 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
             // 内部件集合：各 stage 的 consumesInternal / producesInternal。
             // required inputs = manifest 级 consumed 中不属于内部件的 ref。
             // （旧版按 owner==id 过滤，会漏掉 owner 恰为模块 id 但由 UI/上游维护的件，
-            //   如 thermal/ports.def：owner=thermal 但 maintainedBy=ui，必须进浅检）
+            //   如 thermal/source.def：owner=thermal 但 maintainedBy=ui，必须进浅检）
             QSet<QString> internal;
             for (const ManifestStage& ms : mm->stages) {
                 for (const QString& x : ms.consumesInternal) internal.insert(x);

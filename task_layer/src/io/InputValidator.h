@@ -22,12 +22,12 @@ public:
                          QVector<InputIssue>* issues, QStringList* warnings);
     static bool fileExistsNonEmpty(const QString& path, QString* detail);
 
-    // 端口-网格绑定检查：port.json.meshFile 必须存在且 meshSha256 与主网格原始字节一致。
+    // 端口-网格绑定检查：Model/source_em.json（过渡期旧名 port_em.json）。meshFile 必须存在且 meshSha256 与主网格原始字节一致。
     // 这是 Compact 契约里最容易出错的一环（改网格忘记改哈希），故列为输入检查项。
     static bool validatePortBinding(const QString& modelDir, QVector<InputIssue>* issues,
                                     QStringList* warnings);
 
-    // 校验任意位置的 port.json（UI 动态指定的路径）。
+    // 校验任意位置的源文件（UI 动态指定的路径）。
     // meshSearchDir：meshFile 为相对名时的备选查找目录（通常是 {Model}）。
     static bool validatePortFile(const QString& portPath, const QString& meshSearchDir,
                                  QVector<InputIssue>* issues, QStringList* warnings);

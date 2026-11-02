@@ -38,7 +38,7 @@
 | errorCode | 触发条件 | 可恢复 | 处置 |
 | --- | --- | --- | --- |
 | `QS-TL-INPUT-MISSING` | 必需输入文件/目录缺失（`errorMessage` 含具体路径） | 是 | 补齐输入后重跑该阶段 |
-| `QS-TL-INPUT-INVALID` | 输入内容静态校验失败（如 port_em.json 语法/字段） | 是 | 按 `errorMessage` 修正输入 |
+| `QS-TL-INPUT-INVALID` | 输入内容静态校验失败（如 source_em.json 语法/字段） | 是 | 按 `errorMessage` 修正输入 |
 | `QS-TL-CFG-UNKNOWNMODULE` | 流水线引用了 modules.json 中未注册的模块 | 否（配置错误） | 修正 pipelines.json 或补部署模块 |
 | `QS-TL-CFG-DEADLOCK` | 阶段依赖无法解析或成环，任务被强制收尾 | 否（配置错误） | 修正依赖图 |
 | `QS-TL-MOD-NOTCONFIGURED` | 模块缺少 manifest/stage 绑定（模块未登记或 manifest 缺 stage） | 否（配置错误） | 补 modules.json 路由与 manifest stage |
@@ -94,7 +94,7 @@
 
 - thermal 2026.10.30-native-1.0 的 `errorContract` 为 `qs-json-stderr`：失败时在 stderr 输出结构化 JSON（字段 `code`（`QS-TH-*`）、`severity`、`message` 等）。
 - 任务层按与 compact_em 相同的机制从输出尾部提取最后一条 QS 码作为 `errorCode` 原样上报（实测码：`QS-TH-IO-FILE`（exit=3 文件缺失/不可读）、`QS-TH-NUM-COVERAGE`（exit=4 材料覆盖 gap/overlap）等，完整表见 `thermal/ERROR_CODES.md`）。
-- extract 阶段必需件：热网格（经流水线 stage `artifacts` 路由，默认 `Result/gds2geo/thermal/model_thermal.msh`）、`Model/matdb.json`（gds_full em 阶段 publisher 落位）、`Setting/set.json`（含 `thermal` 对象）、`Model/port_thermal.json`（UI 维护，meshFile/meshSha256 绑定实际网格）。
+- extract 阶段必需件：热网格（经流水线 stage `artifacts` 路由，默认 `Result/gds2geo/thermal/model_thermal.msh`）、`Model/matdb.json`（gds_full em 阶段 publisher 落位）、`Setting/set.json`（含 `thermal` 对象）、`Model/source_thermal.json`（UI 维护，meshFile/meshSha256 绑定实际网格；过渡期旧名 port_thermal.json 同样接受）。
 - post 阶段的 `Model/thermal.op0` 与 `Model/thermal_run.json` 是**显式 CLI 输入而非 manifest 公共前置**；task_layer 按 pipelines.json 的 stage `requires` 字段在启动前做存在性检查，缺失则整段以 `QS-TL-SKIP-NOINPUT` 跳过（不阻断 extract 产物）。
 - 算法范围：仅三层堆叠模型（中部线性四面体 + 平行 XY 薄层），薄层 `material_footprints` 必须完整铺满其 `reference_surfaces`（无 gap/overlap，否则 exit=4）；uniform 功率 + 全局底面定温 + 其余绝热。
 

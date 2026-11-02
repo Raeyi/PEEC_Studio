@@ -1,6 +1,6 @@
 # 模块自描述契约规范（module.manifest.json）
 
-v1.1 · 2026-10-30 · 模块交付四件套之一（exe / README.md / ERROR_CODES.md / module.manifest.json），放模块包根目录，**模块团队维护**。
+v1.2 · 2026-11-02 · 模块交付四件套之一（exe / README.md / ERROR_CODES.md / module.manifest.json），放模块包根目录，**模块团队维护**。v1.2 变更：对外 ref 端口类改名 `em/ports.def` → `em/source.def`、`thermal/ports.def` → `thermal/source.def`（路径对应 `Model/source_em.json` / `Model/source_thermal.json`）；新增预留 ref `em/boundary.def` / `thermal/boundary.def`（→ `Model/boundary_em.json` / `Model/boundary_thermal.json`，暂无消费方）；`defaultTemplate` 字段废止（templates/ 不再随包）。
 机器校验：平台方提供 `docs/module.manifest.schema.json`（JSON Schema draft-07），模块团队可用任意 JSON Schema 校验器本地自查；task_layer 加载时按同一 schema 做结构校验。
 
 ## 一、职责切分
@@ -114,7 +114,7 @@ v1.1 · 2026-10-30 · 模块交付四件套之一（exe / README.md / ERROR_CODE
 1. **消费者只写 ref，不写路径**；ref→路径解析权 100% 归 task_layer（注册期建路由表）；
 2. 每个对外 ref 唯一生产者（重复 = 注册失败 `QS-TL-CFG-ARTIFACT-MISMATCH`）；
 3. name 小写自解释；废弃 ref 名字永不复用；
-4. 端口文件按链路区分：`em/ports.def` → `Model/port_em.json`；`thermal/ports.def` → `Model/port_thermal.json`。各消费方只校验自己那份。
+4. 源/边界文件按链路区分：`em/source.def` → `Model/source_em.json`、`em/boundary.def` → `Model/boundary_em.json`（预留）；`thermal/source.def` → `Model/source_thermal.json`、`thermal/boundary.def` → `Model/boundary_thermal.json`（预留）。v1.1 旧 ref（em/ports.def / thermal/ports.def，指向 port_*.json）废弃。各消费方只校验自己那份。
 
 ## 五、内部工件（internal ref）
 
@@ -286,15 +286,14 @@ task_layer 不做 internal ref 存在性检查（深检归模块），用它做�
         "accept": { "schemaVersion": { "min": 4, "max": 4 } } },
       { "ref": "gds2geo/matdb.model", "path": "Model/matdb.json",
         "accept": { "schemaVersion": { "min": 3, "max": 3 } } },
-      { "ref": "em/ports.def", "path": "Model/port_em.json",
+      { "ref": "em/source.def", "path": "Model/source_em.json",
         "maintainedBy": ["ui"],
         "accept": { "fields": ["meshFile", "meshSha256", "triangleIds"] } },
-      { "ref": "user/solver.set", "path": "Setting/set.json",
-        "defaultTemplate": "templates/default_set.json" }
+      { "ref": "user/solver.set", "path": "Setting/set.json" }
     ]
   },
   "dependsOn": { "modules": ["gds2geo"],
-                 "artifacts": ["gds2geo/mesh.em", "gds2geo/matdb.model", "em/ports.def", "user/solver.set"] },
+                 "artifacts": ["gds2geo/mesh.em", "gds2geo/matdb.model", "em/source.def", "user/solver.set"] },
   "capabilities": { "dataLayout": "peec-data/v1", "breakingChanges": [] }
 }
 ```

@@ -81,8 +81,15 @@ QString InputValidator::sha256OfFile(const QString& path)
 bool InputValidator::validatePortBinding(const QString& modelDir, QVector<InputIssue>* issues,
                                         QStringList* warnings)
 {
-    const bool ok = validatePortFile(QDir(modelDir).filePath("port.json"), modelDir,
-                                     issues, warnings);
+    // DATA_LAYOUT v1.2：规范名 source_em.json；过渡期同时接受旧名 port_em.json
+    // （当前 compact_em 2026.10.30 版仍实读旧名）
+    QString portPath;
+    for (const QString& name : { "source_em.json", "port_em.json" })
+        if (QFile::exists(QDir(modelDir).filePath(name))) {
+            portPath = QDir(modelDir).filePath(name);
+            break;
+        }
+    const bool ok = validatePortFile(portPath, modelDir, issues, warnings);
     // 主网格唯一性提示（契约要求 Model 下只有一个主网格）
     const QStringList meshes = QDir(modelDir).entryList({"*.msh"}, QDir::Files, QDir::Name);
     if (meshes.size() > 1 && warnings) {
@@ -102,7 +109,7 @@ bool InputValidator::validatePortFile(const QString& portPath, const QString& me
     const QJsonDocument doc = QJsonDocument::fromJson(pf.readAll(), &perr);
     if (perr.error != QJsonParseError::NoError || !doc.isObject()) {
         if (issues) issues->push_back({portPath, "badJson",
-            "port.json parse error: " + perr.errorString()});
+            QString("%1 parse error: ").arg(QFileInfo(portPath).fileName()) + perr.errorString()});
         return false;
     }
     const QJsonObject root = doc.object();
@@ -111,31 +118,33 @@ bool InputValidator::validatePortFile(const QString& portPath, const QString& me
 
     if (meshFile.isEmpty()) {
         if (issues) issues->push_back({portPath, "missingField",
-            "port.json: meshFile is empty"});
+            QString("%1: meshFile is empty").arg(QFileInfo(portPath).fileName())});
         return false;
     }
 
-    // meshFile 是主网格文件名：先按 port.json 同目录找，再退到 meshSearchDir（通常 {Model}）。
-    // UI 动态指定的 port.json 往往不在 Model 下，两步查找才能覆盖两种布局。
+    // meshFile 是主网格文件名：先按源文件同目录找，再退到 meshSearchDir（通常 {Model}）。
+    // UI 动态指定的源文件往往不在 Model 下，两步查找才能覆盖两种布局。
     QString meshPath = QFileInfo(portPath).dir().filePath(meshFile);
     if (!QFileInfo::exists(meshPath) && !meshSearchDir.isEmpty())
         meshPath = QDir(meshSearchDir).filePath(meshFile);
     if (!QFileInfo::exists(meshPath)) {
         if (issues) issues->push_back({meshPath, "missing",
-            QString("port.json references '%1' but it does not exist (looked beside port.json and in %2)")
-                .arg(meshFile, meshSearchDir.isEmpty() ? QString("<unset>") : meshSearchDir)});
+            QString("%1 references '%2' but it does not exist (looked beside the source file and in %3)")
+                .arg(QFileInfo(portPath).fileName(), meshFile,
+                     meshSearchDir.isEmpty() ? QString("<unset>") : meshSearchDir)});
         return false;
     }
 
     const QString actualSha = sha256OfFile(meshPath);
     if (expectSha.isEmpty()) {
         if (warnings) warnings->append(
-            QString("port.json has no meshSha256; mesh identity not verified: %1").arg(meshFile));
+            QString("%1 has no meshSha256; mesh identity not verified: %2")
+                .arg(QFileInfo(portPath).fileName(), meshFile));
     } else if (actualSha.compare(expectSha, Qt::CaseInsensitive) != 0) {
         if (issues) issues->push_back({meshPath, "sha256Mismatch",
-            QString("mesh SHA-256 mismatch: port.json expects %1..., actual %2... "
-                    "(mesh changed but port.json was not re-bound)")
-                .arg(expectSha.left(16), actualSha.left(16))});
+            QString("mesh SHA-256 mismatch: %1 expects %2..., actual %3... "
+                    "(mesh changed but the source file was not re-bound)")
+                .arg(QFileInfo(portPath).fileName(), expectSha.left(16), actualSha.left(16))});
         return false;
     }
 

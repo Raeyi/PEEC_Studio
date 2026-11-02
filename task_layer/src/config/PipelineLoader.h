@@ -38,7 +38,7 @@ public:
     void setBase(const QString& dataRoot, const QString& moduleRoot,
                  const QString& binRoot, const QString& taskDir);
 
-    // UI 动态输入（如 port.json 路径）。值本身可含固定变量，会一并展开。
+    // UI 动态输入（如 source_em.json 路径）。值本身可含固定变量，会一并展开。
     void setInputs(const QJsonObject& inputs);
     void clearInputs() { m_inputs = QJsonObject(); m_extraVars.clear(); }
     QJsonObject inputs() const { return m_inputs; }

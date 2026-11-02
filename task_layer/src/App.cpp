@@ -197,9 +197,15 @@ QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineI
 
     bool ok = InputValidator::validate(required, {}, {}, &issues, &warnings);
 
-    // 端口绑定预检：EM 链入口检查 Model/port_em.json（布局规范 D3/I3）
+    // 端口绑定预检：EM 链入口检查 Model/source_em.json（DATA_LAYOUT v1.2 D3/I3；
+    // 过渡期同时接受旧名 port_em.json —— 当前 compact_em 2026.10.30 版仍实读旧名）
     const QString modelDir = r.resolve("{Model}");
-    const QString portEm = QDir(modelDir).filePath("port_em.json");
+    QString portEm;
+    for (const QString& name : { "source_em.json", "port_em.json" })
+        if (QFileInfo::exists(QDir(modelDir).filePath(name))) {
+            portEm = QDir(modelDir).filePath(name);
+            break;
+        }
     const bool emEntry = [this, &entryModuleIds]() {
         for (const QString& mid : entryModuleIds) {
             const ModuleDef* d = m_registry.module(mid);
@@ -207,11 +213,11 @@ QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineI
         }
         return false;
     }();
-    if (emEntry && QFileInfo::exists(portEm)) {
+    if (emEntry && !portEm.isEmpty()) {
         if (!InputValidator::validatePortFile(portEm, modelDir, &issues, &warnings))
             ok = false;
     } else if (emEntry) {
-        warnings << "Model/port_em.json not present yet - UI must write it "
+        warnings << "Model/source_em.json not present yet - UI must write it "
                    "(triangleIds picked on the mesh) before running peec_basic";
     }
 
