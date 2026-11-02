@@ -1,6 +1,6 @@
 # Compact EM 准静态 PEEC 模块
 
-模块包 id：`compact_em`。交付批次2026.10.30，API 2，遵循PEEC Studio数据布局规范文档v1.1；机器布局主版本为`peec-data/v1`。
+模块包 id：`compact_em`。交付批次2026.11.02，API 2，遵循PEEC Studio数据布局规范文档v1.2；机器布局主版本为`peec-data/v1`。
 
 面向纯金属自由空间与无损异质介质模型，提供参数提取、频域端口求解、S参数图及可选源/场后处理。导体按PEC近似，MATDB电导率与厚度仅校验，不形成导体电阻或损耗；仅支持频域，Taylor>0不启用全波传播。几何/积分仍有单精度兼容路径，不宣称端到端全双精度。
 
@@ -24,13 +24,15 @@ $dataRoot = 'D:\cases\example'
 <dataRoot>/
   Model/<唯一主网格>.msh
   Model/matdb.json
-  Model/port_em.json
+  Model/source_em.json
   Setting/set.json
 ```
 
-主网格支持MSH2.2/4.1 ASCII与二进制、4.0 ASCII；一阶三角形/四面体与点，拒绝不支持的激励线和高阶单元。Model目录必须恰好一份.msh，不再排除Space_Mesh。建模链坐标单位为mm，对应DIM=1000；转换遵循`x_m=x_mesh/DIM`，禁止靠几何数值猜单位。MATDB schemaVersion=3，物理组数字匹配材料id；导体surface/C要求正电导率和正厚度，实际使用的volume/D必须无损。表面条目顶层thickness/thicknessUnit支持m/mm/um；properties中conductivity单位S/m、relativePermittivity/relativePermeability单位1，使用constant模型。隐式外部为真空。详细材料/端口示例见examples。
+主网格支持MSH2.2/4.1 ASCII与二进制、4.0 ASCII；一阶三角形/四面体与点，拒绝不支持的激励线和高阶单元。Model目录必须恰好一份.msh，不再排除Space_Mesh。建模链坐标单位为mm，对应DIM=1000；转换遵循`x_m=x_mesh/DIM`，禁止靠几何数值猜单位。MATDB schemaVersion=3，物理组数字匹配材料id；导体surface/C要求正电导率和正厚度，实际使用的volume/D必须无损。表面条目顶层thickness/thicknessUnit支持m/mm/um；properties中conductivity单位S/m、relativePermittivity/relativePermeability单位1，使用constant模型。隐式外部为真空。详细材料/端口示例随独立案例包`compact_em_cases_YYYYMMDD`提供。
 
-`port_em.json`包含meshFile、主网格原始字节meshSha256和非空ports。每端口含两个不同的原始Gmsh三角形元素triangleIds、单位direction、有限正impedanceOhm。元素ID上限2^53-1，端口数组顺序决定Sij端口顺序；direction与第一面心指向第二面心的连线同向。改网格后须更新端口与SHA-256。
+`source_em.json`包含meshFile、主网格原始字节meshSha256和非空ports。每端口含两个不同的原始Gmsh三角形元素triangleIds、单位direction、有限正impedanceOhm。元素ID上限2^53-1，端口数组顺序决定Sij端口顺序；direction与第一面心指向第二面心的连线同向。改网格后须更新端口与SHA-256。
+
+v1.2仅更改EM源文件名，JSON仍使用`ports`数组。旧`port_em.json`需显式迁移为`source_em.json`；新版程序固定读取新名，坏新文件不会回退旧名。`boundary_em.json`为平台预留输入，当前模块不消费。
 
 ## 计算设置
 
@@ -44,7 +46,7 @@ $dataRoot = 'D:\cases\example'
 
 常用参数：DIM必填且正；0<FS<=FE；PRECISION=0时N_FP必填且正，正PRECISION按Hz或decade步长；Swap_Log=0线性/1对数，不能整除时追加FE。MNA_WEIGHT缺省0.8且正；SOLVER_MEMORY_MB=0自动（MiB新增分配预算）、SOLVER_THREADS=0自动（最大4096）。Solver_SET仅0受支持。Taylor缺省0；SAVE_BIN/SAVE_TXT/SAVE_SP缺省1/0/0，POST_PROCESSING缺省1、POST_FREQ_INDEX=-1、POST_PORT=1、六个POST_PLOT_*缺省1、POST_FIELD缺省0。这些SAVE/POST开关仅在legacy输出策略下隐式启用文件，minimal由CLI显式选择。
 
-过渡版直接CLI支持旧Setting/set.txt，发弃用warning；两者并存时set.json优先并warning；坏JSON不回退TXT。当前旧模块化SET_EM.json须用仓库scripts/convert-compact-settings.py显式转换，不参与自动搜索。转换保留原参数，拒绝覆盖目标。正式task_layer预检要求set.json，旧算例应先迁移，不能用defaultTemplate替代旧参数。模板templates/default_set.json由task_layer复制；计算模块不写Model/Setting。
+过渡版直接CLI支持旧Setting/set.txt，发弃用warning；两者并存时set.json优先并warning；坏JSON不回退TXT。当前旧模块化SET_EM.json须用仓库scripts/convert-compact-settings.py显式转换，不参与自动搜索。转换保留原参数，拒绝覆盖目标。正式task_layer预检要求set.json，旧算例应先迁移。v1.2废止defaultTemplate，完整set.json样例随独立案例包提供；计算模块不写Model/Setting。
 
 ## 输出契约
 
@@ -78,6 +80,8 @@ minimal选择--post-freq-index/--post-port须同时--export post。Plot输出覆
 
 退出码：所有程序0成功、1已知/标准异常失败；Extractor未知异常为2，其余未知异常为1。stderr为UTF-8 QS JSON，机器按code和severity判断；日志路径和errorContract见module.manifest.json，详细处置见ERROR_CODES.md。
 
+2026.11.02 修复了文件 SHA-256 的 CNG 对象缓冲区生命周期：哈希句柄销毁后才释放其存储，覆盖正常返回和异常展开。四程序已同批重编，输入输出契约与 API 2 保持。
+
 ## 构建与自测
 
 Windows x64、VS2022/MSVC v143、oneMKL。Release使用/MT与MKL LP64 sequential静态库；系统Windows DLL仍由系统提供。构建依赖仓库scripts和01_Mainline/Shared相对布局。Shared Settings_IO与Mesh_IO/Plotter为仓库内部源码模块，随源码批次管理；本批实际使用MSVC 14.44.35207与oneMKL 2025.0.0；四程序PE导入表仅含Windows系统KERNEL32.dll、bcrypt.dll，记录见本次验证报告。
@@ -89,4 +93,14 @@ python ..\..\scripts\test-compact-review-fixes.py --runtime .\pipeline --output 
 powershell -NoProfile -File ..\..\scripts\package-compact-module.ps1 -ProjectRoot . -Destination D:\deliveries\compact_em
 ```
 
-examples只读，仅供开发复制到外置dataRoot运行，不是包内可写DATA。标准介质与双层纯金属用于内部一致性回归，不代表实测或外部全波精度验收。task_layer/dev_case注册、publisher与完整UI链需平台工具到位后联调。
+基准程序为v1.1布局（port_em.json、平铺set.json、分阶段输出）时，在契约测试命令中增加`--baseline-layout v1.1`；缺省legacy用于更早的port.json/SET_EM.json布局。打包脚本同时生成同级`compact_em_cases_YYYYMMDD`，可用`-CasesDestination`指定新的同名日期目录。交付安装包共12个根文件：4 exe、manifest、2 schema、README/INPUT_FORMAT/OUTPUT_FORMAT/ERROR_CODES及package-files.json；索引记录其余11件的大小与SHA-256，不自引用。安装包不包含DATA、examples或templates目录。
+
+检验实际交付包时，契约测试增加`--package-root <compact_em目录> --cases-root <独立案例包目录>`；它会检查文件清单/哈希，把两个案例复制到新的验证目录，并按manifest的四阶段参数运行。两个交付目录必须都是新目录，现有交付不覆盖。
+
+CNG 生命周期回归直接调用生产头文件与系统 BCrypt，使用测试专用分配器使释放后访问确定性失败；包含空文件、标准向量、分块边界和缺文件异常路径。需要 Windows、Python 3.9+、VS C++ 工具及 Windows SDK，不需要 MKL；构建产物和日志写到指定的新外部目录，省略 --output 时使用新临时目录。仓库 scripts/test-repository.ps1 也会调用此回归。
+
+```powershell
+python .\Common\tests\test_file_sha256_lifetime.py --output D:\validation\sha256-lifetime-new-run
+```
+
+独立案例包包含standard（无损介质）与two_layer_surface_port（双层纯金属），每个案例含Model、Setting及验收README。案例网格、材料、端口内容和设置保留原值，仅将源文件导出为source_em.json。源码仓库examples保留历史输入快照，打包脚本负责导出规范名称；这些目录不进入安装包。两个案例用于内部一致性回归，不代表实测或外部全波精度验收。task_layer/dev_case注册、publisher与完整UI链需平台工具到位后联调。

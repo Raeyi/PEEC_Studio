@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "compact_em",
   "name": "Compact EM 电磁求解链",
-  "version": "2026.10.30",
+  "version": "2026.11.02",
   "apiVersion": 2,
   "minApiVersion": 1,
   "cli": {
@@ -176,8 +176,8 @@
         }
       },
       {
-        "ref": "em/ports.def",
-        "path": "Model/port_em.json",
+        "ref": "em/source.def",
+        "path": "Model/source_em.json",
         "maintainedBy": [
           "ui"
         ],
@@ -197,8 +197,7 @@
             "min": 1,
             "max": 1
           }
-        },
-        "defaultTemplate": "templates/default_set.json"
+        }
       }
     ]
   },
@@ -209,7 +208,7 @@
     "artifacts": [
       "gds2geo/mesh.em",
       "gds2geo/matdb.model",
-      "em/ports.def",
+      "em/source.def",
       "user/solver.set"
     ]
   },
@@ -219,6 +218,10 @@
       {
         "version": "2026.10.30",
         "note": "API 2: explicit dataRoot; per-stage output paths; port_em.json; flat set.json; optional receipts separated from mandatory internal artifact integrity."
+      },
+      {
+        "version": "2026.11.02",
+        "note": "DATA_LAYOUT v1.2: Model/source_em.json replaces port_em.json; em/source.def replaces em/ports.def; defaultTemplate removed; examples and settings are delivered in a separate case package."
       }
     ]
   }

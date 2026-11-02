@@ -312,9 +312,9 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 端口只能由用户在网格上选取，任务层既生成不了也猜不出来，所以**端口文件由 UI 直接写到
 `{dataRoot}/Model/`**，不经过 task_layer。按 DATA_LAYOUT v1.2 D3，EM 链路规范名为 **`source_em.json`**
 （热链路 `source_thermal.json`；`boundary_em.json` / `boundary_thermal.json` 为预留槽位，
-暂无消费方、格式待定，UI 可不写）。**过渡期注意**：当前 compact_em 2026.10.30 二进制
-仍实读旧名 `port_em.json`——平台预检同时接受新/旧名（新名优先）；compact_em 按 v1.2
-重发版（实读 `source_em.json`）后，UI 只写 `source_em.json`，旧名废弃：
+暂无消费方、格式待定，UI 可不写）。**UI 只写 `source_em.json`**（当前交付的 compact_em v1.2
+版 2026-11-02 起实读新名、不回退旧名）；平台预检仍兼容旧名 `port_em.json`
+（新名优先），用于过渡存量算例：
 
 ```json
 {
@@ -358,7 +358,7 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 为后续模块预留。
 
 - 当前 `peec_basic` 的输入全部是固定名：`Model/model_em.msh`、`Model/matdb.json`、
-  `Model/source_em.json`（过渡期旧名 `port_em.json` 亦可）、`Setting/set.json`（2026.10.30 版起 set.txt 弃用；
+  `Model/source_em.json`、`Setting/set.json`（compact_em v1.2 版起 set.txt 弃用；
   set.json 样例随模块案例包提供）。
 - UI 要改求解设置（FS/FE/N_FP 等）直接写 dataRoot 的 `Setting/`，不经任务层代理；
 - `inputs.validate` 会校验必需输入文件存在、`meshFile` 存在且哈希与主网格一致。
@@ -493,7 +493,7 @@ dataRoot = <部署根>/cases/<项目名>/DATA
 ```text
 <case>\DATA\
 ├── Model\        主网格 *.msh（恰好一份）、matdb.json、source_em.json（规范名，v1.2）
-│                 + boundary_em.json（预留）；过渡期旧名 port_em.json 同样被接受
+│                 + boundary_em.json（预留）；平台预检仍兼容旧名 port_em.json（compact_em 不再读旧名）
 ├── Setting\      set.json（schemaVersion 1，平铺格式）
 ├── Result\
 │   ├── compact_em\  模块产物区（按 stage 子目录）：extract\ solve\ plot\ post\
@@ -505,8 +505,8 @@ dataRoot = <部署根>/cases/<项目名>/DATA
 `source_em.json` 必须与主网格绑定（`meshFile` + `meshSha256`），改动网格后要重新生成源文件，
 否则提取阶段会报文件损坏类错误（`QS-IO-FILE-CORRUPTED`）。
 
-注意：compact_em 2026.10.30 版（当前交付）产物已按阶段落到 `Result/compact_em/<stage>/`；
-过渡期二进制仍读旧输入名 `port_em.json`，按 v1.2 重发版后改读 `source_em.json`（见 4.7）。
+注意：当前交付 compact_em v1.2（2026-11-02）产物按阶段落到 `Result/compact_em/<stage>/`，
+二进制实读 `source_em.json`（不再读旧名 `port_em.json`，见 4.7）。
 
 **`gds_full` 的算例布局**（输入是版图而不是网格）：
 

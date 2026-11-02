@@ -80,7 +80,7 @@
               "ref": { "type": "string", "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_.]*$" },
               "path": { "type": "string" },
               "accept": { "type": "object" },
-              "defaultTemplate": { "type": "string", "description": "relative to module package dir" },
+              "defaultTemplate": { "type": "string", "description": "deprecated in v1.2: templates/ no longer ships in the package; accepted only for legacy manifests" },
               "maintainedBy": { "type": "array", "items": { "type": "string" } }
             }
           }

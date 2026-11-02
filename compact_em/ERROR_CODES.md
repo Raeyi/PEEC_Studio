@@ -10,7 +10,7 @@
 
 | 新登记错误码 | 触发条件 |
 | --- | --- |
-| `QS-BC-PORT-MAPPING_AMBIGUOUS` | `port_em.json` 的方向与 `triangleIds` 顺序相反；历史几何端点的多重匹配记录属于旧输入。 |
+| `QS-BC-PORT-MAPPING_AMBIGUOUS` | `source_em.json` 的方向与 `triangleIds` 顺序相反；历史几何端点的多重匹配记录属于旧输入。 |
 | `QS-BC-PORT-SHORTED` | PORT记录两端相同，或几何映射后两端是同一实际电位节点。 |
 | `QS-COMM-DATA-STALE` | 阶段记录的输入/输出指纹与当前文件不同，或执行期间输入变化。 |
 | `QS-FMT-INPUT-AMBIGUOUS` | 输入目录含多个网格/材料候选，无法唯一选择。 |
@@ -29,7 +29,7 @@
 | 规范错误码 | 当前触发边界 |
 | --- | --- |
 | `QS-FMT-MSH-PHYSICAL_TAG_MISSING` | 无激励线、无 PEC 三角面、Line/Surface tag 不匹配。 |
-| `QS-BC-PORT-FLOATING` | `port_em.json` 引用了不存在或未映射到 PEC 面节点的导体三角形元素 ID。 |
+| `QS-BC-PORT-FLOATING` | `source_em.json` 引用了不存在或未映射到 PEC 面节点的导体三角形元素 ID。 |
 | `QS-SRC-PORT-COUNT_MISMATCH` | PORT 声明数量不正、缺行或多行。 |
 | `QS-SRC-REF_IMPEDANCE-MISMATCH` | 端口阻抗非有限或非正。 |
 | `QS-SRC-SWEEP-EMPTY` | 求解实际频率列表为空。 |
@@ -39,7 +39,7 @@
 | `QS-VAL-UNIT-MISMATCH` | 材料属性的单位不符。 |
 | `QS-IO-FILE-NOT_FOUND` | 必需设置、模型、材料、矩阵、端口、CSV或所要求的GNUplot可执行文件不存在。 |
 | `QS-IO-FILE-PERMISSION_DENIED` | 文件存在但无法打开，限相关输入读取边界。 |
-| `QS-IO-FILE-CORRUPTED` | 矩阵/PORT/阶段记录/后处理源格式不完整、尾部垃圾或坏读；也包括 `port_em.json` 的网格 SHA-256 不匹配。 |
+| `QS-IO-FILE-CORRUPTED` | 矩阵/PORT/阶段记录/后处理源格式不完整、尾部垃圾或坏读；也包括 `source_em.json` 的网格 SHA-256 不匹配。 |
 | `QS-IO-FILE-MAGIC_BAD` | 二进制矩阵非PEECMAT1。 |
 | `QS-IO-DIR-NOT_WRITABLE` | 结果目录创建失败。 |
 | `QS-IO-DISK-FULL` | filesystem_error明确报告no_space_on_device；未用无法分辨原因的写失败冒充磁盘满。 |
@@ -66,4 +66,4 @@ stage_receipt.json只作可选自证；缺失、损坏或写失败不作为消�
 
 ## API 2 接入行为
 
-0表示成功，1表示已知或标准异常失败；Extractor未知异常返回2，其余程序返回1。缺data-root、路径越界、非法runtime/JSON/已知参数报QS-FMT-SETTING-INVALID；未知新JSON键按v1.1忽略。缺内部artifacts索引报QS-COMM-DEPS-NOT_READY，索引/实际文件不一致报QS-COMM-DATA-STALE。receipt写入失败只warning，不改变退出码。端口固定名port_em.json，设置为set.json，日志Result/logs/compact_em。
+0表示成功，1表示已知或标准异常失败；Extractor未知异常返回2，其余程序返回1。缺data-root、路径越界、非法runtime/设置JSON/已知参数报QS-FMT-SETTING-INVALID；未知新设置JSON键按v1.2忽略。缺内部artifacts索引报QS-COMM-DEPS-NOT_READY，索引/实际文件不一致报QS-COMM-DATA-STALE。receipt写入失败只warning，不改变退出码。端口固定名source_em.json，缺失时报QS-IO-FILE-NOT_FOUND，不自动读取旧名port_em.json；源定义坏JSON报QS-FMT-JSON-INVALID。设置为set.json，日志Result/logs/compact_em。
