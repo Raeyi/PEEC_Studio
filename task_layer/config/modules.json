@@ -41,21 +41,21 @@
       "displayName": "几何准备（热/电磁目标派生）",
       "kind": "external",
       "provider": "gds2geo",
-      "stage": "prepare",
+      "stage": "prepared",
       "searchDirs": ["{MODULE_ROOT}/gds2geo"]
     },
     "gds.mesh_em": {
       "displayName": "电磁网格生成",
       "kind": "external",
       "provider": "gds2geo",
-      "stage": "mesh_em",
+      "stage": "em",
       "searchDirs": ["{MODULE_ROOT}/gds2geo"]
     },
     "gds.mesh_thermal": {
       "displayName": "热网格生成（可选）",
       "kind": "external",
       "provider": "gds2geo",
-      "stage": "mesh_thermal",
+      "stage": "thermal",
       "searchDirs": ["{MODULE_ROOT}/gds2geo"]
     },
     "sim.solver": {

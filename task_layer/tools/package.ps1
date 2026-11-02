@@ -47,8 +47,8 @@ foreach ($f in $runtime) {
     }
 }
 
-# 2) config: module registry + pipeline definitions
-Copy-Item -Force (Join-Path $root "config\*") (Join-Path $dist "config")
+# 2) config: module registry + pipeline definitions (JSON only; skip *.bak drafts)
+Copy-Item -Force (Join-Path $root "config\*.json") (Join-Path $dist "config")
 
 # 3) worker_host: host process for DLL-shaped modules
 $wh = Join-Path $build "bin\worker_host.exe"

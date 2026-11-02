@@ -3,7 +3,7 @@
 // 接口约定（C ABI，跨编译器稳定）：
 //   int qs_peec_module_entry(const char* job_json_path, const char* data_root,
 //                            const char* log_path);
-//   返回 0 表示成功；非 0 表示失败（错误详情写入 Result/Logs/ 或 stderr JSON）
+//   返回 0 表示成功；非 0 表示失败（错误详情写入 Result/logs/<providerId>/ 或 stderr JSON）
 #pragma once
 
 #ifdef __cplusplus

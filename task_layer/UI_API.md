@@ -21,7 +21,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\package.ps1     # 产出 dist\
 
 ```text
 dist\                     ← 整个目录交给 UI，拷走即用
-├── task_layer.exe        817 KB   UI 唯一需要启动的进程
+├── task_layer.exe        ~935 KB  UI 唯一需要启动的进程
 ├── Qt6Core.dll           6.8 MB   必须与 exe 同目录
 ├── libstdc++-6.dll                 MinGW 运行时（MSVC 构建时没有这三项）
 ├── libgcc_s_seh-1.dll
@@ -30,9 +30,10 @@ dist\                     ← 整个目录交给 UI，拷走即用
 │   ├── modules.json
 │   └── pipelines.json
 ├── bin\
-│   ├── worker_host.exe             DLL 形态模块的宿主（当前流水线用不到，但建议带上）
+│   ├── worker_host.exe             DLL 形态模块的宿主（当前流水线用不到，可删）
 │   └── Qt6Core.dll
 ├── UI_API.md                       本文档
+├── ERROR_CODES.md                  任务层自有错误码登记（QS-TL-*）
 └── README.md
 ```
 
@@ -170,33 +171,35 @@ task_layer.exe serve [--config <目录>] [--bin <目录>] [--module-root <目录
 
 | pipeline | 说明 |
 |---|---|
-| `gds_full` | **建模**：源模型 → 几何准备 → 电磁网格（热网格可选）→ **交接**（把网格/材料/设置落到 `Model/` + `Setting/`） |
+| `gds_full` | **建模**：源模型 → 几何准备 → 电磁网格（热网格可选）；正式件（主网格 + 材料）由任务层 **publisher 自动落位到 `Model/`**（v1.1 布局，无 handoff） |
 | `peec_basic` | **电磁**：PEEC 提取 → 频域求解 → S 参数绘图 + 源/场后处理（后两段可选） |
 | `thermal_te` | 预留，未接入 |
 
-进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`n进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。`n`nUI 侧下拉框请只暴露 `gds_full` / `peec_basic`。想区分"已注册"与"可执行"，
-用 `modules.list` 的 `available` 字段（见 4.2）。
+进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。
+模块能否真正运行（程序是否找得到）用 `modules.list` 的 `available` 字段判断（见 4.2）。
 
 ### 典型业务流程（四步，中间插着 UI 选端口）
 
 端口只能由人在网格上选，所以**不是一条流水线跑到底**，而是四步：
 
 ```text
-① UI: task.run gds_full          → Model/model_em.msh + matdb.json，Setting/set.txt
-                                   （此时还没有 port.json，建模照样成功；旧网格自动清理）
-② UI: 加载 model_em.msh 渲染      → 用户选三角面 → 写 Model/port.json
-③ UI: module.run internal.handoff → 刷新 port.json 的 meshFile / meshSha256
+① UI: task.run gds_full          → publisher 自动落位 Model/model_em.msh + matdb.json
+                                   （此时还没有端口文件，建模照样成功；旧网格自动替换）
+② UI: 加载 model_em.msh 渲染      → 用户选三角面 → 写 Model/port_em.json（规范名）
+                                   过渡期：当前 compact_em 版本实读 Model/port.json，
+                                   两份内容相同地写（见 4.7）
+③ UI: inputs.validate（可选）     → 跑前体检：文件存在 + 端口↔网格 SHA-256 绑定
 ④ UI: task.run peec_basic        → 提取 → 求解 → S 参数
 ```
 
 ```json
-// ① 建模（不需要 port.json）
+// ① 建模（不需要端口文件）
 {"method":"task.run","params":{"pipeline":"gds_full","dataRoot":"D:/cases/demo/DATA"}}
 
-// ② UI 自己写 D:/cases/demo/DATA/Model/port.json（不经过 task_layer）
+// ② UI 自己写 D:/cases/demo/DATA/Model/port_em.json 和 Model/port.json（不经过 task_layer）
 
-// ③ 刷新端口与网格的绑定（7ms，省得前端自己算 SHA-256）
-{"method":"module.run","params":{"moduleId":"internal.handoff","dataRoot":"D:/cases/demo/DATA"}}
+// ③ 跑前体检（可选但推荐；issues 直接可展示给用户）
+{"method":"inputs.validate","params":{"pipeline":"peec_basic","dataRoot":"D:/cases/demo/DATA"}}
 
 // ④ 跑电磁
 {"method":"task.run","params":{"pipeline":"peec_basic","dataRoot":"D:/cases/demo/DATA"}}
@@ -205,9 +208,11 @@ task_layer.exe serve [--config <目录>] [--bin <目录>] [--module-root <目录
 几点约定：
 
 - ① ~ ④ 必须用**同一个 `dataRoot`**；
-- ① 的交接段负责把 `Result/em/` 搬到 `Model/`，并**保证 `Model/` 下只有一份 `*.msh`**
-  （多份 EM 会直接报 `QS-FMT-INPUT-AMBIGUOUS`）；
-- ③ 不是必须的，但强烈推荐——否则前端得自己算网格的 SHA-256（见 4.7）。
+- 正式件落位（`Result/gds2geo/em/` → `Model/`）由任务层 publisher 按 manifest `publishTo`
+  自动执行并**保证 `Model/` 下只有一份 `*.msh`**（多份 EM 会直接报 `QS-FMT-INPUT-AMBIGUOUS`）；
+  旧版的 `internal.handoff` 模块已移除，UI 不需要再触发任何交接动作；
+- ③ 不是必须的，但强烈推荐——否则端口与网格的 SHA-256 绑定错误要到后端运行中才会被发现
+  （报 `QS-IO-FILE-CORRUPTED`）。
 
 ### 4.4 inputs.validate（跑之前先体检）
 
@@ -221,14 +226,16 @@ task_layer.exe serve [--config <目录>] [--bin <目录>] [--module-root <目录
 ```json
 {"jsonrpc":"2.0","id":3,"result":{
   "valid":false,
-  "checked":["D:/cases/demo/DATA/Model/model.msh", "..."],
-  "issues":[{"path":"D:/cases/demo/DATA/Model/port.json",
+  "checked":["D:/cases/demo/DATA/Model/model_em.msh", "..."],
+  "issues":[{"path":"D:/cases/demo/DATA/Model/port_em.json",
              "reason":"missing","detail":"file does not exist"}],
   "warnings":[]
 }}
 ```
 
-UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户（路径 + 原因），`warnings` 以次要样式提示。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度约束校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。`n`n注意：这是**静态输入检查**（文件存在性、port.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。
+UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户（路径 + 原因），`warnings` 以次要样式提示。
+
+注意：这是**静态输入检查**（文件存在性、port_em.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。
 
 ### 4.5 task.run（启动任务）
 
@@ -273,15 +280,17 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 同一个模块既可以用 `module.run` 单独启动，也可以作为 `task.run` 流水线里的一个阶段，
 两种方式走的是同一套执行与状态逻辑，UI 不需要写两套处理。
 
-### 4.7 端口定义 port.json（UI 负责写进 `Model/`）
+### 4.7 端口定义（UI 负责写进 `Model/`；规范名 `port_em.json`）
 
-端口只能由用户在网格上选取，任务层既生成不了也猜不出来，所以 **port.json 由 UI 直接写到
-`{dataRoot}/Model/port.json`**，不经过 task_layer：
+端口只能由用户在网格上选取，任务层既生成不了也猜不出来，所以**端口文件由 UI 直接写到
+`{dataRoot}/Model/`**，不经过 task_layer。按 DATA_LAYOUT D3，EM 链路规范名为 **`port_em.json`**
+（热链路预留 `port_thermal.json`）；**当前 compact_em（2026.10.22 版）实读 `port.json`**——
+过渡期两份文件内容相同地写：
 
 ```json
 {
   "meshFile": "model_em.msh",
-  "meshSha256": "<可留空，交接阶段会按实际网格重算>",
+  "meshSha256": "<网格原始字节的 SHA-256>",
   "ports": [
     {"direction": [0,0,1],  "impedanceOhm": 50, "triangleIds": [1, 2]},
     {"direction": [0,0,-1], "impedanceOhm": 50, "triangleIds": [3, 4]}
@@ -300,41 +309,29 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
   | 留空 `""` | `QS-FMT-JSON-SCHEMA_VIOLATION`：`meshSha256 must be a non-empty JSON string` |
   | 非空但不匹配 | `QS-IO-FILE-CORRUPTED`：`meshSha256 does not match the selected mesh` |
 
-  **推荐做法**：UI 只写 `ports`，写完后再调一次 `module.run internal.handoff`（7ms），
-  由任务层把 `meshFile` / `meshSha256` 刷新成实际值，前端不用碰哈希。
-  若前端愿意自己算网格 SHA-256 也可以，两条路都行。
+  **推荐做法**：UI 写文件时自己算好网格 SHA-256（网格文件就是 UI 自己渲染的来源，
+  算哈希很便宜），写完再调一次 `inputs.validate` 复核（绑定不符会直接报 issue）。
 
-- `Model/` 下只能有一份 `*.msh`：版图迭代会不断产出新网格，交接阶段会**自动删除上一轮的旧网格**，
-  UI 不需要手动清理（否则 EM 报 `QS-FMT-INPUT-AMBIGUOUS`）。
+- `Model/` 下只能有一份 `*.msh`：版图迭代会不断产出新网格，publisher 落位正式件时会
+  **自动替换上一轮的旧网格**，UI 不需要手动清理（否则 EM 报 `QS-FMT-INPUT-AMBIGUOUS`）。
 
-**版图迭代时的失效检测**（重要）：交接阶段会比对 port.json 记录的网格指纹与本次生成的网格，
-不一致说明网格已重新生成，会通过 `task.stage.log` 通知：
+**版图迭代时的失效检测**（重要）：网格重新生成后，端口文件里记的 `triangleIds` 可能与新网格
+不再对应。当前由 SHA-256 绑定检查兜底：`inputs.validate` 会报 `port_em.json` 绑定不符
+（后端运行时则报 `QS-IO-FILE-CORRUPTED`），此时 UI 应提示用户**重新选端口**；
+建模任务本身仍会成功完成。
 
-```text
-[warn] mesh changed since port.json was written (sha deadbeef1111 -> 08ea3d3b8710):
-       triangleIds may no longer match this mesh. Re-pick ports in the UI before running peec_basic.
-```
+### 4.8 inputs：可选的动态输入（预留通道）
 
-UI 收到这条应提示用户**重新选端口**。此时建模任务仍会成功完成，只是端口需要复核。
+`task.run` / `inputs.validate` 都接受 `inputs` 对象，会写入 `state.json` 的 `inputs` 字段留痕。
+该通道支持通用动态变量（驼峰键转大写下划线：`portJson` → `{PORT_JSON}`、`setFile` →
+`{SET_FILE}`），供模块 `argsTemplate` 引用。**当前流水线的模块 manifest 一律走固定路径
+（DATA_LAYOUT：`Model/port_em.json`、`Setting/set.json`/`set.txt` 等），不经过该通道**——
+为后续模块预留。
 
-### 4.8 inputs：可选的动态输入（set.txt 等）
-
-| 键 | 对应变量 | 用途 |
-|---|---|---|
-| `portJson` | `{PORT_JSON}` | 端口文件放在算例之外时使用；不传则沿用 `Model/port.json` |
-| `setFile` | `{SET_FILE}` | 求解设置（set.txt）。不传时：算例已有则沿用，否则任务层生成默认（`DIM=1000`，即坐标单位 mm） |
-| `fs` / `fe` / `nFp` | `{FS}` / `{FE}` / `{N_FP}` | 仅自动生成 set.txt 时生效，默认 `1e9` / `10e9` / `100` |
-
-```json
-{"jsonrpc":"2.0","id":4,"method":"task.run","params":{
-  "pipeline":"peec_basic",
-  "dataRoot":"D:/cases/demo/DATA",
-  "inputs":{"setFile":"D:/cases/demo/config/set.txt"}
-}}
-```
-
-- `inputs` 会写入 `state.json` 的 `inputs` 字段，便于追溯；
-- `inputs.validate` 同样接受 `inputs`，会校验文件存在、`meshFile` 存在且哈希与主网格一致。
+- 当前 `peec_basic` 的输入全部是固定名：`Model/model_em.msh`、`Model/matdb.json`、
+  `Model/port_em.json`（及过渡期 `port.json`）、`Setting/set.txt`（及规范形态 `set.json`）；
+- UI 要改求解设置（FS/FE/N_FP 等）直接写 dataRoot 的 `Setting/`，不经任务层代理；
+- `inputs.validate` 会校验必需输入文件存在、`meshFile` 存在且哈希与主网格一致。
 
 ### 4.9 task.status / task.result
 
@@ -347,11 +344,11 @@ UI 收到这条应提示用户**重新选端口**。此时建模任务仍会成�
 ```json
 {"taskId":"t-20261028-104233-7f3a1c","pipeline":"peec_basic","status":"running",
  "startedAt":"2026-10-28T10:42:33","elapsedMs":0,
- "inputs":{"portJson":"D:/cases/demo/config/port.json"},
+ "inputs":{},
  "stages":[
    {"id":"extract","moduleId":"peec.model_extract","name":"PEEC 模型提取",
     "status":"done","exitCode":0,"startedAt":...,"finishedAt":...,
-    "outputs":["D:/cases/demo/DATA/Result/model.peec"],"errorCode":"","errorMessage":""},
+    "outputs":["D:/cases/demo/DATA/Result/compact_em/extract/model.peec"],"errorCode":"","errorMessage":""},
    {"id":"solve","moduleId":"peec.solver","name":"频域求解","status":"running",...}
  ]}
 ```
@@ -360,9 +357,9 @@ UI 收到这条应提示用户**重新选端口**。此时建模任务仍会成�
 
 ```json
 {"taskId":"...","status":"done","resultFiles":[
-  "D:/cases/demo/DATA/Result/model.peec",
-  "D:/cases/demo/DATA/Result/S_parameter.csv",
-  "D:/cases/demo/DATA/Result/S_Parameter_Plot/S_para_mag_port1.svg"]}
+  "D:/cases/demo/DATA/Result/compact_em/extract/model.peec",
+  "D:/cases/demo/DATA/Result/compact_em/solve/S_parameter.csv",
+  "D:/cases/demo/DATA/Result/compact_em/plot/S_para_mag_port1.svg"]}
 ```
 
 任务结束后仍可查询（任务层保留最近一次任务），UI 不必在运行中抢答。
@@ -408,8 +405,8 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 
 1. 任务层**不会解析**后端的百分比/进度行（当前后端也没有这种输出），不做假进度；UI 进度条建议按"阶段数"打点，用 `task.stage.log` 填充日志窗（高频，需限流）。
 2. 失败时 `task.stage.finished` 的 `errorCode` 优先取后端输出中最后一条 `"code":"QS-..."`（compact_em 契约），否则为 `QS-TL-MOD-EXEC`；gds2geo 无 QS 码，固定 `QS-TL-MOD-EXEC` + 退出码（2=输入/配置，5=执行）。
-3. 完整错误对象字段（severity/message_user_zh/user_action/trace_id 等）由 compact_em 自己写在 stderr 与 `Result/Logs/<module>-<trace_id>.jsonl`，任务层不重组，只透传文本并提取 code；UI 若要展示中文提示，从 `task.stage.log` 里对应 JSON 行解析，或让 UI 直接读该 jsonl。
-4. gds2geo 的详细诊断在其运行包 `gds2geo/DATA/runtime/*.log`（未指定 `--runtime-dir` 时），不在算例目录；任务层的 `task.log` 在 `Result/tasks/<taskId>/`。
+3. 完整错误对象字段（severity/message_user_zh/user_action/trace_id 等）由 compact_em 自己写在 stderr 与 `Result/logs/compact_em/<exe>-<trace_id>.jsonl`（DATA_LAYOUT 规范位置；当前 compact_em 2026.10.22 版仍写旧 `Result/Logs/`，过渡期两处都读），任务层不重组，只透传文本并提取 code；UI 若要展示中文提示，从 `task.stage.log` 里对应 JSON 行解析，或让 UI 直接读该 jsonl。
+4. gds2geo 的日志由任务层经 `--runtime-dir` 写到算例目录的 `Result/logs/gds2geo/`（符合 DATA_LAYOUT R2）；其数据包锁过渡期在 `Result/gds2geo/runtime/`（规范位置为 dataRoot 的 `.locks/`），运行中勿删；任务层的 `task.log`/`state.json` 在 `Result/tasks/<taskId>/`。
 
 ---
 
@@ -461,31 +458,46 @@ UI 侧只需要维护这一个目录，新增模块也不会改变这个约定�
 dataRoot = <部署根>/cases/<项目名>/DATA
 ```
 
-**`peec_basic` 的算例布局**：
+**`peec_basic` 的算例布局**（按 DATA_LAYOUT v1.1）：
 
 ```text
 <case>\DATA\
-├── Model\      主网格 *.msh、matdb.json、port.json
-├── Setting\    set.txt（FS/FE/N_FP/DIM ...）
-└── Result\     后端产出；任务层会在 Result\tasks\<taskId>\ 下写 state.json 与 task.log
+├── Model\        主网格 *.msh（恰好一份）、matdb.json、port_em.json（规范名）
+│                 + port.json（当前 compact_em 版本实读名；过渡期双写）
+├── Setting\      set.json（规范形态，schemaVersion 1）+ set.txt（当前版本实读；过渡期双写）
+├── Result\
+│   ├── compact_em\  模块产物区（按 stage 子目录）：extract\ solve\ plot\ post\
+│   ├── logs\compact_em\  诊断 jsonl
+│   └── tasks\<taskId>\  state.json + task.log（仅任务层写）
+└── .locks\       锁文件（规范位置）
 ```
 
-`port.json` 必须与主网格绑定（`meshFile` + `meshSha256`），改动网格后要重新生成端口文件，否则提取阶段会报文件损坏类错误。
+`port_em.json` 必须与主网格绑定（`meshFile` + `meshSha256`），改动网格后要重新生成端口文件，
+否则提取阶段会报文件损坏类错误（`QS-IO-FILE-CORRUPTED`）。
+
+注意：当前 compact_em（2026.10.22 版）把产物写到旧扁平布局（`Result\model.peec` 等，
+迁移期现象，见交付说明 §6.1）；其下一版适配后自动落到 `Result/compact_em/<stage>/`。
 
 **`gds_full` 的算例布局**（输入是版图而不是网格）：
 
 ```text
 <case>\DATA\
-├── Model\      model.gds + model_info.csv（或 model_info.xtf，二选一）
-└── Result\
-    ├── source\    源模型：model.geo / model.json / matdb.json
-    ├── prepared\  派生几何：em.geo / em.json / thermal.geo / thermal.json / matdb.json
-    ├── em\        电磁网格：model_em.msh + matdb.json
-    └── thermal\   热网格：model_thermal.msh + matdb.json（可选阶段）
+├── Model\        输入：model.gds + model_info.csv（或 model_info.xtf，二选一）
+│                 输出（publisher 自动落位）：model_em.msh + matdb.json
+├── Result\
+│   ├── gds2geo\
+│   │   ├── source\    源模型：model.geo / model.json / matdb.json
+│   │   ├── prepared\  派生几何：em.geo / em.json / thermal.geo / thermal.json / matdb.json
+│   │   ├── em\        电磁网格：model_em.msh / model_em.msh.json（receipt）/ matdb.json
+│   │   └── thermal\   热网格：model_thermal.msh / model_thermal.msh.json（receipt）/ matdb.json（可选阶段）
+│   ├── logs\gds2geo\  日志 + 私有锁 + source-attempts 暂存
+│   └── tasks\<taskId>\  state.json + task.log
+└── .locks\       锁文件（规范位置）
 ```
 
-注意：gds2geo 的日志（`source-attempts` 等）写在它自己目录的 `gds2geo\DATA\runtime\` 下，
-不在算例目录里；任务层自己的 `task.log` 和 `state.json` 始终在算例的 `Result\tasks\<taskId>\` 下。
+注意：gds2geo 的数据包锁过渡期实际写在 `Result/gds2geo/runtime/`（规范位置为 dataRoot 的
+`.locks/`，见交付说明 §6.4）；任务层自己的 `task.log` 和 `state.json` 始终在算例的
+`Result\tasks\<taskId>\` 下。
 
 ---
 
@@ -573,195 +585,13 @@ private:
 ## 十、联调自查
 
 ```powershell
-# 1) 任务层自检（不接 UI）
+# 1) 任务层自检（工作目录 = dist\）
 .\task_layer.exe modules
 .\task_layer.exe pipelines
-.\task_layer.exe run --pipeline peec_basic --data-root ..\compact_em\DATA
-.\task_layer.exe run --pipeline gds_full   --data-root ..\gds2geo\DATA
-
-# 2) 协议自检（模拟 UI，需要 Python）
-python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\compact_em\DATA
+# 2) 算例自检（用交付包自带 cases，或按"七"自建的算例目录）
+.\task_layer.exe run --pipeline gds_full --data-root <包根>\cases\demo\DATA
 ```
 
 `rpc_smoke.py` 走完 ping / modules.list / pipelines.list / inputs.validate /
 task.run / task.finished / task.status / task.result 八项断言并打印 `RESULT: PASS`，
 UI 侧可用它先确认部署没问题，再接自己的进程封装。
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

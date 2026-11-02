@@ -111,18 +111,18 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
             m_manifests.insert(m.id, m);
             m_packageDirs.insert(m.id, pit.value());
         } else {
-            missing << QString("%s: %s").arg(pit.key(), err);
+            missing << QString("%1: %2").arg(pit.key(), err);
         }
     }
     for (const QString& provider : pkgOf.keys())
         if (!m_manifests.contains(provider))
-            missing << QString("%s: package found but manifest load failed").arg(provider);
+            missing << QString("%1: package found but manifest load failed").arg(provider);
     // 路由了但完全没找到包的 provider
     QSet<QString> allProviders;
     for (const RoutingEntry& re : m_routing) allProviders.insert(re.provider);
     for (const QString& provider : allProviders)
         if (!pkgOf.contains(provider))
-            missing << QString("%s: package directory not found").arg(provider);
+            missing << QString("%1: package directory not found").arg(provider);
     if (missingProviders) *missingProviders = missing;
 
     // 3) 合成 ModuleDef
@@ -144,7 +144,7 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
         } else {
             const ManifestStage* st = mm->stage(r.stageId);
             if (!st) {
-                missing << QString("%s: stage '%s' not in manifest of %s")
+                missing << QString("%1: stage '%2' not in manifest of %3")
                             .arg(moduleId, r.stageId, r.provider);
                 if (missingProviders) *missingProviders = missing;
                 def.command = QString();
@@ -170,7 +170,13 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
                 // （保守策略：入口阶段校验由 App 按 pipeline 入口过滤）
                 def.contract.requiredInputs << a.path;   // 暂存 POSIX 相对路径
             }
+            // produced → 本 stage 的 outputChecks + publishes：
+            // 按 DATA_LAYOUT D2（Result/<providerId>/<stageId>/ 与 stage 一一对应）
+            // 用前缀归属，其他 stage 的产物不进本 stage 浅检（修复"全 stage 全量查
+            // 全 manifest 产物"导致的 QS-TL-OUTPUT-MISSING 误报）
+            const QString stagePrefix = "Result/" + mm->id + "/" + r.stageId + "/";
             for (const ManifestArtifact& a : mm->produced) {
+                if (!a.path.startsWith(stagePrefix)) continue;
                 def.contract.outputChecks << a.path;
                 if (!a.publishTo.isEmpty())
                     def.contract.publishes.append({a.path, a.publishTo});

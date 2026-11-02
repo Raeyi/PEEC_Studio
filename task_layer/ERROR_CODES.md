@@ -38,10 +38,10 @@
 | errorCode | 触发条件 | 可恢复 | 处置 |
 | --- | --- | --- | --- |
 | `QS-TL-INPUT-MISSING` | 必需输入文件/目录缺失（`errorMessage` 含具体路径） | 是 | 补齐输入后重跑该阶段 |
-| `QS-TL-INPUT-INVALID` | 输入内容静态校验失败（如 port.json 语法/字段） | 是 | 按 `errorMessage` 修正输入 |
+| `QS-TL-INPUT-INVALID` | 输入内容静态校验失败（如 port_em.json 语法/字段） | 是 | 按 `errorMessage` 修正输入 |
 | `QS-TL-CFG-UNKNOWNMODULE` | 流水线引用了 modules.json 中未注册的模块 | 否（配置错误） | 修正 pipelines.json 或补部署模块 |
 | `QS-TL-CFG-DEADLOCK` | 阶段依赖无法解析或成环，任务被强制收尾 | 否（配置错误） | 修正依赖图 |
-| `QS-TL-MOD-NOTCONFIGURED` | internal 内建动作的 command 未识别 | 否（配置错误） | 修正 modules.json 的 command |
+| `QS-TL-MOD-NOTCONFIGURED` | 模块缺少 manifest/stage 绑定（模块未登记或 manifest 缺 stage） | 否（配置错误） | 补 modules.json 路由与 manifest stage |
 
 ### 2.2 IO 与产物
 
@@ -75,7 +75,7 @@
 
 ### 3.1 compact_em（有 QS 契约）
 
-- compact_em 失败时在 stderr 输出结构化 JSON 错误记录（UTF-8），字段含 `code`（`QS-*`）、`severity`、`message_dev`、`message_user_zh`、`user_action`、`trace_id`、`recoverable` 等；同一记录同时追加到 `Result/Logs/<module>-<trace_id>.jsonl`。
+- compact_em 失败时在 stderr 输出结构化 JSON 错误记录（UTF-8），字段含 `code`（`QS-*`）、`severity`、`message_dev`、`message_user_zh`、`user_action`、`trace_id`、`recoverable` 等；同一记录同时追加到 `Result/logs/compact_em/<exe>-<trace_id>.jsonl`（DATA_LAYOUT 规范位置；当前 compact_em 2026.10.22 版写旧 `Result/Logs/`，过渡期两处并存）。
 - 任务层在阶段非 0 退出时，从输出尾部正则提取最后一条 `"code":"QS-[A-Za-z0-9_-]+"`，作为 `task.stage.finished` 的 `errorCode` 原样上报。
 - 完整错误对象由 compact_em 自己负责写全，任务层**不重组、不改写字段**；UI 若要展示中文提示，从 `task.stage.log` 对应 JSON 行解析，或直接读 jsonl。
 - 完整码表见 `compact_em/ERROR_CODES.md`（本地增量 + 规范码边界）。
@@ -84,7 +84,7 @@
 
 - gds2geo 当前没有 QS 编码、统一 JSON stderr 或 trace_id 合同；诊断为带程序名的文本 + 进程退出码。
 - 因此任务层对 gds2geo 固定上报 `QS-TL-MOD-EXEC`，并附带 `exitCode`：`2` = CLI/输入/配置类，`5` = 执行类（细分语义见 `gds2geo/ERROR_CODES.md`）。
-- 详细诊断在运行包 `gds2geo/DATA/runtime/*.log`（未指定 `--runtime-dir` 时），不在算例目录；任务层的 `task.log` 在 `Result/tasks/<taskId>/`。
+- 详细诊断由任务层经 `--runtime-dir` 写到算例的 `Result/logs/gds2geo/`；数据包锁过渡期在 `Result/gds2geo/runtime/`（规范位置 dataRoot 的 `.locks/`）；任务层的 `task.log`/`state.json` 在 `Result/tasks/<taskId>/`。
 - 《物理模块错误码清单.xlsx》中的 G2G-001~166 建议码**尚未接入 gds2geo 程序**，属规划项；接入前任务层不会看到这些码。
 
 ### 3.3 兜底

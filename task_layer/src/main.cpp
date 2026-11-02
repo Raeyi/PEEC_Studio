@@ -134,8 +134,15 @@ int main(int argc, char* argv[])
         ModuleRegistry reg;
         PipelineLoader loader;
         QString err;
+        // 与 serve/run 模式相同的模块根推导（向上找含后端包的目录），
+        // 避免 manifest 探测失败刷 stderr 警告
+        const QString cliModuleRoot = guessModuleRoot(configDir, exeDir);
         if (!reg.loadRouting(configDir + "/modules.json", &err) ||
-            !reg.loadManifests(QDir(configDir).absolutePath() + "/../..", {}, nullptr, &err)) {
+            !reg.loadManifests(cliModuleRoot, {}, nullptr, &err)) {
+            QTextStream(stdout) << "config error: " << err << "\n";
+            return 2;
+        }
+        if (!loader.loadFromFile(configDir + "/pipelines.json", &err)) {
             QTextStream(stdout) << "config error: " << err << "\n";
             return 2;
         }

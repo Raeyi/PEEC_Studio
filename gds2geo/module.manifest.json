@@ -23,7 +23,7 @@
       "errorContract": { "type": "none" }
     },
     {
-      "id": "prepare",
+      "id": "prepared",
       "executable": "geo_prepare.exe",
       "argsTemplate": [
         "--runtime-dir", "{runtimeDir}",
@@ -34,7 +34,7 @@
       "errorContract": { "type": "none" }
     },
     {
-      "id": "mesh_em",
+      "id": "em",
       "executable": "geo2em.exe",
       "argsTemplate": [
         "--runtime-dir", "{runtimeDir}",
@@ -45,7 +45,7 @@
       "errorContract": { "type": "none" }
     },
     {
-      "id": "mesh_thermal",
+      "id": "thermal",
       "executable": "geo2thermal.exe",
       "optional": true,
       "argsTemplate": [
@@ -65,10 +65,20 @@
       { "ref": "gds2geo/prepared.em.geo", "path": "Result/gds2geo/prepared/em.geo" },
       { "ref": "gds2geo/prepared.em.json", "path": "Result/gds2geo/prepared/em.json" },
       { "ref": "gds2geo/prepared.matdb", "path": "Result/gds2geo/prepared/matdb.json", "schemaVersion": "3" },
+      { "ref": "gds2geo/prepared.thermal.geo", "path": "Result/gds2geo/prepared/thermal.geo" },
+      { "ref": "gds2geo/prepared.thermal.json", "path": "Result/gds2geo/prepared/thermal.json" },
       { "ref": "gds2geo/mesh.em", "path": "Result/gds2geo/em/model_em.msh",
         "schemaVersion": "4", "units": { "length": "mm" }, "publishTo": "Model/model_em.msh" },
       { "ref": "gds2geo/matdb.model", "path": "Result/gds2geo/em/matdb.json",
-        "schemaVersion": "3", "publishTo": "Model/matdb.json" }
+        "schemaVersion": "3", "publishTo": "Model/matdb.json" },
+      { "ref": "gds2geo/receipt.em", "path": "Result/gds2geo/em/model_em.msh.json",
+        "schemaVersion": "4" },
+      { "ref": "gds2geo/mesh.thermal", "path": "Result/gds2geo/thermal/model_thermal.msh",
+        "schemaVersion": "4", "units": { "length": "mm" } },
+      { "ref": "gds2geo/matdb.thermal", "path": "Result/gds2geo/thermal/matdb.json",
+        "schemaVersion": "3" },
+      { "ref": "gds2geo/receipt.thermal", "path": "Result/gds2geo/thermal/model_thermal.msh.json",
+        "schemaVersion": "5" }
     ],
     "consumed": [
       { "ref": "user/layout.gds", "path": "Model/model.gds",

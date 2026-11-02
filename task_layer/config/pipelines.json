@@ -19,9 +19,9 @@
       "maxParallel": 1,
       "stages": [
         { "id": "parse", "module": "phys.model_parse", "name": "物理模型解析（gds2geo）", "dependsOn": [] },
-        { "id": "prepare", "module": "gds.prepare", "name": "几何准备", "dependsOn": ["parse"] },
-        { "id": "mesh_em", "module": "gds.mesh_em", "name": "电磁网格", "dependsOn": ["prepare"] },
-        { "id": "mesh_thermal", "module": "gds.mesh_thermal", "name": "热网格", "dependsOn": ["prepare"], "optional": true }
+        { "id": "prepared", "module": "gds.prepare", "name": "几何准备", "dependsOn": ["parse"] },
+        { "id": "em", "module": "gds.mesh_em", "name": "电磁网格", "dependsOn": ["prepared"] },
+        { "id": "thermal", "module": "gds.mesh_thermal", "name": "热网格", "dependsOn": ["prepared"], "optional": true }
       ]
     },
     "thermal_te": {
