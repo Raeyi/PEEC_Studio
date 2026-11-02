@@ -3,7 +3,7 @@
     {
       "dimension": "volume",
       "id": 1,
-      "name": "UPPER",
+      "name": "UPPER__Volume",
       "properties": {
         "conductivity": {
           "model": "constant",
@@ -16,7 +16,7 @@
     {
       "dimension": "volume",
       "id": 2,
-      "name": "LOWER",
+      "name": "LOWER__Volume",
       "properties": {
         "conductivity": {
           "model": "constant",
@@ -28,7 +28,7 @@
     },
     {
       "dimension": "surface",
-      "id": 3,
+      "id": 4,
       "name": "UPPER__Surface_0.0005mm",
       "properties": {
         "conductivity": {
@@ -43,7 +43,7 @@
     },
     {
       "dimension": "surface",
-      "id": 4,
+      "id": 5,
       "name": "LOWER__Surface_0.0005mm",
       "properties": {
         "conductivity": {
@@ -57,6 +57,6 @@
       "type": "C"
     }
   ],
-  "nextId": 5,
+  "nextId": 6,
   "schemaVersion": 3
 }

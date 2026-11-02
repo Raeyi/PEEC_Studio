@@ -75,9 +75,10 @@
 
 ### 3.1 compact_em（有 QS 契约）
 
-- compact_em 失败时在 stderr 输出结构化 JSON 错误记录（UTF-8），字段含 `code`（`QS-*`）、`severity`、`message_dev`、`message_user_zh`、`user_action`、`trace_id`、`recoverable` 等；同一记录同时追加到 `Result/logs/compact_em/<exe>-<trace_id>.jsonl`（DATA_LAYOUT 规范位置；当前 compact_em 2026.10.22 版写旧 `Result/Logs/`，过渡期两处并存）。
+- compact_em 失败时在 stderr 输出结构化 JSON 错误记录（UTF-8），字段含 `code`（`QS-*`）、`severity`、`message_dev`、`message_user_zh`、`user_action`、`trace_id`、`recoverable` 等；同一记录同时追加到 `Result/logs/compact_em/<exe>-<trace_id>.jsonl`（DATA_LAYOUT 规范位置；2026.10.30 版起写规范位置，早期 2026.10.22 版写旧 `Result/Logs/`）。
 - 任务层在阶段非 0 退出时，从输出尾部正则提取最后一条 `"code":"QS-[A-Za-z0-9_-]+"`，作为 `task.stage.finished` 的 `errorCode` 原样上报。
 - 完整错误对象由 compact_em 自己负责写全，任务层**不重组、不改写字段**；UI 若要展示中文提示，从 `task.stage.log` 对应 JSON 行解析，或直接读 jsonl。
+- 退出码：四程序 `0` 成功、`1` 失败；Extractor 另有 `2` = 未处理异常。原生崩溃（如 `0xC0000005`，无 QS JSON）走 3.4 兜底：`QS-TL-MOD-EXEC` + 原始 `exitCode`。
 - 完整码表见 `compact_em/ERROR_CODES.md`（本地增量 + 规范码边界）。
 
 ### 3.2 gds2geo（无 QS 契约，1102 版起）

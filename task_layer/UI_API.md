@@ -196,8 +196,8 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 ① UI: task.run gds_full          → publisher 自动落位 Model/model_em.msh + matdb.json
                                    （此时还没有端口文件，建模照样成功；旧网格自动替换）
 ② UI: 加载 model_em.msh 渲染      → 用户选三角面 → 写 Model/port_em.json（规范名）
-                                   过渡期：当前 compact_em 版本实读 Model/port.json，
-                                   两份内容相同地写（见 4.7）
+                                   同时写 Setting/set.json（平铺 EM 设置，schemaVersion=1）
+                                   （模板 compact_em/templates/default_set.json）
 ③ UI: inputs.validate（可选）     → 跑前体检：文件存在 + 端口↔网格 SHA-256 绑定
 ④ UI: task.run peec_basic        → 提取 → 求解 → S 参数
 ```
@@ -220,7 +220,7 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 // ① 建模（不需要端口文件）
 {"method":"task.run","params":{"pipeline":"gds_full","dataRoot":"D:/cases/demo/DATA"}}
 
-// ② UI 自己写 D:/cases/demo/DATA/Model/port_em.json 和 Model/port.json（不经过 task_layer）
+// ② UI 自己写 D:/cases/demo/DATA/Model/port_em.json 和 Setting/set.json（不经过 task_layer）
 
 // ③ 跑前体检（可选但推荐；issues 直接可展示给用户）
 {"method":"inputs.validate","params":{"pipeline":"peec_basic","dataRoot":"D:/cases/demo/DATA"}}
@@ -311,7 +311,7 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 
 端口只能由用户在网格上选取，任务层既生成不了也猜不出来，所以**端口文件由 UI 直接写到
 `{dataRoot}/Model/`**，不经过 task_layer。按 DATA_LAYOUT D3，EM 链路规范名为 **`port_em.json`**
-（热链路预留 `port_thermal.json`）；**当前 compact_em（2026.10.22 版）实读 `port.json`**——
+（热链路 `port_thermal.json`）。compact_em **2026.10.30 版起直接读 `port_em.json`**（旧 `port.json` 名已废弃）：
 过渡期两份文件内容相同地写：
 
 ```json
@@ -352,11 +352,12 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 `task.run` / `inputs.validate` 都接受 `inputs` 对象，会写入 `state.json` 的 `inputs` 字段留痕。
 该通道支持通用动态变量（驼峰键转大写下划线：`portJson` → `{PORT_JSON}`、`setFile` →
 `{SET_FILE}`），供模块 `argsTemplate` 引用。**当前流水线的模块 manifest 一律走固定路径
-（DATA_LAYOUT：`Model/port_em.json`、`Setting/set.json`/`set.txt` 等），不经过该通道**——
+（DATA_LAYOUT：`Model/port_em.json`、`Setting/set.json` 等），不经过该通道**——
 为后续模块预留。
 
 - 当前 `peec_basic` 的输入全部是固定名：`Model/model_em.msh`、`Model/matdb.json`、
-  `Model/port_em.json`（及过渡期 `port.json`）、`Setting/set.txt`（及规范形态 `set.json`）；
+  `Model/port_em.json`、`Setting/set.json`（2026.10.30 版起 set.txt 弃用，
+  模板见 `compact_em/templates/default_set.json`）。
 - UI 要改求解设置（FS/FE/N_FP 等）直接写 dataRoot 的 `Setting/`，不经任务层代理；
 - `inputs.validate` 会校验必需输入文件存在、`meshFile` 存在且哈希与主网格一致。
 
