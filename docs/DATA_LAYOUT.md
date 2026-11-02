@@ -16,7 +16,7 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 <dataRoot>\
 ├── Model\            【输入与共享资产】跨任务持久
 │   ├── model.gds             [UI]       版图（UI 选取放入，固定名）
-│   ├── model_info.csv|.xtf   [UI]       工艺（二选一，固定名）
+│   ├── model_info.csv          [UI]       工艺（固定名；gds2geo V1.1 仅接受 CSV，不支持 XTF）
 │   ├── <主网格>.msh           [gds2geo]  EM 主网格正式件（Model 下 *.msh 恰好一份）
 │   ├── matdb.json            [gds2geo]  材料库正式件
 │   ├── source_em.json         [UI]       EM 源定义（compact_em 消费；v1.1 名 port_em.json）
@@ -65,7 +65,7 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 | D2 | 模块内二级目录 = 子阶段名（manifest.stages[].id），一一对应 |
 | D3 | `Model/` 是唯一跨模块共享区；源/边界文件按链路命名（source_em.json / source_thermal.json，boundary_em.json / boundary_thermal.json），各消费方只认自己那份；热边界条件一律写 boundary_thermal.json，不得内嵌 source_thermal.json（格式见 §八.2） |
 | D4 | 模块诊断日志 → `Result/logs/<providerId>/`；任务编排记录 → `Result/tasks/`（task_layer 所有） |
-| D5 | 锁集中 `.locks/`，命名 `<providerId>.*.lock`；运行中禁止手工删除 |
+| D5 | 锁机制按模块：compact_em / thermal 用 `.locks/` 文件锁（命名 `<providerId>.*.lock`，锁文件存在不代表正在运行，陈旧锁由模块自行处理）；gds2geo V1.1 用系统命名互斥量、不创建锁文件（不得与旧版文件锁混用同一算例）。运行中禁止手工干预 |
 | D6 | 模块阶段自证文件统一命名 `stage_receipt.json`（可选，放各自阶段目录内）；取代历史上的 extract.state / solve.state |
 | D7 | **publisher 机制**：正式件落位（如 `Result/gds2geo/em/model_em.msh` → `Model/model_em.msh`）由 **task_layer 统一执行**（按 manifest `publishTo` 声明复制）。模块只负责把阶段产物正确写到 `Result/<providerId>/<stageId>/`，**不自己往 Model//Setting/ 搬文件** |
 
@@ -241,4 +241,4 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 本规范带版本（当前 v1.2），manifest 的 `capabilities.dataLayout` 声明遵循版本。破坏性变更（移动契约件/改固定名/改 set 格式）→ 版本 +1，窗口期内全模块适配；新增模块或自由区目录不升版本。
 版本记录：v1.1（2026-10-30）→ v1.2（2026-11-02）：port_* → source_* 改名、新增 boundary_* 预留件、包内 examples//templates/ 改为包外案例包交付。
 
-v1.2 修订 2（2026-11-02 下午，布局不变、契约细化）：① 定义 boundary_thermal.json 格式（§八.2），热边界条件移出 source_thermal.json（thermal 重发版起落地）；② 明确 set.json 作用域（§八.1）：纯热算例不携带 EM 字段；③ 目录树补 Result/thermal 产物区与 logs/thermal 日志行；④ gds2geo 热网格标记为必需（V1.1 起）。
+v1.2 修订 2（2026-11-02 下午，布局不变、契约细化）：① 定义 boundary_thermal.json 格式（§八.2），热边界条件移出 source_thermal.json（thermal 重发版起落地）；② 明确 set.json 作用域（§八.1）：纯热算例不携带 EM 字段；③ 目录树补 Result/thermal 产物区与 logs/thermal 日志行；④ gds2geo 热网格标记为必需（V1.1 起）；⑤ 工艺文件固定为 model_info.csv（gds2geo V1.1 仅接受 CSV，XTF 不再支持）；⑥ D5 锁机制按模块细化（gds2geo V1.1 为系统命名互斥量、无锁文件）。

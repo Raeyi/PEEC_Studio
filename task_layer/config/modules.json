@@ -55,7 +55,7 @@
       "searchDirs": ["{MODULE_ROOT}/gds2geo"]
     },
     "gds.mesh_thermal": {
-      "displayName": "热网格生成（可选）",
+      "displayName": "热网格生成（1102 起必需）",
       "kind": "external",
       "provider": "gds2geo",
       "stage": "thermal",

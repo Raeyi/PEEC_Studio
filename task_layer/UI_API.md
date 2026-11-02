@@ -436,7 +436,7 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 1. 任务层**不会解析**后端的百分比/进度行（当前后端也没有这种输出），不做假进度；UI 进度条建议按"阶段数"打点，用 `task.stage.log` 填充日志窗（高频，需限流）。
 2. 失败时 `task.stage.finished` 的 `errorCode` 优先取后端输出中最后一条 `"code":"QS-..."`（compact_em 契约），否则为 `QS-TL-MOD-EXEC`；gds2geo 无 QS 码，固定 `QS-TL-MOD-EXEC` + 退出码（2=输入/配置，5=执行）。
 3. 完整错误对象字段（severity/message_user_zh/user_action/trace_id 等）由 compact_em 自己写在 stderr 与 `Result/logs/compact_em/<exe>-<trace_id>.jsonl`（DATA_LAYOUT 规范位置；当前 compact_em 2026.10.22 版仍写旧 `Result/Logs/`，过渡期两处都读），任务层不重组，只透传文本并提取 code；UI 若要展示中文提示，从 `task.stage.log` 里对应 JSON 行解析，或让 UI 直接读该 jsonl。
-4. gds2geo 的日志由任务层经 `--runtime-dir` 写到算例目录的 `Result/logs/gds2geo/`（符合 DATA_LAYOUT R2）；其数据包锁过渡期在 `Result/gds2geo/runtime/`（规范位置为 dataRoot 的 `.locks/`），运行中勿删；任务层的 `task.log`/`state.json` 在 `Result/tasks/<taskId>/`。
+4. gds2geo 的日志由任务层经 `--runtime-dir` 写到算例目录的 `Result/logs/gds2geo/`（符合 DATA_LAYOUT R2）；V1.1 以系统命名互斥量控制并发、不创建 `.lock` 文件（不得与旧版文件锁程序混用同一算例）；任务层的 `task.log`/`state.json` 在 `Result/tasks/<taskId>/`。
 
 ---
 
@@ -512,21 +512,21 @@ dataRoot = <部署根>/cases/<项目名>/DATA
 
 ```text
 <case>\DATA\
-├── Model\        输入：model.gds + model_info.csv（或 model_info.xtf，二选一）
+├── Model\        输入：model.gds + model_info.csv（gds2geo V1.1 仅支持 CSV，不接受 XTF）
 │                 输出（publisher 自动落位）：model_em.msh + matdb.json
 ├── Result\
 │   ├── gds2geo\
 │   │   ├── source\    源模型：model.geo / model.json / matdb.json
 │   │   ├── prepared\  派生几何：em.geo / em.json / thermal.geo / thermal.json / matdb.json
 │   │   ├── em\        电磁网格：model_em.msh / model_em.msh.json（receipt）/ matdb.json
-│   │   └── thermal\   热网格：model_thermal.msh / model_thermal.msh.json（receipt）/ matdb.json（可选阶段）
-│   ├── logs\gds2geo\  日志 + 私有锁 + source-attempts 暂存
+│   │   └── thermal\   热网格：model_thermal.msh / model_thermal.msh.json（receipt）/ matdb.json（V1.1 起必需）
+│   ├── logs\gds2geo\  日志/诊断/私有暂存（V1.1 无锁文件，系统命名互斥量）
 │   └── tasks\<taskId>\  state.json + task.log
 └── .locks\       锁文件（规范位置）
 ```
 
-注意：gds2geo 的数据包锁过渡期实际写在 `Result/gds2geo/runtime/`（规范位置为 dataRoot 的
-`.locks/`，见交付说明 §6.4）；任务层自己的 `task.log` 和 `state.json` 始终在算例的
+注意：gds2geo V1.1 以系统命名互斥量做并发保护、不创建锁文件（旧版文件锁位于
+`Result/gds2geo/runtime/`，不得与旧版混用同一算例）；任务层自己的 `task.log` 和 `state.json` 始终在算例的
 `Result\tasks\<taskId>\` 下。
 
 ---

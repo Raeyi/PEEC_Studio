@@ -92,9 +92,9 @@
 
 ### 3.3 thermal（有 QS 契约，QS-TH-*）
 
-- thermal 2026.10.30-native-1.0 的 `errorContract` 为 `qs-json-stderr`：失败时在 stderr 输出结构化 JSON（字段 `code`（`QS-TH-*`）、`severity`、`message` 等）。
+- thermal 1.0.1（20261102 docs_1.2 重发版）的 `errorContract` 为 `qs-json-stderr`：失败时在 stderr 输出结构化 JSON（字段 `code`（`QS-TH-*`）、`severity`、`message` 等）。
 - 任务层按与 compact_em 相同的机制从输出尾部提取最后一条 QS 码作为 `errorCode` 原样上报（实测码：`QS-TH-IO-FILE`（exit=3 文件缺失/不可读）、`QS-TH-NUM-COVERAGE`（exit=4 材料覆盖 gap/overlap）等，完整表见 `thermal/ERROR_CODES.md`）。
-- extract 阶段必需件：热网格（经流水线 stage `artifacts` 路由，默认 `Result/gds2geo/thermal/model_thermal.msh`）、`Model/matdb.json`（gds_full em 阶段 publisher 落位）、`Setting/set.json`（含 `thermal` 对象）、`Model/source_thermal.json`（UI 维护，meshFile/meshSha256 绑定实际网格；过渡期旧名 port_thermal.json 同样接受）。
+- extract 阶段必需件：热网格（经流水线 stage `artifacts` 路由，默认 `Result/gds2geo/thermal/model_thermal.msh`）、`Model/matdb.json`（gds_full em 阶段 publisher 落位）、`Setting/set.json`（含 `thermal` 对象）、`Model/source_thermal.json`（UI 维护，meshFile/meshSha256 绑定实际网格；1.0.1 只读新名，旧名 port_thermal.json 不再接受）。
 - post 阶段的 `Model/thermal.op0` 与 `Model/thermal_run.json` 是**显式 CLI 输入而非 manifest 公共前置**；task_layer 按 pipelines.json 的 stage `requires` 字段在启动前做存在性检查，缺失则整段以 `QS-TL-SKIP-NOINPUT` 跳过（不阻断 extract 产物）。
 - 算法范围：仅三层堆叠模型（中部线性四面体 + 平行 XY 薄层），薄层 `material_footprints` 必须完整铺满其 `reference_surfaces`（无 gap/overlap，否则 exit=4）；uniform 功率 + 全局底面定温 + 其余绝热。
 

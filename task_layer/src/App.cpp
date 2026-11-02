@@ -198,7 +198,7 @@ QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineI
     bool ok = InputValidator::validate(required, {}, {}, &issues, &warnings);
 
     // 端口绑定预检：EM 链入口检查 Model/source_em.json（DATA_LAYOUT v1.2 D3/I3；
-    // 过渡期同时接受旧名 port_em.json —— 当前 compact_em 2026.10.30 版仍实读旧名）
+    // compact_em v1.2 起只实读新名；旧名 port_em.json 保留仅供绑定诊断，模块不读取）
     const QString modelDir = r.resolve("{Model}");
     QString portEm;
     for (const QString& name : { "source_em.json", "port_em.json" })

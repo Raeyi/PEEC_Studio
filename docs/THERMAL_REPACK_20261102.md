@@ -67,6 +67,15 @@ docs_1.2 §八.2 契约（本次新定义，v1.2 修订 2）：
   （平台侧收到新 manifest 后同步 pipelines/manifest 声明即可）；
 - ERROR_CODES 相应登记（boundary 文件缺失/格式错 → 对应既有码或新增）。
 
+## 问题 3（平台侧补充）：produced 清单补全后处理报告
+
+现状：post 阶段产物中 TemperatureProcessReport.txt（温度后处理报告）未列入
+manifest produced，平台 task.result 的 resultFiles 因此不含它（文件在磁盘
+Result/thermal/post/ 下，UI 可固定路径读取）。新包请将 `post` 阶段产物
+`Result/thermal/post/TemperatureProcessReport.txt` 增补进 manifest produced
+（ref 如 thermal/temperature.report）；如平台后续需要 thermal_nodes.csv /
+thermal_K.mtx 进清单，也一并声明（当前按模块内部件处理，不强制）。
+
 ## 交付要求（新包）
 
 1. 新模块包（如版本升 1.0.2）：四件套 + 按上述 CLI/manifest 改动；
