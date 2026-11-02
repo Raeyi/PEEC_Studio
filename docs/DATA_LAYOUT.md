@@ -21,8 +21,9 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 │   ├── matdb.json            [gds2geo]  材料库正式件
 │   ├── source_em.json         [UI]       EM 源定义（compact_em 消费；v1.1 名 port_em.json）
 │   ├── source_thermal.json    [UI]       热源定义（热模块消费；v1.1 名 port_thermal.json）
-│   ├── boundary_em.json       [UI]       EM 边界定义（预留，暂无消费方）
-│   └── boundary_thermal.json  [UI]       热边界定义（预留，暂无消费方）
+│   ├── boundary_em.json       [UI]       EM 边界定义（预留，格式 TBD，暂无消费方）
+│   └── boundary_thermal.json  [UI]       热边界定义（热模块消费，格式见 §八.2；
+│                                             2026-11-02 前内嵌于 source_thermal.json）
 ├── Setting\          【配置】跨任务持久
 │   └── set.json              [UI 或 compact_em 模板]  求解设置（JSON，schemaVersion 1）
 ├── Result\
@@ -30,15 +31,23 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 │   │   ├── source\    model.geo / model.json / matdb.json
 │   │   ├── prepared\  em.geo / em.json / thermal.geo / thermal.json / matdb.json
 │   │   ├── em\        model_em.msh（工作副本）/ model_em.msh.json / matdb.json
-│   │   └── thermal\   model_thermal.msh / model_thermal.msh.json / matdb.json（可选）
+│   │   └── thermal\   model_thermal.msh / model_thermal.msh.json / matdb.json（必需）
 │   ├── compact_em\     【模块产物区：compact_em 独占】
 │   │   ├── extract\   model.peec / stage_receipt.json
 │   │   ├── solve\     S_parameter.csv / stage_receipt.json
 │   │   ├── plot\      *.svg（可选）
 │   │   └── post\      Source.msh / Post_Model.txt / Post_Source.txt（可选）
+│   ├── thermal\       【模块产物区：thermal 独占】
+│   │   ├── extract\  ThermalNetList.sp / ThermalNetList_RC.sp / thermal_nodes.csv /
+│   │   │              thermal_K.mtx / ThermalTemperatureMap.csv / extraction_report.json /
+│   │   │              thermal_binding.json / stage_receipt.json
+│   │   └── post\      VolumeTemperatureAtOperatingPoint.msh / NodeTemperatureAtOperatingPoint.csv /
+│   │                   MaximumTemperature.txt / TemperatureProcessReport.txt /
+│   │                   post_binding.json / stage_receipt.json
 │   ├── logs\           【模块诊断日志】按模块子目录隔离
 │   │   ├── gds2geo\   gds2geo.log / geo_prepare.log / ...
-│   │   └── compact_em\<exe>-<trace_id>.jsonl
+│   │   ├── compact_em\<exe>-<trace_id>.jsonl
+│   │   └── thermal\   extract-<trace_id>.jsonl / post-<trace_id>.jsonl
 │   └── tasks\          【任务编排记录：task_layer 独占，模块不写不读】
 │       └── <taskId>\  state.json / task.log / job.<stageId>.json
 └── .locks\         【锁集中处】<providerId>.*.lock
@@ -54,7 +63,7 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 |---|---|
 | D1 | `Result/<providerId>/` 模块独占；providerId = manifest 的 id（= 模块包目录名，小写） |
 | D2 | 模块内二级目录 = 子阶段名（manifest.stages[].id），一一对应 |
-| D3 | `Model/` 是唯一跨模块共享区；源/边界文件按链路命名（source_em.json / source_thermal.json，boundary_em.json / boundary_thermal.json 预留），各消费方只认自己那份 |
+| D3 | `Model/` 是唯一跨模块共享区；源/边界文件按链路命名（source_em.json / source_thermal.json，boundary_em.json / boundary_thermal.json），各消费方只认自己那份；热边界条件一律写 boundary_thermal.json，不得内嵌 source_thermal.json（格式见 §八.2） |
 | D4 | 模块诊断日志 → `Result/logs/<providerId>/`；任务编排记录 → `Result/tasks/`（task_layer 所有） |
 | D5 | 锁集中 `.locks/`，命名 `<providerId>.*.lock`；运行中禁止手工删除 |
 | D6 | 模块阶段自证文件统一命名 `stage_receipt.json`（可选，放各自阶段目录内）；取代历史上的 extract.state / solve.state |
@@ -69,8 +78,8 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 | `Model/source_em.json` | UI | compact_em（sha 校验） |
 | `Model/source_thermal.json` | UI | 热模块（1.0.1 起消费；meshFile 指向热网格实际落位路径） |
 | `Model/boundary_em.json` | UI | 预留（暂无消费方） |
-| `Model/boundary_thermal.json` | UI | 预留（暂无消费方） |
-| `Setting/set.json` | UI 或 compact_em 模板 | compact_em |
+| `Model/boundary_thermal.json` | UI | 热模块（边界条件；格式见 §八.2，1.0.2 起重发版起消费） |
+| `Setting/set.json` | UI 或 compact_em 模板 | compact_em（EM 字段）、热模块（`thermal` 对象，见 §八.1） |
 | `Result/gds2geo/**` | gds2geo | 其下游阶段、task_layer publisher |
 | `Result/compact_em/**` | compact_em | 其下游阶段、UI |
 | `Result/logs/<providerId>/` | 对应模块 | 排错 |
@@ -172,6 +181,51 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 - 过渡期：compact_em 下一版 CLI 同时接受 `set.json`（新）与 `set.txt`（旧，deprecated）；两个文件同时存在时 **set.json 优先**并打 warning；
 - set.json 样例随案例包提供（ONBOARDING §1.1）；`templates/` 不再随包携带（v1.1 的 defaultTemplate 机制从未实现，一并废止）。
 
+### 八.1 `thermal` 对象（set.json 内的热链配置）
+
+````jsonc
+{
+  "schemaVersion": 1,
+  "thermal": {
+    "name": "demo1_4.1",                       // 可选标识
+    "selection_id_type": "elementary_entity",  // 固定值（实体选择一律 Elementary ID）
+    "mesh_length_scale_to_m": 0.001,           // 网格坐标 → m 比例（mm 网格 = 0.001）
+    "tetrahedral_domains": [ { "elementary_volume": 4,
+      "material": { "dimension": "volume", "physical_material_id": 3 } } ],
+    "thin_layers": [ { "name": "upper",
+      "visualization_volume": 2,
+      "reference_surfaces": [ 3, 10 ],          // 必须完整铺满（覆盖性检查）
+      "reference_position": "bottom",           // bottom | top
+      "thickness_m": 5e-07,
+      "material_footprints": [ { "surfaces": [ 3 ],
+        "material": { "dimension": "surface", "physical_material_id": 4 } } ] } ]
+  }
+}
+````
+
+- **作用域规则（重要）**：EM 字段（`Solver_SET`…`POST_FIELD`，上文样例）归 EM 链（compact_em 消费）；`thermal` 对象归热链（热模块消费）。消费者忽略未知键，但**不得越链携带**：
+  - 纯热算例（不跑 peec_basic）：set.json 只写 `schemaVersion` + `thermal` 对象，**不复制任何 EM 字段**；
+  - 联合算例（EM + 热）：同一 set.json 同时含 EM 字段与 `thermal` 对象。
+  - 20261102 交付的 thermal 案例 set.json 混入了 EM 字段（FS/FE/POST_* 等），系自 EM 模板复制所致，重发版时按上述规则修正（见 THERMAL_REPACK_20261102.md）。
+
+### 八.2 `boundary_thermal.json` 格式（热边界条件，独立文件）
+
+````jsonc
+{
+  "schemaVersion": 1,
+  "default_external_boundary": "adiabatic",     // 未声明边界面的默认处理
+  "fixed_temperature": [ { "name": "bottom_293p15K",
+    "location": "global_bottom_plane",
+    "surface_entities": [ 18, 22 ],              // 网格 elementary ID
+    "temperature_K": 293.15 } ]
+}
+````
+
+- **热边界条件（外部边界默认 + 固定温度面）一律写入 `Model/boundary_thermal.json`，不得内嵌于 `source_thermal.json`**；source_thermal.json 只含源定义（meshFile / meshSha256 / total_power_W / sources 等）。20261102 交付的 source_thermal.json 内含 `default_external_boundary` 与 `fixed_temperature` 字段，重发版时移出（见 THERMAL_REPACK_20261102.md）；
+- 热链算例必须提供 boundary_thermal.json（至少声明 default_external_boundary）；热模块经 CLI `--boundary` 读取（固定名 Model/boundary_thermal.json）；
+- `boundary_em.json` 仍为预留件（格式 TBD、暂无消费方），与 boundary_thermal.json 互不包含内容；
+- `fixed_temperature.surface_entities` 与 sources 的实体选择同为 Elementary ID（不是 Physical ID）。
+
 ## 九、禁止事项
 
 1. 写非自己声明的目录（拦截码 `QS-TL-CFG-LAYOUT-VIOLATION`）；
@@ -186,3 +240,5 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 
 本规范带版本（当前 v1.2），manifest 的 `capabilities.dataLayout` 声明遵循版本。破坏性变更（移动契约件/改固定名/改 set 格式）→ 版本 +1，窗口期内全模块适配；新增模块或自由区目录不升版本。
 版本记录：v1.1（2026-10-30）→ v1.2（2026-11-02）：port_* → source_* 改名、新增 boundary_* 预留件、包内 examples//templates/ 改为包外案例包交付。
+
+v1.2 修订 2（2026-11-02 下午，布局不变、契约细化）：① 定义 boundary_thermal.json 格式（§八.2），热边界条件移出 source_thermal.json（thermal 重发版起落地）；② 明确 set.json 作用域（§八.1）：纯热算例不携带 EM 字段；③ 目录树补 Result/thermal 产物区与 logs/thermal 日志行；④ gds2geo 热网格标记为必需（V1.1 起）。

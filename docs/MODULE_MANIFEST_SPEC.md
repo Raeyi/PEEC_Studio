@@ -114,7 +114,7 @@ v1.2 · 2026-11-02 · 模块交付四件套之一（exe / README.md / ERROR_CODE
 1. **消费者只写 ref，不写路径**；ref→路径解析权 100% 归 task_layer（注册期建路由表）；
 2. 每个对外 ref 唯一生产者（重复 = 注册失败 `QS-TL-CFG-ARTIFACT-MISMATCH`）；
 3. name 小写自解释；废弃 ref 名字永不复用；
-4. 源/边界文件按链路区分：`em/source.def` → `Model/source_em.json`、`em/boundary.def` → `Model/boundary_em.json`（预留）；`thermal/source.def` → `Model/source_thermal.json`、`thermal/boundary.def` → `Model/boundary_thermal.json`（预留）。v1.1 旧 ref（em/ports.def / thermal/ports.def，指向 port_*.json）废弃。各消费方只校验自己那份。
+4. 源/边界文件按链路区分：`em/source.def` → `Model/source_em.json`、`em/boundary.def` → `Model/boundary_em.json`（预留）；`thermal/source.def` → `Model/source_thermal.json`、`thermal/boundary.def` → `Model/boundary_thermal.json`（格式已定义，见 DATA_LAYOUT §八.2；thermal 重发版起由模块消费）。v1.1 旧 ref（em/ports.def / thermal/ports.def，指向 port_*.json）废弃。各消费方只校验自己那份。
 
 ## 五、内部工件（internal ref）
 
