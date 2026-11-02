@@ -183,7 +183,7 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 |---|---|
 | `gds_full` | **建模**：源模型 → 几何准备 → 电磁网格 → 热网格（1102 版起四段全必需）；EM 主网格 + 材料由任务层 **publisher 自动落位到 `Model/`**，热网格保留在 `Result/gds2geo/thermal/`（v1.1 布局，无 handoff）。gds2geo 1102 版需要的 gmsh 4.11.1 由 task_layer 经子进程环境变量 `GDS2GEO_GMSH_EXECUTABLE` 自动注入，UI 无需处理 |
 | `peec_basic` | **电磁**：PEEC 提取 → 频域求解 → S 参数绘图 + 源/场后处理（后两段可选） |
-| `thermal_basic` | **热**：热路提取（thermal.extract，必需）→ 温度后处理（thermal.post，可选，无 OP0 时自动跳过）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），`Setting/set.json`（含 `thermal` 对象）与 `Model/source_thermal.json` 由 UI 写入 |
+| `thermal_basic` | **热**：热路提取（thermal.extract，必需）→ 温度后处理（thermal.post，可选，无 OP0 时自动跳过）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），求解设置（v1.2 时代 `Setting/set.json` 含 `thermal` 对象；v1.3 起 `Setting/set_thermal.json`）与 `Model/source_thermal.json` 由 UI 写入 |
 
 进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。
 模块能否真正运行（程序是否找得到）用 `modules.list` 的 `available` 字段判断（见 4.2）。
@@ -196,8 +196,8 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 ① UI: task.run gds_full          → publisher 自动落位 Model/model_em.msh + matdb.json
                                    （此时还没有端口文件，建模照样成功；旧网格自动替换）
 ② UI: 加载 model_em.msh 渲染      → 用户选三角面 → 写 Model/source_em.json（规范名，v1.2）
-                                   同时写 Setting/set.json（平铺 EM 设置，schemaVersion=1）
-                                   （set.json 格式见 DATA_LAYOUT §八；样例随模块案例包提供）
+                                   同时写求解设置（v1.2 时代 Setting/set.json 平铺 EM 设置，schemaVersion=1；v1.3 起 Setting/set_em.json）
+                                   （格式见 DATA_LAYOUT §八；样例随平台交付包 templates/ 与案例包提供）
 ③ UI: inputs.validate（可选）     → 跑前体检：文件存在 + 端口↔网格 SHA-256 绑定
 ④ UI: task.run peec_basic        → 提取 → 求解 → S 参数
 ```
@@ -206,7 +206,7 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 
 ```text
 ① UI: task.run gds_full              → 热网格产出在 Result/gds2geo/thermal/（matdb 含热物性）
-② UI: 写 Setting/set.json            → 在 EM 字段基础上增加 "thermal" 对象
+② UI: 写求解设置            → v1.2 时代：set.json 增加 "thermal" 对象；v1.3 起：写 Setting/set_thermal.json
                                         （tetrahedral_domains / thin_layers，elementary 实体 ID；
                                         薄层 material_footprints 必须完整铺满 reference_surfaces）
                                         写 Model/source_thermal.json        → meshFile 指向
@@ -220,7 +220,7 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 // ① 建模（不需要端口文件）
 {"method":"task.run","params":{"pipeline":"gds_full","dataRoot":"D:/cases/demo/DATA"}}
 
-// ② UI 自己写 D:/cases/demo/DATA/Model/source_em.json 和 Setting/set.json（不经过 task_layer）
+// ② UI 自己写 D:/cases/demo/DATA/Model/source_em.json 和求解设置（不经过 task_layer）
 
 // ③ 跑前体检（可选但推荐；issues 直接可展示给用户）
 {"method":"inputs.validate","params":{"pipeline":"peec_basic","dataRoot":"D:/cases/demo/DATA"}}
@@ -228,7 +228,7 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 // ④ 跑电磁
 {"method":"task.run","params":{"pipeline":"peec_basic","dataRoot":"D:/cases/demo/DATA"}}
 
-// 热链：建模完成后（set.json / source_thermal.json 已由 UI 写好）
+// 热链：建模完成后（求解设置 / source_thermal.json 已由 UI 写好）
 {"method":"task.run","params":{"pipeline":"thermal_basic","dataRoot":"D:/cases/demo/DATA"}}
 ```
 
@@ -354,12 +354,12 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 `task.run` / `inputs.validate` 都接受 `inputs` 对象，会写入 `state.json` 的 `inputs` 字段留痕。
 该通道支持通用动态变量（驼峰键转大写下划线：`portJson` → `{PORT_JSON}`、`setFile` →
 `{SET_FILE}`），供模块 `argsTemplate` 引用。**当前流水线的模块 manifest 一律走固定路径
-（DATA_LAYOUT：`Model/source_em.json`、`Setting/set.json` 等），不经过该通道**——
+（DATA_LAYOUT：`Model/source_em.json`、`Setting/` 求解设置 等），不经过该通道**——
 为后续模块预留。
 
 - 当前 `peec_basic` 的输入全部是固定名：`Model/model_em.msh`、`Model/matdb.json`、
-  `Model/source_em.json`、`Setting/set.json`（compact_em v1.2 版起 set.txt 弃用；
-  set.json 样例随模块案例包提供）。
+  求解设置（v1.2 时代 `Setting/set.json`；v1.3 起 `Setting/set_em.json`；compact_em v1.2 版起 set.txt 弃用；
+  样例随平台交付包 templates/ 提供）。
 - UI 要改求解设置（FS/FE/N_FP 等）直接写 dataRoot 的 `Setting/`，不经任务层代理；
 - `inputs.validate` 会校验必需输入文件存在、`meshFile` 存在且哈希与主网格一致。
 
@@ -494,7 +494,7 @@ dataRoot = <部署根>/cases/<项目名>/DATA
 <case>\DATA\
 ├── Model\        主网格 *.msh（恰好一份）、matdb.json、source_em.json（规范名，v1.2）
 │                 + boundary_em.json（预留）；平台预检仍兼容旧名 port_em.json（compact_em 不再读旧名）
-├── Setting\      set.json（schemaVersion 1，平铺格式）
+├── Setting\      求解设置：v1.2 时代 set.json / v1.3 起 set_em.json + set_thermal.json
 ├── Result\
 │   ├── compact_em\  模块产物区（按 stage 子目录）：extract\ solve\ plot\ post\
 │   ├── logs\compact_em\  诊断 jsonl

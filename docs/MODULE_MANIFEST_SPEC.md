@@ -289,7 +289,7 @@ task_layer 不做 internal ref 存在性检查（深检归模块），用它做�
       { "ref": "em/source.def", "path": "Model/source_em.json",
         "maintainedBy": ["ui"],
         "accept": { "fields": ["meshFile", "meshSha256", "triangleIds"] } },
-      { "ref": "user/solver.set", "path": "Setting/set.json" }
+      { "ref": "user/solver.set", "path": "Setting/set_em.json" } // v1.3 起；v1.2 时代为 Setting/set.json
     ]
   },
   "dependsOn": { "modules": ["gds2geo"],

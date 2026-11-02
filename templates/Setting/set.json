@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "DIM": 1000,
+  "FS": 1000000000,
+  "FE": 10000000000,
+  "N_FP": 100,
+  "PRECISION": 0,
+  "Swap_Log": 0,
+  "Taylor": 0,
+  "SAVE_BIN": 1,
+  "SAVE_TXT": 0,
+  "SAVE_SP": 0,
+  "Solver_SET": 0,
+  "MNA_WEIGHT": 0.8,
+  "SOLVER_MEMORY_MB": 0,
+  "SOLVER_THREADS": 0,
+  "POST_PROCESSING": 1,
+  "POST_FREQ_INDEX": -1,
+  "POST_PORT": 1,
+  "POST_PLOT_J": 1,
+  "POST_PLOT_QE": 1,
+  "POST_PLOT_VE": 1,
+  "POST_PLOT_M": 1,
+  "POST_PLOT_QM": 1,
+  "POST_PLOT_VM": 1,
+  "POST_FIELD": 0,
+  "thermal": {
+    "name": "demo1_4.1",
+    "selection_id_type": "elementary_entity",
+    "mesh_length_scale_to_m": 0.001,
+    "tetrahedral_domains": [
+      {
+        "elementary_volume": 4,
+        "material": {
+          "dimension": "volume",
+          "physical_material_id": 3
+        }
+      }
+    ],
+    "thin_layers": [
+      {
+        "name": "upper",
+        "visualization_volume": 2,
+        "reference_surfaces": [
+          3,
+          10
+        ],
+        "reference_position": "bottom",
+        "thickness_m": 5e-7,
+        "material_footprints": [
+          {
+            "surfaces": [
+              3
+            ],
+            "material": {
+              "dimension": "surface",
+              "physical_material_id": 4
+            }
+          },
+          {
+            "surfaces": [
+              10
+            ],
+            "material": {
+              "dimension": "surface",
+              "physical_material_id": 8
+            }
+          }
+        ]
+      },
+      {
+        "name": "lower",
+        "visualization_volume": 3,
+        "reference_surfaces": [
+          16
+        ],
+        "reference_position": "top",
+        "thickness_m": 5e-7,
+        "material_footprints": [
+          {
+            "surfaces": [
+              22
+            ],
+            "material": {
+              "dimension": "surface",
+              "physical_material_id": 4
+            }
+          },
+          {
+            "surfaces": [
+              18
+            ],
+            "material": {
+              "dimension": "surface",
+              "physical_material_id": 8
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
