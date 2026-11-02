@@ -20,7 +20,7 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 │   ├── <主网格>.msh           [gds2geo]  EM 主网格正式件（Model 下 *.msh 恰好一份）
 │   ├── matdb.json            [gds2geo]  材料库正式件
 │   ├── source_em.json         [UI]       EM 源定义（compact_em 消费；v1.1 名 port_em.json）
-│   ├── source_thermal.json    [UI]       热源定义（热模块消费，预留；v1.1 名 port_thermal.json）
+│   ├── source_thermal.json    [UI]       热源定义（热模块消费；v1.1 名 port_thermal.json）
 │   ├── boundary_em.json       [UI]       EM 边界定义（预留，暂无消费方）
 │   └── boundary_thermal.json  [UI]       热边界定义（预留，暂无消费方）
 ├── Setting\          【配置】跨任务持久
@@ -67,7 +67,7 @@ v1.2 · 2026-11-02 · 适用：所有计算层模块与 UI、task_layer。路径
 | `Model/model.gds`、`model_info.*` | UI | gds2geo |
 | `Model/*.msh`、`matdb.json` | task_layer publisher（源：gds2geo） | compact_em、UI（渲染） |
 | `Model/source_em.json` | UI | compact_em（sha 校验） |
-| `Model/source_thermal.json` | UI | 热模块（预留） |
+| `Model/source_thermal.json` | UI | 热模块（1.0.1 起消费；meshFile 指向热网格实际落位路径） |
 | `Model/boundary_em.json` | UI | 预留（暂无消费方） |
 | `Model/boundary_thermal.json` | UI | 预留（暂无消费方） |
 | `Setting/set.json` | UI 或 compact_em 模板 | compact_em |

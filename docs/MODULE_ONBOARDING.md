@@ -117,7 +117,7 @@ compact_em 具体项：
 
 **Q：想新增 dataRoot 下的全局共享目录？** 走 DATA_LAYOUT 版本变更流程；模块私有需求放 `Result/<providerId>/` 自由区。
 **Q：产物 schema 小改要升 apiVersion 吗？** 加可选字段不升（C2）；删字段/改语义升（B4）。拿不准就升。
-**Q：source_thermal.json / boundary_*.json 现在要做吗？** 热模块未接入前只需 UI 预留写入能力；compact_em 只认 `source_em.json`（过渡期旧名 `port_em.json` 亦可）。`boundary_em.json` / `boundary_thermal.json` 是预留槽位：暂无消费方、格式待定，UI 可不写，写了平台不做校验。
+**Q：source_thermal.json / boundary_*.json 现在要做吗？** 热链路做：UI 写 `Model/source_thermal.json`（thermal 1.0.1 已接入，CLI --source；meshFile 须指向热网格实际落位路径——gds_full 链路下为 `Result/gds2geo/thermal/model_thermal.msh`——+ 该文件 SHA-256）。`boundary_em.json` / `boundary_thermal.json` 仍是预留槽位：暂无消费方、格式待定，UI 可不写，写了平台不做校验（thermal 当前的边界字段随 source_thermal.json 提供）。
 **Q：案例（自测样品）能放进模块包吗？** 不能。包内只含四件套；案例按 §1.1 单独交付（`<module>_cases_YYYYMMDD/`），平台归档 `dev/cases/<module>/`。
 **Q：set.txt 什么时候彻底废弃？** compact_em 下一版 CLI 同时接受 set.json + set.txt（过渡）；再下一版只留 set.json。过渡期两个文件同时存在时 set.json 优先 + warning。
 **Q：stage_receipt.json 必须写吗？** 不必须。它是增强信息（排错/复现），不写不影响链路调度。写了就按 DATA_LAYOUT §七 schema。

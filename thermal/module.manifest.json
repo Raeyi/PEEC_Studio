@@ -2,8 +2,8 @@
   "manifestVersion": 1,
   "id": "thermal",
   "name": "薄层与四面体混合热路提取及温度后处理",
-  "version": "2026.10.30-native-1.0",
-  "apiVersion": 1,
+  "version": "2026.11.02-native-1.0.1",
+  "apiVersion": 2,
   "minApiVersion": 1,
   "cli": {
     "executables": [
@@ -28,14 +28,14 @@
         "{artifact:user/thermal.materials}",
         "--settings",
         "{artifact:user/solver.set}",
-        "--ports",
-        "{artifact:thermal/ports.def}"
+        "--source",
+        "{artifact:thermal/source.def}"
       ],
       "allowedArgs": [
         "--mesh",
         "--materials",
         "--settings",
-        "--ports"
+        "--source"
       ],
       "optional": false,
       "exitCodes": {
@@ -51,7 +51,9 @@
       },
       "producesInternal": [
         "thermal/temperature.map",
-        "thermal/extraction.binding"
+        "thermal/extraction.binding",
+        "thermal/operator.matrix",
+        "thermal/node.table"
       ]
     },
     {
@@ -68,8 +70,8 @@
         "{artifact:user/thermal.materials}",
         "--settings",
         "{artifact:user/solver.set}",
-        "--ports",
-        "{artifact:thermal/ports.def}",
+        "--source",
+        "{artifact:thermal/source.def}",
         "--op0",
         "{dataRoot}/Model/thermal.op0",
         "--result-binding",
@@ -79,7 +81,7 @@
         "--mesh",
         "--materials",
         "--settings",
-        "--ports",
+        "--source",
         "--op0",
         "--result-binding"
       ],
@@ -98,6 +100,10 @@
       "consumesInternal": [
         "thermal/temperature.map",
         "thermal/extraction.binding"
+      ],
+      "producesInternal": [
+        "thermal/post.binding",
+        "thermal/post.report"
       ]
     }
   ],
@@ -165,8 +171,8 @@
         }
       },
       {
-        "ref": "thermal/ports.def",
-        "path": "Model/port_thermal.json",
+        "ref": "thermal/source.def",
+        "path": "Model/source_thermal.json",
         "maintainedBy": [
           "ui"
         ],
@@ -191,11 +197,17 @@
       "user/thermal.mesh",
       "user/thermal.materials",
       "user/solver.set",
-      "thermal/ports.def"
+      "thermal/source.def"
     ]
   },
   "capabilities": {
     "dataLayout": "peec-data/v1",
-    "breakingChanges": []
+    "breakingChanges": [
+      {
+        "version": "2026.11.02-native-1.0.1",
+        "note": "docs_1.2: source_thermal.json and thermal/source.def replace former port input; CLI --source replaces --ports. Module-only package; cases delivered separately."
+      }
+    ],
+    "dataLayoutRevision": "1.2"
   }
 }

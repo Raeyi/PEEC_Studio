@@ -1,0 +1,84 @@
+{
+  "materials": [
+    {
+      "dimension": "volume",
+      "id": 3,
+      "name": "silicon",
+      "properties": {
+        "thermalConductivity": {
+          "model": "constant",
+          "unit": "W/(m*K)",
+          "value": 130.0
+        },
+        "density": {
+          "model": "constant",
+          "unit": "kg/m^3",
+          "value": 2330.0
+        },
+        "specificHeat": {
+          "model": "constant",
+          "unit": "J/(kg*K)",
+          "value": 700.0
+        }
+      },
+      "type": "D"
+    },
+    {
+      "dimension": "surface",
+      "id": 4,
+      "name": "copper__Surface_0.0005mm",
+      "properties": {
+        "conductivity": {
+          "model": "constant",
+          "unit": "S/m",
+          "value": 1e+16
+        },
+        "thermalConductivity": {
+          "model": "constant",
+          "unit": "W/(m*K)",
+          "value": 400.0
+        },
+        "density": {
+          "model": "constant",
+          "unit": "kg/m^3",
+          "value": 8960.0
+        },
+        "specificHeat": {
+          "model": "constant",
+          "unit": "J/(kg*K)",
+          "value": 385.0
+        }
+      },
+      "thickness": 0.0005,
+      "thicknessUnit": "mm",
+      "type": "C"
+    },
+    {
+      "dimension": "surface",
+      "id": 8,
+      "name": "silicon__Surface_0.0005mm",
+      "properties": {
+        "thermalConductivity": {
+          "model": "constant",
+          "unit": "W/(m*K)",
+          "value": 130.0
+        },
+        "density": {
+          "model": "constant",
+          "unit": "kg/m^3",
+          "value": 2330.0
+        },
+        "specificHeat": {
+          "model": "constant",
+          "unit": "J/(kg*K)",
+          "value": 700.0
+        }
+      },
+      "type": "D",
+      "thickness": 0.0005,
+      "thicknessUnit": "mm"
+    }
+  ],
+  "nextId": 10,
+  "schemaVersion": 3
+}

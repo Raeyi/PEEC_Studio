@@ -1,0 +1,51 @@
+{
+  "description": "Two copper layers: 1000 W each, uniform volumetric heating through 0.5 um thickness. Complete global bottom at 293.15 K. All other external boundaries adiabatic. Entity selections use Elementary IDs, not Physical IDs.",
+  "mesh_length_unit": "mm",
+  "selection_id_type": "elementary_entity",
+  "total_power_W": 2000.0,
+  "sources": [
+    {
+      "name": "upper_metal",
+      "type": "thin_layer_total_power",
+      "footprint_surface_entities": [
+        3
+      ],
+      "visualization_volume_entity": 2,
+      "top_surface_entity": 15,
+      "thickness_m": 5e-07,
+      "power_W": 1000.0,
+      "distribution_in_plane": "uniform_over_selected_footprint",
+      "distribution_through_thickness": "uniform",
+      "assembly": "consistent_two_trace_thin_layer_source; integrate_material_footprint_on_reference_surface"
+    },
+    {
+      "name": "lower_metal",
+      "type": "thin_layer_total_power",
+      "footprint_surface_entities": [
+        22
+      ],
+      "visualization_volume_entity": 3,
+      "top_surface_entity": 16,
+      "thickness_m": 5e-07,
+      "power_W": 1000.0,
+      "distribution_in_plane": "uniform_over_selected_footprint",
+      "distribution_through_thickness": "uniform",
+      "assembly": "consistent_two_trace_thin_layer_source; integrate_material_footprint_on_reference_surface"
+    }
+  ],
+  "default_external_boundary": "adiabatic",
+  "fixed_temperature": [
+    {
+      "name": "bottom_293p15K",
+      "location": "global_bottom_plane",
+      "surface_entities": [
+        18,
+        22
+      ],
+      "temperature_K": 293.15
+    }
+  ],
+  "schemaVersion": 1,
+  "meshFile": "Model/model_thermal.msh",
+  "meshSha256": "ebd53c3623f1b4f820875dffde0dc6fa8e2c3e801d9007f70a6cdb417f5b6e96"
+}
