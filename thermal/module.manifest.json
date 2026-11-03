@@ -2,8 +2,8 @@
   "manifestVersion": 1,
   "id": "thermal",
   "name": "薄层与四面体混合热路提取及温度后处理",
-  "version": "2026.11.02-native-1.0.1",
-  "apiVersion": 2,
+  "version": "2026.11.02-native-1.0.5",
+  "apiVersion": 6,
   "minApiVersion": 1,
   "cli": {
     "executables": [
@@ -27,15 +27,21 @@
         "--materials",
         "{artifact:user/thermal.materials}",
         "--settings",
-        "{artifact:user/solver.set}",
+        "{artifact:user/thermal.extract_settings}",
         "--source",
-        "{artifact:thermal/source.def}"
+        "{artifact:thermal/source.def}",
+        "--boundary",
+        "{artifact:thermal/boundary.def}",
+        "--simulation-settings",
+        "{artifact:user/thermal.simulation_settings}"
       ],
       "allowedArgs": [
         "--mesh",
         "--materials",
         "--settings",
-        "--source"
+        "--source",
+        "--boundary",
+        "--simulation-settings"
       ],
       "optional": false,
       "exitCodes": {
@@ -69,13 +75,15 @@
         "--materials",
         "{artifact:user/thermal.materials}",
         "--settings",
-        "{artifact:user/solver.set}",
+        "{artifact:user/thermal.extract_settings}",
         "--source",
         "{artifact:thermal/source.def}",
         "--op0",
-        "{dataRoot}/Model/thermal.op0",
-        "--result-binding",
-        "{dataRoot}/Model/thermal_run.json"
+        "{dataRoot}/Result/thermal/post/thermal.op0",
+        "--boundary",
+        "{artifact:thermal/boundary.def}",
+        "--simulation-settings",
+        "{artifact:user/thermal.simulation_settings}"
       ],
       "allowedArgs": [
         "--mesh",
@@ -83,7 +91,8 @@
         "--settings",
         "--source",
         "--op0",
-        "--result-binding"
+        "--boundary",
+        "--simulation-settings"
       ],
       "optional": true,
       "exitCodes": {
@@ -102,8 +111,7 @@
         "thermal/extraction.binding"
       ],
       "producesInternal": [
-        "thermal/post.binding",
-        "thermal/post.report"
+        "thermal/post.binding"
       ]
     }
   ],
@@ -138,6 +146,11 @@
         "ref": "thermal/temperature.maximum",
         "path": "Result/thermal/post/MaximumTemperature.txt",
         "schemaVersion": "1"
+      },
+      {
+        "ref": "thermal/temperature.report",
+        "path": "Result/thermal/post/TemperatureProcessReport.txt",
+        "schemaVersion": "1"
       }
     ],
     "consumed": [
@@ -161,8 +174,8 @@
         }
       },
       {
-        "ref": "user/solver.set",
-        "path": "Setting/set.json",
+        "ref": "user/thermal.extract_settings",
+        "path": "Result/thermal/thermal_extract_control.json",
         "accept": {
           "schemaVersion": {
             "min": 1,
@@ -184,9 +197,37 @@
           "fields": [
             "meshFile",
             "meshSha256",
-            "sources",
-            "fixed_temperature"
+            "sources"
           ]
+        }
+      },
+      {
+        "ref": "thermal/boundary.def",
+        "path": "Model/boundary_thermal.json",
+        "maintainedBy": [
+          "ui"
+        ],
+        "accept": {
+          "schemaVersion": {
+            "min": 1,
+            "max": 1
+          },
+          "fields": [
+            "default_external_boundary"
+          ]
+        }
+      },
+      {
+        "ref": "user/thermal.simulation_settings",
+        "path": "Setting/set_thermal.json",
+        "maintainedBy": [
+          "ui"
+        ],
+        "accept": {
+          "schemaVersion": {
+            "min": 1,
+            "max": 1
+          }
         }
       }
     ]
@@ -196,8 +237,10 @@
     "artifacts": [
       "user/thermal.mesh",
       "user/thermal.materials",
-      "user/solver.set",
-      "thermal/source.def"
+      "user/thermal.extract_settings",
+      "thermal/source.def",
+      "thermal/boundary.def",
+      "user/thermal.simulation_settings"
     ]
   },
   "capabilities": {
@@ -206,8 +249,24 @@
       {
         "version": "2026.11.02-native-1.0.1",
         "note": "docs_1.2: source_thermal.json and thermal/source.def replace former port input; CLI --source replaces --ports. Module-only package; cases delivered separately."
+      },
+      {
+        "version": "2026.11.02-native-1.0.2",
+        "note": "Boundary configuration moved from source_thermal.json to required boundary_thermal.json; new --boundary CLI and thermal/boundary.def dependency. Internal extraction binding now includes boundary SHA256. TemperatureProcessReport.txt promoted to public artifact thermal/temperature.report."
+      },
+      {
+        "version": "2026.11.02-native-1.0.3",
+        "note": "User-requested removal of thermal_run.json and --result-binding. Default OP0 path is temporarily Result/thermal/post/thermal.op0. Node/mapping and extraction consistency checks retained; OP0-to-deck provenance is not verified."
+      },
+      {
+        "version": "2026.11.02-native-1.0.4",
+        "note": "Superseded: extraction control was incorrectly named set_thermal in 1.0.4; corrected in 1.0.5."
+      },
+      {
+        "version": "2026.11.02-native-1.0.5",
+        "note": "Setting/set_thermal.json contains SPICE simulation settings. Extraction control is temporarily Result/thermal/thermal_extract_control.json. --simulation-settings controls the op/probe directives; --settings continues to select extraction control."
       }
     ],
-    "dataLayoutRevision": "1.2"
+    "dataLayoutRevision": "1.2 revision 2"
   }
 }

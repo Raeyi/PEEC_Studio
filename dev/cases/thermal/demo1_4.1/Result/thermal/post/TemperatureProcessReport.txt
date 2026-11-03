@@ -1,0 +1,14 @@
+status SUCCESS
+model hybrid-thin-layer-mapped
+op0 C:\Users\18444\Desktop\AEDA\united_group\ThermalDelivery_1.0\thermal_cases_20261102\demo1_4.1\Result\thermal\post\thermal.op0
+mesh C:\Users\18444\Desktop\AEDA\united_group\ThermalDelivery_1.0\thermal_cases_20261102\demo1_4.1\Model\model_thermal.msh
+map C:\Users\18444\Desktop\AEDA\united_group\ThermalDelivery_1.0\thermal_cases_20261102\demo1_4.1\Result/thermal\extract/ThermalTemperatureMap.csv
+op0_temperature_count 12750
+mapped_temperature_count 9564
+mapping_weight_count 17878
+max_partition_of_unity_error 1.8318679906315083e-14
+minimum_mapped_temperature_K 293.12709999999998
+maximum_mapped_temperature_K 344.1037
+new_temperature_solve_performed false
+values_clamped false
+note Thin-band tetrahedral vertex temperatures come from the thin-layer solution.

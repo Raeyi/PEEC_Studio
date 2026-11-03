@@ -1,0 +1,6 @@
+maximum_mapped_temperature_K 344.1037
+maximum_mapped_temperature_C 70.953700000000026
+original_mesh_node 766
+x_m 0.017950748376730559
+y_m 0.017549888604487272
+z_m 0.0036000000000000003

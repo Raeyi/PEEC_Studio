@@ -1,82 +1,91 @@
-# thermal 原生模块 1.0
+# thermal 1.0.5 — docs_1.2 修订2
 
-依据 docs_1.2 内 v1.2 数据布局、模块契约和接入规范。Windows x64，C++17，MSVC v143 /MT 静态运行库。无需 Python、NumPy、SciPy、Gmsh DLL 或 VC++ Redistributable。系统 DLL（KERNEL32、BCRYPT 等）仍由 Windows 提供。解析器为项目自有实现，没有第三方运行时库。
+2026-11-02 重建；apiVersion=6。依据 DATA_LAYOUT §八.1/§八.2 与 THERMAL_REPACK_20261102.md。模块目录名必须为 thermal，包内仅两个 EXE、README.md、ERROR_CODES.md、module.manifest.json 五个文件。
 
-## 安装及调用
+## 安装与调用
 
-把本目录以 `thermal` 名称部署到 MODULE_ROOT。安装目录可只读。数据必须在独立 dataRoot。无参数启动不会在 EXE 旁搜索文件。
+Windows x64，原生 C++17，MSVC v143 /MT。无需 Python、Gmsh DLL、NumPy、SciPy 或 VC++ Redistributable。仅依赖 Windows 系统 KERNEL32/bcrypt；JSON、MSH 解析器为项目自有实现，无第三方运行库。原后处理算法沿用项目原生版本。
+
+安装目录可只读；算例不放 EXE 目录内，不提供无参数自动搜索数据的模式。
 
 ```powershell
-.\ThermalExtract.exe --data-root "D:\cases\demo1"
-# 用户另行使用 ALPS 求解 Result/thermal/extract/ThermalNetList.sp
-.\TemperatureProcess.exe --data-root "D:\cases\demo1"
+.\ThermalExtract.exe --data-root "D:\cases\demo1_4.1"
+.\TemperatureProcess.exe --data-root "D:\cases\demo1_4.1"
 ```
 
-|CLI|默认值/作用|
+第二条需要与该工程对应的真实 ALPS OP0，不要求用户维护额外绑定JSON。提取不启动 ALPS、不求温度、不生成 OP0。案例提供的历史 OP0 仅供原模型回归。
+
+|参数|默认值/说明|
 |---|---|
 |--data-root|必填，独立算例根目录|
 |--runtime-dir|Result/logs/thermal，可指定其子目录|
 |--mesh|Model/model_thermal.msh|
 |--materials|Model/matdb.json|
-|--settings|Setting/set.json|
-|--source|Model/source_thermal.json|
-|--op0|仅 post，Model/thermal.op0|
-|--result-binding|仅 post，Model/thermal_run.json|
-|--help / --version|独立使用，打印帮助或版本|
+|--settings|Result/thermal/thermal_extract_control.json，热路提取配置|
+|--simulation-settings|Setting/set_thermal.json，SPICE分析/输出设置|
+|--source|Model/source_thermal.json，只含热源|
+|--boundary|Model/boundary_thermal.json，独立热边界，extract/post 都接受|
+|--op0|仅 post，Result/thermal/post/thermal.op0|
+|--help / --version|单独使用，不要求 dataRoot|
 
-路径可为 dataRoot 内相对路径或绝对路径，支持中文和空格。文件路径不能越出 dataRoot；不读取/写入 Result/tasks。私有互斥锁在 .locks/thermal.pipeline.lock，锁文件存在不代表正在运行。退出码及 QS 错误见 ERROR_CODES.md。
+相对路径基于 dataRoot；绝对路径必须仍在 dataRoot 内，不能指向 Result/tasks。项目目录名按规范使用字母数字下划线；父目录支持 Unicode。日志在 Result/logs/thermal，互斥锁在 .locks/thermal.pipeline.lock。只检测运行中的锁句柄，不因残留锁文件拒绝重跑。退出码0成功、2配置格式、3文件IO、4数值校验、5系统服务、6互斥锁；完整 QS 码见 ERROR_CODES.md。
 
-## 输入文件职责
+## 输入契约
 
-- 网格：MSH 4.1 ASCII，一阶三角形/四面体；兼容 2.2 ASCII。不能读取 binary、高阶单元、棱柱/六面体。后处理节点标签上限 10000000，2.2 后处理要求连续标签。
-- matdb.json：schemaVersion=3，按 dimension + physical_material_id 查材料。thermalConductivity、density、specificHeat 均为正数常量，单位分别 W/(m*K)、kg/m^3、J/(kg*K)。电导率不参与热计算。
-- Setting/set.json：schemaVersion=1，保留标准电磁字段，新增 thermal 对象。thermal.mesh_length_scale_to_m 指定坐标到 m 的比例（后处理支持 m/mm/um）；tetrahedral_domains 定义体网格和材料；thin_layers 定义参考面、厚度、材料投影和仅用于显示的体。
-- Model/source_thermal.json：schemaVersion=1，meshFile 为 dataRoot 内路径，meshSha256 是网格文件原始字节 SHA256；sources 定义各层总功率，fixed_temperature 定义底面温度，default_external_boundary=adiabatic。
-- Model/thermal.op0：由用户/求解器导入的真实 ALPS 结果，不由本模块生成。必须包含全部 T1…TN 节点温度。
-- Model/thermal_run.json：schemaVersion=1，netlistSha256 为实际求解网表 SHA256，op0Sha256 为结果 SHA256。用来防止误选文件；哈希本身不能证明求解器确实运行过，导入方须保证来源真实。
+1. 网格：MSH4.1 ASCII，一阶三角形/四面体，兼容2.2 ASCII。高阶、二进制、六面体/棱柱不支持。后处理4.1节点标签上限10000000；2.2后处理要求连续标签。坐标按 thermal.mesh_length_scale_to_m 转为m，后处理支持m/mm/um。
+2. matdb.json：schemaVersion=3；材料由 dimension + physical_material_id 指定。thermalConductivity、density、specificHeat 均为正数constant，单位 W/(m*K)、kg/m^3、J/(kg*K)。
+4. source_thermal.json：schemaVersion=1，meshFile（dataRoot内实际热网格路径）、meshSha256（文件原始字节SHA256）、selection_id_type、total_power_W、sources；可有说明/单位。sources 支持 thin_layer_total_power，按 footprint_surface_entities 上均匀功率、厚度方向均匀分配。**禁止 default_external_boundary/fixed_temperature 字段**，旧格式明确报错。
+5. boundary_thermal.json：独立必需输入，schemaVersion=1。当前仅支持 default_external_boundary=adiabatic，以及完整全局底面的固定温度。示例：
 
-实体选择全部用 Elementary ID；材料 ID 属于材料库。不能把 Physical ID 当成几何实体 ID。
+```json
+{"schemaVersion":1,"default_external_boundary":"adiabatic","fixed_temperature":[{"name":"bottom_293p15K","location":"global_bottom_plane","surface_entities":[18,22],"temperature_K":293.15}]}
+```
 
-## 算法范围
+surface_entities 一律为 Elementary ID，不是 Physical ID。若省略 fixed_temperature，格式上视为空数组；本版独立稳态网表要求至少一组固定温度，故报“不具备固定温度边界”，不会把全绝热有热源的模型当作可求稳态。缺失文件、错误版本、负温度、无效实体等均报错。源字段不得写入边界文件。boundary_em.json 仍为预留，本模块不读取。
 
-本版针对当前三层模型：中层线性四面体；上下层为平行 XY 的等厚薄层、双温度迹。参考面须与中层网格共形；外表面网格可不对齐。薄层材料通过三角形交叠积分，包含面内和厚度方向传热。原薄层四面体不重复组装，只用于求解后的温度插值。
+6. Result/thermal/post/thermal.op0：用户实际求解得到的 ALPS 输出，必须含全部 T1…TN 温度。
 
-支持金属投影区域内均匀功率、全局完整底面固定温度、其他外面绝热。不支持局部底面固定温度、对流、辐射、温变材料或曲面薄层。遇到未支持设置报错，不静默代替。
+## 计算与输出
 
-网表 V 对应 K，I 对应 W，R 为 K/W，C 为 J/K。Rt 与带符号 Gcorr 共同表示 FEM 矩阵；不能删除 Gcorr。RC 网表自包含，默认仍为 .op，不自动设置瞬态工况。提取程序不求温度、不启动 ALPS、不生成 .op0。后处理不补造缺失温度，也不截断低于边界温度的数值。
+本次只调整文件职责，不改变算法：中层四面体 FEM、上下层双温度迹薄层 FEM；支持平行XY等厚薄层，参考面须与中层共形，材料投影须完整覆盖参考面。原薄层四面体只用于最终温度显示，不重复组装。尚未实现讨论中的 PEEC 四面体替代方法。
 
-## 输出
+网表 V=温度K，I=功率W，R=K/W，C=J/K。保留 Rt 和带符号 Gcorr 才与 FEM 矩阵等价，不能删除 Gcorr。DC/RC网表自包含，默认.op；瞬态参数由用户另定。后处理不补造缺失节点，不截断低温。
 
-`Result/thermal/extract/`：ThermalNetList.sp、ThermalNetList_RC.sp（主交付），thermal_nodes.csv（节点坐标/热容/热源），thermal_K.mtx（MatrixMarket 热导矩阵），ThermalTemperatureMap.csv（原网格节点到热节点的权重），extraction_report.json，thermal_binding.json。
+- Result/thermal/extract：ThermalNetList.sp、ThermalNetList_RC.sp、thermal_nodes.csv、thermal_K.mtx、ThermalTemperatureMap.csv、extraction_report.json、thermal_binding.json、stage_receipt.json。
+- Result/thermal/post：VolumeTemperatureAtOperatingPoint.msh（原网格追加K/℃ NodeData）、NodeTemperatureAtOperatingPoint.csv、MaximumTemperature.txt、TemperatureProcessReport.txt、post_binding.json、stage_receipt.json。
 
-`Result/thermal/post/`：VolumeTemperatureAtOperatingPoint.msh（原网格加 K/℃ NodeData）、NodeTemperatureAtOperatingPoint.csv、MaximumTemperature.txt、TemperatureProcessReport.txt、post_binding.json。
+thermal_binding.json 对网格、材料、设置、源、**边界**和网表/映射做指纹绑定；修改边界必须重新提取，不能继续使用旧解。该内部格式变更需要新提取结果，旧版 binding 不能直接用于新版 post。receipt 是辅助排错信息，不参与调度。两个程序不写 Model/Setting、不发布正式件、不读写 Result/tasks。
 
-每阶段可写 stage_receipt.json；调度不能依赖它，task_layer 状态由平台维护。映射、绑定、节点表与矩阵是本模块内部件；公共产物见 manifest。此版不声明 publishTo，也不自行修改 Model/Setting。
+## 平台接入和本地验证
 
-## 平台接入与待联调项
+manifest 用新版官方 Schema 校验；新增 thermal/boundary.def，两个阶段的 argsTemplate 均传 --boundary {artifact:thermal/boundary.def}。布局字段按Schema仍写 peec-data/v1，具体修订记 dataLayoutRevision=1.2 revision 2。当前API为6、批次1.0.5：按用户指示将提取配置移至Result/thermal/thermal_extract_control.json；继续保留此前取消结果绑定输入及临时OP0落点的改动。
 
-manifest 已用随标准的 JSON Schema 校验。样例采用 UI 提供的 user/thermal.mesh 和 user/thermal.materials ref；集成建模链时由平台路由上游工件，并传入 --mesh/--materials，不能在程序中硬编码上游目录。包外样例 Model 只有一份热网格；与 EM 同算例时不得向 Model 再放第二份主网格，应通过 ref 指向热链产物。
+案例、源码、验收记录在模块包外，不能装入 thermal/。案例包 thermal_cases_20261102 中含完整Model/Setting、历史OP0及已生成Result结果；字段搬家后网表与历史求解对应网表保持相同。两阶段调用见案例README。验证脚本使用本交付内的参考数据，不依赖外部案例；开发验证需要Python3.12/jsonschema，运行EXE不需要。
 
-post 是可选阶段；OP0 和 thermal_run.json 是该阶段显式 CLI 输入，不作为整个模块的公共前置工件，避免 extract 被尚未生成的 OP0 阻塞。平台在 post 启动前可做存在性检查，本程序始终做内容及指纹深检。
+平台提供的 THERMAL_REPACK_20261102.md 说明旧1.0.1已通过平台E2E；该结论不等同于本1.0.5已通过平台E2E。本次完成模块本地测试，平台收到新manifest后需重跑thermal_basic。未运行新的ALPS物理求解。
 
-标准正文说消费者只写 ref，但官方 Schema 要求 consumed.path；本包按 Schema 保留声明路径，argsTemplate 实际使用 artifact ref 路由。
+重编译：包外 source/build.ps1，VS2022 C++和Windows SDK；输出source/build。无examples/templates/defaultTemplate机制。
 
-未提供 task_layer.exe，尚未执行真实平台注册、路由表/DAG/API 窗口校验和 task_layer dev_case。不能把本地模块测试当作平台全链路验收。交付根目录 validation 中记录已测与未测项。
+正式结果清单已包括 thermal/temperature.report → Result/thermal/post/TemperatureProcessReport.txt，供 task.result/resultFiles 收录。thermal_nodes.csv 和 thermal_K.mtx 继续登记为内部工件，不改变既有用途。
+## 用户指定的临时OP0路径（1.0.3）
 
-## 本地测试及源码
+取消 thermal_run.json 文件和 --result-binding 参数；无该文件也能正常后处理。OP0默认放 Result/thermal/post/thermal.op0，可用 --op0 指定 dataRoot 内其他路径。模块不会覆写或删除输入OP0。保留网格、材料、设置、源、边界与提取结果一致性校验，以及OP0节点集合/数值/映射检查；不再检查OP0是否确实来自当前网表，导入方负责选择正确结果。自动输出 post_binding.json 只是本次输入与输出指纹记录，op0NetlistBindingVerified=false，不作为额外前置输入。
 
-包外 thermal_cases_20261102/demo1_4.1 是独立算例；运行案例包目录“开始测试.ps1”。用户完成 ALPS 后运行案例包目录“导入ALPS结果.ps1 -Op0 ... -SolvedNetlist ...”，该脚本是 UI/用户导入辅助工具，不属于模块安装目录。
+该改动优先执行用户指示；docs_1.2重发说明中附带thermal_run.json的旧案例要求不再采用。临时路径待用户后续确定。案例附带Result/thermal/extract与post实际结果，其中温度来自历史OP0映射，未新增ALPS求解。
 
-源码在交付根目录 source，运行 source/build.ps1（VS2022 C++/Windows SDK）。输出 source/build。开发验收脚本需要 Python3.12 + jsonschema；EXE 运行不需要这些环境。
+## 文件职责（1.0.5，按用户纠正）
 
-## 2026-11-02 / docs_1.2 重发变更
+- `Setting/set_thermal.json`：用户交互产生的 **SPICE 仿真设置**，只包含分析类型和输出设置。
+- `Result/thermal/thermal_extract_control.json`：原提取控制文件，内容原样保留，暂存于此；含网格单位、体域、薄层、材料关联。它不是仿真设置，后续由用户决定拆分。
+- `Model/source_thermal.json`、`Model/boundary_thermal.json`：热源和热边界。
+- `Result/thermal/post/thermal.op0`：保持用户指定的临时路径。
 
-本模块目录仅含两个 EXE、README.md、ERROR_CODES.md、module.manifest.json 共五个文件（四类交付件）。案例独立交付 thermal_cases_20261102.zip，不再携带 templates/examples。
+当前仿真设置示例：
+```json
+{"schemaVersion":1,"analysis":"op","probe":["V(*)"]}
+```
+提取程序将其写入两份网表的 `.op` 和 `.probe V(*)`，末尾 `.end` 由程序生成。支持 `probe` 列表中的 `V(*)` 或 `V(Tn)`；当前分析类型仅支持 `op`，其他类型明确报错，尚不支持通过此文件配置瞬态。后处理仍要求 OP0 包含全部热节点，完整温度可视化应保留 `V(*)`。
 
-默认读取 Model/source_thermal.json，显式参数为 --source，原 --ports 不再接受，故 apiVersion 升至 2；minApiVersion=1 只表示上游兼容窗口。此版不会回退读取旧端口文件。配置内容及计算方法不变，仍为已验证 FEM/双迹薄层，尚未实现讨论中的 PEEC 四面体方案。
+`--settings` 继续指定提取控制文件，默认 `Result/thermal/thermal_extract_control.json`；新增 `--simulation-settings` 指定仿真设置，默认 `Setting/set_thermal.json`。两个文件都是输入，程序不覆写。仿真设置更改后需重新生成网表并使用相应求解结果；后处理校验设置指纹。`Setting/set.json` 不读取。
 
-boundary_thermal.json 在 v1.2 尚无格式及消费方；本版不读取、不创建、不声明该 ref。原 fixed_temperature/default_external_boundary 字段继续放在 source_thermal.json，直至正式边界契约定义。
-
-按新版官方 Schema，capabilities.dataLayout 仍为 peec-data/v1；具体遵循规范修订号另记 dataLayoutRevision=1.2。案例项目名使用字母、数字、下划线，不含空格或特殊字符；父路径支持 Unicode。
-
-源码和开发测试在交付总目录中另附；只有 thermal/ 或模块 zip 应安装到 MODULE_ROOT。
+该划分按用户最新指示实施，优先于 docs_1.2 的旧布局。API6、版本1.0.5；平台应使用更新后的 manifest。未实现或运行 ALPS 求解器，也未新增 UI。

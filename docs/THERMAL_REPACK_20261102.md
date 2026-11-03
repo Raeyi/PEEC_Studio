@@ -1,5 +1,22 @@
 # thermal 重打包说明（20261102 交付修正）
 
+> **回执（2026-11-03）：重发版 1.0.5 已收到并完成集成。**
+> - 交付：thermal_module_20261102_1.0.5.zip（模块四件套 5 文件）+ thermal_cases_20261102.zip
+>   （demo1_4.1 案例，含参考输出与历史 OP0）。
+> - 四项问题回执：① 设置作用域（EM 字段不再出现于热链设置文件）✓；② boundary_thermal.json
+>   独立 + --boundary + SHA 入内部绑定 ✓；③ TemperatureProcessReport.txt 正式声明为
+>   thermal/temperature.report ✓；④ 设置拆分——**按用户最新指示实施**，优先于本说明问题 4
+>   文案：Setting/set_thermal.json = SPICE 仿真设置（analysis/probe），thermal 对象移入
+>   Result/thermal/thermal_extract_control.json（暂存于此，拆分位置待定）；OP0 默认路径
+>   Result/thermal/post/thermal.op0（thermal_run.json 已于 1.0.3 取消）；manifest 标注
+>   dataLayoutRevision "1.2 revision 2"、apiVersion 6。
+> - 平台集成：仓库已换 1.0.5 模块目录 + 新案例归档（dev/cases/thermal/demo1_4.1）；
+>   pipelines.json post 段 requires 修正为 Result/thermal/post/thermal.op0；E2E 双通道
+>   全过（直接案例跑 10/10 产物与 vendor 参考逐字节一致；平台 pipeline 全链 2.6s，
+>   344.1037 K / 12750 节点 / 9564 行，网表 .op/.probe 注入正确）。
+> - DATA_LAYOUT 已升 v1.4 按 1.0.5 实况定形热侧（§八.1 含版本沿革）；本文件留档为
+>   重发请求历史。
+>
 致 thermal 模块团队。平台对 2026-11-02 交付（ThermalDelivery_1.0，模块 1.0.1 +
 案例包 thermal_cases_20261102）做了全链集成验证：模块包 5 文件 SHA 全过、
 manifest 符合 v1.2、thermal_basic 平台 E2E 全链通过（2.4s）、4 个关键产物

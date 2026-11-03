@@ -183,7 +183,7 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 |---|---|
 | `gds_full` | **建模**：源模型 → 几何准备 → 电磁网格 → 热网格（1102 版起四段全必需）；EM 主网格 + 材料由任务层 **publisher 自动落位到 `Model/`**，热网格保留在 `Result/gds2geo/thermal/`（v1.1 布局，无 handoff）。gds2geo 1102 版需要的 gmsh 4.11.1 由 task_layer 经子进程环境变量 `GDS2GEO_GMSH_EXECUTABLE` 自动注入，UI 无需处理 |
 | `peec_basic` | **电磁**：PEEC 提取 → 频域求解 → S 参数绘图 + 源/场后处理（后两段可选） |
-| `thermal_basic` | **热**：热路提取（thermal.extract，必需）→ 温度后处理（thermal.post，可选，无 OP0 时自动跳过）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），求解设置（v1.2 时代 `Setting/set.json` 含 `thermal` 对象；v1.3 起 `Setting/set_thermal.json`）与 `Model/source_thermal.json` 由 UI 写入 |
+| `thermal_basic` | **热**：热路提取（thermal.extract，必需）→ 温度后处理（thermal.post，可选，无 OP0 时自动跳过）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），热链四件由 UI 写入：`Model/source_thermal.json`（热源）+ `Model/boundary_thermal.json`（边界条件，必需，thermal 1.0.5 起；1.0.1 时代内嵌于 source_thermal.json）+ `Setting/set_thermal.json`（SPICE 仿真设置 analysis/probe，thermal 1.0.5 起）+ `Result/thermal/thermal_extract_control.json`（提取控制：体域/薄层，暂存于此；v1.2 时代/thermal 1.0.1 读合并件 `Setting/set.json` 的 `thermal` 对象） |
 
 进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。
 模块能否真正运行（程序是否找得到）用 `modules.list` 的 `available` 字段判断（见 4.2）。
@@ -206,7 +206,7 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 
 ```text
 ① UI: task.run gds_full              → 热网格产出在 Result/gds2geo/thermal/（matdb 含热物性）
-② UI: 写求解设置            → v1.2 时代：set.json 增加 "thermal" 对象；v1.3 起：写 Setting/set_thermal.json
+② UI: 写求解设置            → v1.2 时代：set.json 增加 "thermal" 对象；thermal 1.0.5 起：写 Setting/set_thermal.json（SPICE 仿真设置）+ Result/thermal/thermal_extract_control.json（thermal 对象，暂存于此）
                                         （tetrahedral_domains / thin_layers，elementary 实体 ID；
                                         薄层 material_footprints 必须完整铺满 reference_surfaces）
                                         写 Model/source_thermal.json        → meshFile 指向
@@ -494,7 +494,7 @@ dataRoot = <部署根>/cases/<项目名>/DATA
 <case>\DATA\
 ├── Model\        主网格 *.msh（恰好一份）、matdb.json、source_em.json（规范名，v1.2）
 │                 + boundary_em.json（预留）；平台预检仍兼容旧名 port_em.json（compact_em 不再读旧名）
-├── Setting\      求解设置：v1.2 时代 set.json / v1.3 起 set_em.json + set_thermal.json
+├── Setting\      求解设置：v1.2 时代 set.json / v1.3 起 set_em.json + set_thermal.json（SPICE 仿真设置）
 ├── Result\
 │   ├── compact_em\  模块产物区（按 stage 子目录）：extract\ solve\ plot\ post\
 │   ├── logs\compact_em\  诊断 jsonl

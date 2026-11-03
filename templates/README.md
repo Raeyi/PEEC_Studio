@@ -9,13 +9,14 @@
 | 文件 | 时代 | 写者 | 说明 |
 |---|---|---|---|
 | Setting/set_em.json | v1.3 起 | UI | EM 求解设置（平铺字段，schemaVersion 1）；纯热算例不需要 |
-| Setting/set_thermal.json | v1.3 起 | UI | 热求解设置（thermal 对象：四面体域 + 薄层）；纯 EM 算例不需要 |
+| Setting/set_thermal.json | thermal 1.0.5 起 | UI | SPICE 仿真设置（analysis/probe；当前仅支持 op、瞬态未支持）；程序不覆写；纯 EM 算例不需要 |
+| Result/thermal/thermal_extract_control.json | thermal 1.0.5 起 | UI | 提取控制（网格单位/四面体域/薄层/材料关联，即 thermal 对象）；暂存于此，后续拆分位置待定 |
 | Setting/set.json | v1.2 时代 | UI | 合并件 = EM 字段 + thermal 对象（联合算例形态）；纯热算例只留 schemaVersion + thermal，不复制 EM 字段 |
 | Model/source_em.json | 全时代 | UI | EM 源定义（meshFile/meshSha256 + 端口 triangleIds） |
 | Model/source_thermal.json | 全时代 | UI | 热源定义（meshFile 指向落位路径 + SHA + sources）；不含边界条件 |
-| Model/boundary_thermal.json | thermal 1.0.2 起 | UI | 热边界条件（default_external_boundary + fixed_temperature）；1.0.1 时代内嵌于 source_thermal.json |
+| Model/boundary_thermal.json | thermal 1.0.5 起 | UI | 热边界条件（default_external_boundary + fixed_temperature），**必需输入**（经 --boundary 传入，SHA 入内部绑定）；1.0.1 时代内嵌于 source_thermal.json |
 
-（1.0.1 → 1.0.2 之间：boundary 字段仍写在 source_thermal.json 内；新包集成后按上表。）
+（1.0.1 时代：boundary 字段内嵌于 source_thermal.json、无独立仿真设置文件；1.0.5 起按上表。1.0.5 的划分按用户最新指示实施，优先于 DATA_LAYOUT v1.3 上午的拆分文案。）
 
 ## 使用流程
 
@@ -26,8 +27,9 @@
    - source_em.json：meshSha256 = 落位主网格 SHA-256；ports 的 triangleIds 在新网格上选取；
    - source_thermal.json：meshFile = Result/gds2geo/thermal/model_thermal.msh（落位路径），
      meshSha256 = 该文件 SHA-256；sources 的实体 ID 为新网格的 Elementary ID；
-   - set_thermal.json（或 v1.2 时代 set.json 的 thermal 对象）：四面体域/薄层的
-     elementary ID / reference_surfaces 按新网格选取（薄层参考面必须完整铺满）；
+   - thermal_extract_control.json：四面体域/薄层的 elementary ID / reference_surfaces 按新网格选取
+     （薄层参考面必须完整铺满）；set_thermal.json 为仿真设置，默认 {"analysis":"op","probe":["V(*)"]}
+     即可（完整温度可视化需保留 V(*)）；
    - boundary_thermal.json：固定温度面 surface_entities 为新网格 Elementary ID；
 4. 跑 peec_basic / thermal_basic（OP0 就绪后 post 才可跑）。
 

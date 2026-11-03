@@ -1,6 +1,0 @@
-{
-  "schemaVersion": 1,
-  "netlistSha256": "0b6a7d5ddf98c68c7f542f7da7b21fe7a8e4e6300323f2f5cb4ec308f50c9a5e",
-  "op0Sha256": "5c47638f05424b1f6c834d295a311d7c0fd73aa0c0375551894f89423e3d1281",
-  "provenance": "Historical OP0 regression fixture; not a fresh solve. Native operator equivalence checked separately."
-}
