@@ -245,7 +245,7 @@ v1.4 · 2026-11-03 · 适用：所有计算层模块与 UI、task_layer。路径
 }
 ````
 
-- **热边界条件（外部边界默认 + 固定温度面）一律写入 `Model/boundary_thermal.json`，不得内嵌于 `source_thermal.json`**；source_thermal.json 只含源定义（meshFile / meshSha256 / total_power_W / sources 等）。20261102 交付的 source_thermal.json 内含 `default_external_boundary` 与 `fixed_temperature` 字段，重发版时移出（见 THERMAL_REPACK_20261102.md）；
+- **热边界条件（外部边界默认 + 固定温度面）一律写入 `Model/boundary_thermal.json`，不得内嵌于 `source_thermal.json`**；source_thermal.json 只含源定义（meshFile / meshSha256 / total_power_W / sources 等）。20261102 交付的 source_thermal.json 内含 `default_external_boundary` 与 `fixed_temperature` 字段，重发版时移出（见 REPACK/thermal.md 第 1 轮）；
 - 热链算例必须提供 boundary_thermal.json（至少声明 default_external_boundary）；热模块经 CLI `--boundary` 读取（固定名 Model/boundary_thermal.json）；
 - `boundary_em.json` 仍为预留件（格式 TBD、暂无消费方），与 boundary_thermal.json 互不包含内容；
 - `fixed_temperature.surface_entities` 与 sources 的实体选择同为 Elementary ID（不是 Physical ID）。

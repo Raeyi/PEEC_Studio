@@ -1,22 +1,32 @@
-# thermal 重打包说明（20261102 交付修正）
+# thermal 模块重打包请求日志（REPACK/thermal）
 
-> **回执（2026-11-03）：重发版 1.0.5 已收到并完成集成。**
-> - 交付：thermal_module_20261102_1.0.5.zip（模块四件套 5 文件）+ thermal_cases_20261102.zip
->   （demo1_4.1 案例，含参考输出与历史 OP0）。
-> - 四项问题回执：① 设置作用域（EM 字段不再出现于热链设置文件）✓；② boundary_thermal.json
->   独立 + --boundary + SHA 入内部绑定 ✓；③ TemperatureProcessReport.txt 正式声明为
->   thermal/temperature.report ✓；④ 设置拆分——**按用户最新指示实施**，优先于本说明问题 4
->   文案：Setting/set_thermal.json = SPICE 仿真设置（analysis/probe），thermal 对象移入
->   Result/thermal/thermal_extract_control.json（暂存于此，拆分位置待定）；OP0 默认路径
->   Result/thermal/post/thermal.op0（thermal_run.json 已于 1.0.3 取消）；manifest 标注
->   dataLayoutRevision "1.2 revision 2"、apiVersion 6。
-> - 平台集成：仓库已换 1.0.5 模块目录 + 新案例归档（dev/cases/thermal/demo1_4.1）；
->   pipelines.json post 段 requires 修正为 Result/thermal/post/thermal.op0；E2E 双通道
->   全过（直接案例跑 10/10 产物与 vendor 参考逐字节一致；平台 pipeline 全链 2.6s，
->   344.1037 K / 12750 节点 / 9564 行，网表 .op/.probe 注入正确）。
-> - DATA_LAYOUT 已升 v1.4 按 1.0.5 实况定形热侧（§八.1 含版本沿革）；本文件留档为
->   重发请求历史。
->
+> 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
+> 关联活契约：`DATA_LAYOUT.md`（v1.4）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.0.5（2026.11.02-native-1.0.5，apiVersion 6）**。
+
+## 第 1 轮（2026-11-02 请求 → 2026-11-03 收口）
+
+状态：**已收口** —— 重发版 1.0.5 已收到并集成（模块目录替换 + 新案例归档 dev/cases/thermal/demo1_4.1 + E2E 双通道全过；DATA_LAYOUT 升 v1.4 按 1.0.5 实况定形热侧）。
+
+### 回执（2026-11-03）
+
+- 交付：thermal_module_20261102_1.0.5.zip（模块四件套 5 文件）+ thermal_cases_20261102.zip
+  （demo1_4.1 案例，含参考输出与历史 OP0）。
+- 四项问题回执：① 设置作用域（EM 字段不再出现于热链设置文件）✓；② boundary_thermal.json
+  独立 + --boundary + SHA 入内部绑定 ✓；③ TemperatureProcessReport.txt 正式声明为
+  thermal/temperature.report ✓；④ 设置拆分——**按用户最新指示实施**，优先于本说明问题 4
+  文案：Setting/set_thermal.json = SPICE 仿真设置（analysis/probe），thermal 对象移入
+  Result/thermal/thermal_extract_control.json（暂存于此，拆分位置待定）；OP0 默认路径
+  Result/thermal/post/thermal.op0（thermal_run.json 已于 1.0.3 取消）；manifest 标注
+  dataLayoutRevision "1.2 revision 2"、apiVersion 6。
+- 平台集成：仓库已换 1.0.5 模块目录 + 新案例归档（dev/cases/thermal/demo1_4.1）；
+  pipelines.json post 段 requires 修正为 Result/thermal/post/thermal.op0；E2E 双通道
+  全过（直接案例跑 10/10 产物与 vendor 参考逐字节一致；平台 pipeline 全链 2.6s，
+  344.1037 K / 12750 节点 / 9564 行，网表 .op/.probe 注入正确）。
+- DATA_LAYOUT 已升 v1.4 按 1.0.5 实况定形热侧（§八.1 含版本沿革）；本文件留档为
+  重发请求历史。
+
+### 请求正文（2026-11-02）
+
 致 thermal 模块团队。平台对 2026-11-02 交付（ThermalDelivery_1.0，模块 1.0.1 +
 案例包 thermal_cases_20261102）做了全链集成验证：模块包 5 文件 SHA 全过、
 manifest 符合 v1.2、thermal_basic 平台 E2E 全链通过（2.4s）、4 个关键产物
@@ -27,7 +37,7 @@ MaximumTemperature 344.1037 K / 9564 节点。数值与稳定性没有问题。
 但对照契约（DATA_LAYOUT 现已升 v1.3），发现**案例输入文件/设置共四处
 需修正**，需要重打新的案例包（模块包 CLI/manifest 需相应改动，一并重打）：
 
-## 问题 1：case 的 set.json 混入了 EM 配置字段
+### 问题 1：case 的 set.json 混入了 EM 配置字段
 
 文件：thermal_cases_20261102/demo1_4.1/Setting/set.json
 
@@ -49,7 +59,7 @@ docs_1.2 §八.1 作用域规则：
 `Setting/set_thermal.json`——即修正后的「只含 thermal 对象」文件直接以
 set_thermal.json 交付，不再存在合并 set.json。
 
-## 问题 2：边界条件内嵌在 source_thermal.json 里
+### 问题 2：边界条件内嵌在 source_thermal.json 里
 
 文件：thermal_cases_20261102/demo1_4.1/Model/source_thermal.json
 
@@ -88,7 +98,7 @@ docs_1.2 §八.2 契约（本次新定义，v1.2 修订 2）：
   （平台侧收到新 manifest 后同步 pipelines/manifest 声明即可）；
 - ERROR_CODES 相应登记（boundary 文件缺失/格式错 → 对应既有码或新增）。
 
-## 问题 3（平台侧补充）：produced 清单补全后处理报告
+### 问题 3（平台侧补充）：produced 清单补全后处理报告
 
 现状：post 阶段产物中 TemperatureProcessReport.txt（温度后处理报告）未列入
 manifest produced，平台 task.result 的 resultFiles 因此不含它（文件在磁盘
@@ -97,7 +107,7 @@ Result/thermal/post/ 下，UI 可固定路径读取）。新包请将 `post` 阶
 （ref 如 thermal/temperature.report）；如平台后续需要 thermal_nodes.csv /
 thermal_K.mtx 进清单，也一并声明（当前按模块内部件处理，不强制）。
 
-## 问题 4：求解设置拆分（DATA_LAYOUT v1.3，2026-11-02 升版）
+### 问题 4：求解设置拆分（DATA_LAYOUT v1.3，2026-11-02 升版）
 
 平台契约 DATA_LAYOUT 已升 v1.3：`Setting/set.json` 按链路拆分为
 `set_em.json`（EM 字段，compact_em 消费）与 `set_thermal.json`（热对象，
@@ -113,7 +123,7 @@ thermal_K.mtx 进清单，也一并声明（当前按模块内部件处理，不
 - 案例包 demo1_4.1 的 Setting/ 交付 `set_thermal.json`（无 set.json）；
 - 数值回归基线不受影响（设置内容未变）。
 
-## 交付要求（新包）
+### 交付要求（新包）
 
 1. 新模块包（如版本升 1.0.2）：四件套 + 按上述 CLI/manifest 改动（含问题 4
    的 consumed 路径与 dataLayoutRevision）；包内仍只有四件套，无
@@ -134,3 +144,7 @@ thermal_K.mtx 进清单，也一并声明（当前按模块内部件处理，不
 §八.1 set_thermal.json 格式、目录树/所有权表/不变式联动）；平台读取由 manifest
 consumed 驱动，无需代码改动；新包到位后平台重跑 thermal_basic 全链 E2E 并对照
 回归基线。docs_1.3 契约包随本说明重发。
+
+## 未决项（非重打包）
+
+- **thermal_extract_control.json 存放位置待用户确认**（1.0.5 按用户最新指示暂存 `Result/thermal/`，平台现状已按实况接受并写入契约）。确认后开新轮次或出契约小修订，DATA_LAYOUT 相应升版。
