@@ -9,10 +9,12 @@
 
 ### 2026-11-04 会议补充（并入 v1.3 重发要求）
 
-1. **包内须携带 `set_em.json`**（放包根，与四件套同级）：
-   - 内容 = 该版本默认求解设置（平铺 EM 字段，schemaVersion=1，与 Setting/set_em.json 格式一致）；
-   - 模块二进制**不消费**此文件（二进制读 dataRoot 的 Setting/ 同名文件）；
-   - 用途：前端 UI 加载时取默认值（新建算例/设置页）；
+1. **设置默认件归平台管理**（set_em.json）：
+   - 默认求解设置文件由平台维护（初值在平台包 templates/Setting/set_em.json，
+     平台负责最终内容并传给前端 UI 作默认值）；
+   - **包内无需携带 set_em.json**；
+   - v1.3 若改动设置格式/字段/默认值，**须在发版说明中注明**，平台据此更新
+     templates/ 文件并传给 UI；
    - 依据：DATA_LAYOUT v1.4 修订 1 ①、MODULE_ONBOARDING 修订（2026-11-04）。
 2. **移除 plot 阶段 / plotter exe**：
    - 平台 peec_basic 流水线已移除 plot 阶段（2026-11-04）：仅 extract → solve → post；

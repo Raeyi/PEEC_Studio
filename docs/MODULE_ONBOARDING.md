@@ -2,7 +2,7 @@
 
 v1.2 · 2026-11-02 · 读者：模块团队负责人。前置阅读：DATA_LAYOUT.md、MODULE_MANIFEST_SPEC.md。
 v1.2 变更：① 包内只含四件套，不再携带 `examples/`、`templates/`（统一各模块包结构）；② 新增**案例包交付**要求（§1.1，包外单独交付）；③ 输入文件名改名 `port_em.json` → `source_em.json`、`port_thermal.json` → `source_thermal.json`，新增预留件 `boundary_em.json`、`boundary_thermal.json`（DATA_LAYOUT v1.2）。
-修订（2026-11-04，随 DATA_LAYOUT v1.4 修订 1）：① 包内增**设置默认件**（compact_em: `set_em.json` / thermal: `set_thermal.json`，放包根；内容 = 该版本默认求解/仿真设置，模块二进制不消费，供平台/UI 加载默认值；自各家下一版发版起）；② peec_basic 流水线移除 plot 阶段（绘图交前端；compact_em v1.3 重发版起不再提供 plotter exe）。
+修订（2026-11-04，随 DATA_LAYOUT v1.4 修订 1）：① **设置默认件归平台管理**（set_em.json / set_thermal.json，初值在平台包 templates/；平台负责最终内容并传给 UI；模块包无需携带 set_*.json，设置格式/默认值变更在发版说明注明即可）；② peec_basic 流水线移除 plot 阶段（绘图交前端；compact_em v1.3 重发版起不再提供 plotter exe）。
 机器校验工具：`docs/module.manifest.schema.json`（JSON Schema draft-07，平台方提供）。
 
 ## 一、交付四件套
@@ -14,7 +14,7 @@ v1.2 变更：① 包内只含四件套，不再携带 `examples/`、`templates/
 | 3 | `ERROR_CODES.md` | QS 错误码登记：code / 触发条件 / 可恢复性 / 处置 |
 | 4 | `module.manifest.json` | 按 MANIFEST_SPEC 书写；**提交前用 JSON Schema 校验器验证** |
 
-包内**只含四件套 + 设置默认件**（compact_em: `set_em.json` / thermal: `set_thermal.json`，放包根；内容 = 该版本默认求解/仿真设置，模块二进制不消费，供平台/UI 加载默认值；2026-11-04 起）——不再携带 `examples/`、`templates/` 或任何其他目录/文件（统一所有模块包结构，降低平台集成成本）。
+包内**只含四件套**——不再携带 `examples/`、`templates/` 或任何其他目录/文件（统一所有模块包结构，降低平台集成成本）。设置默认件（set_em.json / set_thermal.json）**归平台管理**（初值在平台交付包 `templates/`，平台负责最终内容并传给 UI）；模块包无需携带 set_*.json，设置格式/默认值变更在发版说明注明即可（2026-11-04 定）。
 **不再接受包内可读写 `DATA/`。** 包内不含 UI 输入文件——UI 选取的输入直接写入算例 `<dataRoot>\Model\`。
 
 ### 1.1 案例交付（必做，包外单独交付）
@@ -119,8 +119,8 @@ compact_em 具体项：
 **Q：想新增 dataRoot 下的全局共享目录？** 走 DATA_LAYOUT 版本变更流程；模块私有需求放 `Result/<providerId>/` 自由区。
 **Q：产物 schema 小改要升 apiVersion 吗？** 加可选字段不升（C2）；删字段/改语义升（B4）。拿不准就升。
 **Q：热链输入文件现在要写哪些？** 两个：① `Model/source_thermal.json`——只含源定义（meshFile 指向热网格实际落位路径，gds_full 链路下为 `Result/gds2geo/thermal/model_thermal.msh`，+ 该文件 SHA-256；total_power_W / sources 等），**不含边界条件**；② `Model/boundary_thermal.json`——热边界条件（default_external_boundary + fixed_temperature，格式见 DATA_LAYOUT §八.2），热模块经 CLI `--boundary` 读取（重发版起）。`boundary_em.json` 仍是预留槽位（格式 TBD、暂无消费方），UI 可不写。另注意求解设置拆分（DATA_LAYOUT §八，v1.3 起 set_em.json/set_thermal.json；v1.2 过渡期纯热算例 set.json 不复制 EM 字段）。
-**Q：案例（自测样品）能放进模块包吗？** 不能。包内只含四件套 + 设置默认件；案例按 §1.1 单独交付（`<module>_cases_YYYYMMDD/`），平台归档 `dev/cases/<module>/`。
-**Q：设置默认件（set_em.json / set_thermal.json）怎么放？** 放包根（与四件套同级，不进 dataRoot）；内容 = 该版本默认求解/仿真设置（compact_em 侧为平铺 EM 字段 schemaVersion=1；thermal 侧为 SPICE 仿真设置 {schemaVersion, analysis, probe}）；模块二进制**不消费**此文件（二进制读 dataRoot 的 Setting/ 同名文件），平台/UI 加载时取默认值；2026-11-04 起随发版必带（DATA_LAYOUT v1.4 修订 1）。
+**Q：案例（自测样品）能放进模块包吗？** 不能。包内只含四件套；案例按 §1.1 单独交付（`<module>_cases_YYYYMMDD/`），平台归档 `dev/cases/<module>/`。
+**Q：设置默认件（set_em.json / set_thermal.json）怎么放？** 模块包**不携带**（2026-11-04 定）：设置默认件归**平台管理**——初值在平台交付包 `templates/` 目录，平台负责最终内容并传给 UI 作默认值；模块发版若改动设置格式/默认值，在发版说明中注明即可，平台据此更新 templates/ 文件并传给 UI（DATA_LAYOUT v1.4 修订 1 ①）。
 **Q：set.txt 什么时候彻底废弃？** compact_em 下一版 CLI 同时接受 JSON 求解设置 + set.txt（过渡）；v1.3 起 JSON 设置文件名为 set_em.json。过渡期两个文件同时存在时 JSON 优先 + warning。
 **Q：stage_receipt.json 必须写吗？** 不必须。它是增强信息（排错/复现），不写不影响链路调度。写了就按 DATA_LAYOUT §七 schema。
 **Q：我们的模块没有 --data-root 参数，要用散参数，合规吗？** 合规（R1 允许）。manifest argsTemplate 里用 `{dataRoot}/...` 拼出绝对路径传给散参数即可；cli.dataRootArg 字段省略。

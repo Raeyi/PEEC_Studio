@@ -148,4 +148,4 @@ consumed 驱动，无需代码改动；新包到位后平台重跑 thermal_basic
 ## 未决项（非重打包）
 
 - **thermal_extract_control.json 存放位置待用户确认**（1.0.5 按用户最新指示暂存 `Result/thermal/`，平台现状已按实况接受并写入契约）。确认后开新轮次或出契约小修订，DATA_LAYOUT 相应升版。
-- **模块包须携带 `set_thermal.json`**（SPICE 仿真设置 {schemaVersion, analysis, probe}，放包根；自下一版发版起必带；模块二进制不消费，供前端 UI 加载时取默认值；2026-11-04 会议定，DATA_LAYOUT v1.4 修订 1 ①）。
+- **设置默认件归平台管理**（set_thermal.json）：SPICE 仿真设置默认值由平台维护（平台包 templates/Setting/set_thermal.json，平台负责最终内容并传给 UI）；模块包**无需携带 set_thermal.json**——下一版若改动设置格式/默认值，在发版说明注明即可（2026-11-04 会议定，DATA_LAYOUT v1.4 修订 1 ①）。
