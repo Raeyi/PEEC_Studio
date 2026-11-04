@@ -136,15 +136,14 @@ proc->write(QJsonDocument(QJsonObject{
 ```json
 { "id": "peec_basic", "maxParallel": 2, "stages": [
     { "id": "extract", "module": "peec.model_extract", "name": "...", "dependsOn": [] },
-    { "id": "solve",   "module": "peec.solver",        "name": "...", "dependsOn": ["extract"] },
-    { "id": "plot",    "module": "peec.plotter",       "name": "...", "dependsOn": ["solve"], "optional": true }
+    { "id": "solve",   "module": "peec.solver",        "name": "...", "dependsOn": ["extract"] }
 ]}
 ```
 
 - `dependsOn` 声明依赖，形成 DAG；就绪阶段按 `maxParallel` 并行启动；
-- `optional: true`：输入缺失自动跳过（Skipped），不阻断主链（对应旁路：网格融合/DPEC/绘图）。
+- `optional: true`：输入缺失自动跳过（Skipped），不阻断主链（对应旁路：网格融合/DPEC/后处理等；S 参数绘图由前端完成，平台自 2026-11-04 起不再跑 plot 阶段）。
 - **注意**：`peec_basic` 的 `maxParallel` 为 **1**。Compact 用 `DATA/.peec-data.lock` 独占句柄限制并发写，
-  同一 DATA 上并行跑绘图/后处理会互相锁失败；并行能力留给未来不共享 DATA 的 DLL 模块。
+  同一 DATA 上并行跑后处理会互相锁失败（plot 阶段已移除）；并行能力留给未来不共享 DATA 的 DLL 模块。
 
 ## 四、命令行
 
@@ -228,7 +227,6 @@ PEEC_Stdio\
 $dataRoot = 'C:\...\Compact_pipeline_20261023\Compact_pipeline\DATA'
 & '...\Compact_pipeline\PEEC_Model_Extractor.exe'   --data-root $dataRoot
 & '...\Compact_pipeline\PEEC_Solver.exe'            --data-root $dataRoot
-& '...\Compact_pipeline\PEEC_S_Parameter_Plotter.exe' --data-root $dataRoot
 ```
 
 成功退出码为 0；DATA\Result 下出现 model.peec / extract.state / S_parameter.csv / solve.state 即链路通。
@@ -237,7 +235,7 @@ $dataRoot = 'C:\...\Compact_pipeline_20261023\Compact_pipeline\DATA'
 > 注意：`Compact_pipeline\DATA` 的大样例有 10916 个 PEC 面，提取约 33–165 s、`model.peec` 约 2.9 GB；
 > `N_FP=100` 时求解会因内存预算不足报 `QS-SOLV-MEMORY-OUT_OF_MEMORY`（32 GB 机器）。冒烟请用 8.2 的小算例。
 
-### 8.2 生成小算例并跑通四段流水线
+### 8.2 生成小算例并跑通三段流水线
 
 ```powershell
 # 1) 生成小算例（平行板 + 两端端口，16~32 个三角形；自动算网格 SHA-256）
@@ -254,9 +252,9 @@ python .\tools\make_mini_case.py --out ..\demo\mini_strip
 .\build\task_layer.exe run --pipeline peec_basic --data-root ..\demo\mini_strip\DATA
 ```
 
-预期：终端按 extract→solve→plot→post 顺序打印事件，最后 `task.finished {"status":"done"}`；
+预期：终端按 extract→solve→post 顺序打印事件，最后 `task.finished {"status":"done"}`；
 `DATA\Result\tasks\<taskId>\` 下生成 `state.json` + `task.log`；
-S 参数 SVG 在 `Result\S_Parameter_Plot\`，源图在 `Result\Source_Plot\`。
+S 参数 CSV 在 `Result\compact_em\solve\S_parameter.csv`，源/场后处理件在 `Result\compact_em\post\`（plot 阶段已移除，SVG 绘图由前端完成）。
 
 exe 放在 `build\` 下运行时，模块根会自动向上找到含后端运行包（`compact_em` / `gds2geo` /
 `electromagnetic` / `Compact_pipeline`）的目录；

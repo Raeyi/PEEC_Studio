@@ -1,11 +1,25 @@
 # compact_em 模块重打包请求日志（REPACK/compact_em）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.4）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**v1.2（2026-11-02，API 2）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.4 修订 1）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**v1.2（2026-11-02，API 2）**。
 
 ## 第 1 轮（2026-11-02 请求 → 待回执）
 
 状态：**待回执** —— v1.3 重发包（set_em.json）未交付。关联状态：P0 间歇性 0xC0000005 崩溃 vendor 于 2026-11-03 确认**已修复并合入主线**；平台将在 v1.3 重发版上验证（全链 + WER 干净 + 数值基线 101 行 S 参数）。
+
+### 2026-11-04 会议补充（并入 v1.3 重发要求）
+
+1. **包内须携带 `set_em.json`**（放包根，与四件套同级）：
+   - 内容 = 该版本默认求解设置（平铺 EM 字段，schemaVersion=1，与 Setting/set_em.json 格式一致）；
+   - 模块二进制**不消费**此文件（二进制读 dataRoot 的 Setting/ 同名文件）；
+   - 用途：前端 UI 加载时取默认值（新建算例/设置页）；
+   - 依据：DATA_LAYOUT v1.4 修订 1 ①、MODULE_ONBOARDING 修订（2026-11-04）。
+2. **移除 plot 阶段 / plotter exe**：
+   - 平台 peec_basic 流水线已移除 plot 阶段（2026-11-04）：仅 extract → solve → post；
+     S 参数绘图由前端完成（直接读 S_parameter.csv 绘图）；
+   - v1.3 重发包**不再提供 PEEC_S_Parameter_Plotter.exe**，同时从 manifest 移除 plot 阶段条目
+     （平台 modules.json 的 peec.plotter 路由随 v1.3 集成同步移除）；
+   - s2p/SVG 产物不再生成，原「未登记 resultFiles」缺口随之消失（绘图归前端职责）。
 
 ### 请求正文（2026-11-02）
 

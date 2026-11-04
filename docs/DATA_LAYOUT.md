@@ -1,9 +1,10 @@
 # PEEC Studio 数据布局规范（DATA_LAYOUT）
 
-v1.4 · 2026-11-03 · 适用：所有计算层模块与 UI、task_layer。路径与目录的唯一事实源；manifest 中所有 path 以本文件为基准；冲突时以本文件为准。
+v1.4 修订 1 · 2026-11-04 · 适用：所有计算层模块与 UI、task_layer。路径与目录的唯一事实源；manifest 中所有 path 以本文件为基准；冲突时以本文件为准。
 变更（v1.2）：`port_em.json` → `source_em.json`、`port_thermal.json` → `source_thermal.json`；新增预留件 `boundary_em.json`、`boundary_thermal.json`（均 UI 输入）；模块包不再携带 examples//templates/（案例改为包外单独交付，见 ONBOARDING §1.1）。
 变更（v1.3）：求解设置拆分为 `Setting/set_em.json`（EM 字段，compact_em 消费）与 `Setting/set_thermal.json`（热对象，热模块消费）；原合并件 `set.json` 为 v1.2 时代格式（见 §八）。生效条件：thermal ≥1.0.2 与 compact_em ≥v1.3 重发版集成起（模块按各自 manifest consumed 声明读取，平台代码不改）。
 变更（v1.4）：热侧设置定形按 thermal 1.0.5 重发版（2026-11-02，按用户最新指示实施，优先于 v1.3 热侧稿）：`Setting/set_thermal.json` 为 SPICE 仿真设置（analysis/probe，§八.1）；`thermal` 对象移入 `Result/thermal/thermal_extract_control.json`（提取控制，暂存于此、拆分位置待定）；`Model/boundary_thermal.json` 为必需输入（§八.2）；OP0 默认路径 `Result/thermal/post/thermal.op0`。EM 侧 `set_em.json` 改名不变（compact_em ≥v1.3 重发版待到位）。
+变更（v1.4 修订 1，2026-11-04，布局不变、交付细化）：① 模块交付包增**设置默认件**：compact_em 包根携 `set_em.json`、thermal 包根携 `set_thermal.json`（内容 = 该版本默认求解/仿真设置；模块二进制不消费——二进制读 dataRoot 的 Setting/ 同名文件；供平台/UI 新建算例与加载设置页取默认值；2026-11-04 会议定，自各家下一版发版起）；② peec_basic 流水线移除 plot 阶段（S 参数绘图由前端完成；平台 2026-11-04 起不跑 plot，`Result/compact_em/plot\` 不再生成；compact_em v1.3 重发版起不再提供 plotter exe）。
 
 ## 一、总则
 
@@ -39,7 +40,7 @@ v1.4 · 2026-11-03 · 适用：所有计算层模块与 UI、task_layer。路径
 │   ├── compact_em\     【模块产物区：compact_em 独占】
 │   │   ├── extract\   model.peec / stage_receipt.json
 │   │   ├── solve\     S_parameter.csv / stage_receipt.json
-│   │   ├── plot\      *.svg（可选）
+│   │   ├── plot\      *.svg（平台 2026-11-04 起不再跑此阶段；目录不再生成，旧算例可残留）
 │   │   └── post\      Source.msh / Post_Model.txt / Post_Source.txt（可选）
 │   ├── thermal\       【模块产物区：thermal 独占】
 │   │   ├── thermal_extract_control.json  [UI 初始值] 提取控制（暂存于此，1.0.5 起，§八.1）
@@ -59,7 +60,7 @@ v1.4 · 2026-11-03 · 适用：所有计算层模块与 UI、task_layer。路径
 ```
 
 注：
-- 模块交付包**只含四件套**（manifest / exe / README / ERROR_CODES），不含输入文件、DATA/ 或 examples//templates/：UI 选取的输入直接写入 `<dataRoot>\Model\`，自测案例改为**包外案例包单独交付**（ONBOARDING §1.1），平台方归档 `dev/cases/<模块>/`。
+- 模块交付包**只含四件套**（manifest / exe / README / ERROR_CODES）**+ 设置默认件**（compact_em: `set_em.json` / thermal: `set_thermal.json`，放包根；2026-11-04 起；内容 = 该版本默认求解/仿真设置，模块二进制不消费，供平台/UI 加载默认值；变更 v1.4 修订 1 ①），不含输入文件、DATA/ 或 examples//templates/：UI 选取的输入直接写入 `<dataRoot>\Model\`，自测案例改为**包外案例包单独交付**（ONBOARDING §1.1），平台方归档 `dev/cases/<模块>/`。
 - `Result/tasks/` 下的 `state.json` 是 **task_layer 的任务编排记录**（阶段状态/errorCode/outputs/providers 版本快照），模块不写、不读、不依赖其内容做调度判断。详见 §七。
 
 ## 三、分区规则
@@ -266,3 +267,5 @@ v1.4 · 2026-11-03 · 适用：所有计算层模块与 UI、task_layer。路径
 版本记录：v1.1（2026-10-30）→ v1.2（2026-11-02）：port_* → source_* 改名、新增 boundary_* 预留件、包内 examples//templates/ 改为包外案例包交付 → v1.3（2026-11-02）：Setting/set.json 拆分为 set_em.json + set_thermal.json；自 thermal ≥1.0.2 与 compact_em ≥v1.3 重发版集成起生效（模块读取由 manifest consumed 驱动，平台代码不变；v1.2 时代模块继续读合并件 set.json） → v1.4（2026-11-03）：热侧设置按 thermal 1.0.5 重发版定形（set_thermal.json = SPICE 仿真设置；thermal 对象 → Result/thermal/thermal_extract_control.json 暂存；boundary_thermal.json 必需；OP0 默认路径 Result/thermal/post/thermal.op0）；按用户最新指示实施，优先于 v1.3 热侧稿（§八.1）；EM 侧 set_em.json 不变（compact_em v1.3 重发版待到位）。
 
 v1.2 修订 2（2026-11-02 下午，布局不变、契约细化）：① 定义 boundary_thermal.json 格式（§八.2），热边界条件移出 source_thermal.json（thermal 重发版起落地）；② 明确 set.json 作用域（§八.1）：纯热算例不携带 EM 字段；③ 目录树补 Result/thermal 产物区与 logs/thermal 日志行；④ gds2geo 热网格标记为必需（V1.1 起）；⑤ 工艺文件固定为 model_info.csv（gds2geo V1.1 仅接受 CSV，XTF 不再支持）；⑥ D5 锁机制按模块细化（gds2geo V1.1 为系统命名互斥量、无锁文件）。
+
+v1.4 修订 1（2026-11-04，布局不变、交付细化）：① 模块交付包增设置默认件（compact_em 包根 `set_em.json` / thermal 包根 `set_thermal.json`，内容 = 该版本默认求解/仿真设置；模块二进制不消费，供平台/UI 加载默认值；2026-11-04 会议定，自各家下一版发版起）；② peec_basic 移除 plot 阶段（S 参数绘图交前端；平台不再生成 `Result/compact_em/plot\`；compact_em v1.3 重发版起不再提供 plotter exe）。

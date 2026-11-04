@@ -3,13 +3,12 @@
   "_comment": "handoff 阶段已移除（v1.1 布局规范：正式件由 publisher 按 manifest publishTo 落位，见 docs/DATA_LAYOUT.md D3）",
   "pipelines": {
     "peec_basic": {
-      "displayName": "电磁基本链路（PEEC 四段）",
-      "description": "网格/材料/端口校验 → P/L 提取 → 频域求解 → S 参数绘图 + 源/场后处理",
+      "displayName": "电磁基本链路（PEEC 三段）",
+      "description": "网格/材料/端口校验 → P/L 提取 → 频域求解 → 源/场后处理（S 参数绘图由前端完成；2026-11-04 起平台不再跑 plot 阶段）",
       "maxParallel": 1,
       "stages": [
         { "id": "extract", "module": "peec.model_extract", "name": "PEEC 模型提取", "dependsOn": [] },
         { "id": "solve", "module": "peec.solver", "name": "频域求解", "dependsOn": ["extract"] },
-        { "id": "plot", "module": "peec.plotter", "name": "S 参数绘图", "dependsOn": ["solve"], "optional": true },
         { "id": "post", "module": "peec.post", "name": "源/场后处理", "dependsOn": ["solve"], "optional": true }
       ]
     },

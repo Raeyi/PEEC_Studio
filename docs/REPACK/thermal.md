@@ -1,7 +1,7 @@
 # thermal 模块重打包请求日志（REPACK/thermal）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.4）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.0.5（2026.11.02-native-1.0.5，apiVersion 6）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.4 修订 1）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.0.5（2026.11.02-native-1.0.5，apiVersion 6）**。
 
 ## 第 1 轮（2026-11-02 请求 → 2026-11-03 收口）
 
@@ -148,3 +148,4 @@ consumed 驱动，无需代码改动；新包到位后平台重跑 thermal_basic
 ## 未决项（非重打包）
 
 - **thermal_extract_control.json 存放位置待用户确认**（1.0.5 按用户最新指示暂存 `Result/thermal/`，平台现状已按实况接受并写入契约）。确认后开新轮次或出契约小修订，DATA_LAYOUT 相应升版。
+- **模块包须携带 `set_thermal.json`**（SPICE 仿真设置 {schemaVersion, analysis, probe}，放包根；自下一版发版起必带；模块二进制不消费，供前端 UI 加载时取默认值；2026-11-04 会议定，DATA_LAYOUT v1.4 修订 1 ①）。
