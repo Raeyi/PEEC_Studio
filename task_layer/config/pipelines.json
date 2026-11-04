@@ -25,14 +25,14 @@
     },
     "thermal_basic": {
       "displayName": "热基本链路（thermal 两段）",
-      "description": "热路提取 → 温度后处理（可选）。热网格经 stage artifacts 路由到 gds2geo 热链产物（Result/gds2geo/thermal/），材料用 publisher 落位的 Model/matdb.json；UI 提供 Model/source_thermal.json + Model/boundary_thermal.json（必需）+ Setting/set_thermal.json（SPICE 仿真设置：analysis/probe）+ Result/thermal/thermal_extract_control.json（提取控制：体域/薄层，暂存于此，后续再定拆分位置）",
+      "description": "热路提取 → 温度后处理（可选）。热网格经 stage artifacts 路由到 gds2geo 热链产物（Result/gds2geo/thermal/），材料用 publisher 落位的 Model/matdb.json；UI 提供 Model/source_thermal.json（schemaVersion 2，含 thermal 提取对象：体域/薄层/材料关联）+ Model/boundary_thermal.json（必需）+ Setting/set_thermal.json（SPICE 仿真设置：analysis/probe）；post 依赖 Model/thermal.op0（ALPS 结果，1.0.6 起标准位置，1.0.5 时代的 Result/thermal/ 独立控制件已取消）",
       "maxParallel": 1,
       "stages": [
         { "id": "extract", "module": "thermal.extract", "name": "热路提取", "dependsOn": [],
           "artifacts": { "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh" } },
         { "id": "post", "module": "thermal.post", "name": "温度后处理（OP0 映射）", "dependsOn": ["extract"], "optional": true,
           "artifacts": { "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh" },
-          "requires": ["Result/thermal/post/thermal.op0"] }
+          "requires": ["Model/thermal.op0"] }
       ]
     }
   }

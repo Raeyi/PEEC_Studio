@@ -9,10 +9,10 @@
 切换信号：本目录出现新文件名的初值**不构成切换信号**——写哪个设置文件以平台通知
 （交付说明修订行）为准。
 
-热链下一版布局（2026-11-04 用户与 vendor 确认，DATA_LAYOUT v1.5）：OP0 默认位置 =
-`Model/thermal.op0`（程序去 source_thermal.json 所在目录读取）；thermal_extract_control.json
-独立文件移除；OP0 与 SPICE 网表暂不做校验。现行包（1.0.5 时代）行为不变；下一版集成后
-平台另行通知。
+热链 1.0.6 布局（2026-11-04 集成，DATA_LAYOUT v1.5 修订 1）：OP0 标准位置 =
+`Model/thermal.op0`（程序去 source_thermal.json 所在目录读取；OP0 是算例产物，由用户经案例
+导入脚本放入，不属于本目录模板件）；thermal_extract_control.json 独立文件取消（提取控制内嵌
+于 source_thermal.json，schemaVersion 2）；OP0 与 SPICE 网表暂不做校验。
 
 ## 文件清单
 
@@ -20,7 +20,7 @@
 |---|---|---|---|
 | Setting/set_em.json | v1.3 起 | UI | EM 求解设置（平铺字段，schemaVersion 1）；纯热算例不需要 |
 | Setting/set_thermal.json | thermal 1.0.5 起 | UI | SPICE 仿真设置（analysis/probe；当前仅支持 op、瞬态未支持）；程序不覆写；纯 EM 算例不需要 |
-| Result/thermal/thermal_extract_control.json | thermal 1.0.5 起（下一版移除） | UI | 提取控制（网格单位/四面体域/薄层/材料关联，即 thermal 对象）；1.0.5 时代暂存于此；**thermal 下一版起移除（2026-11-04 vendor 确认，载体以 vendor 下一版声明为准）** |
+| ~~Result/thermal/thermal_extract_control.json~~ | ~~thermal 1.0.5 时代~~ | — | **已取消（thermal 1.0.6，2026-11-04 集成）**：提取控制（thermal 对象）改内嵌于 Model/source_thermal.json（schemaVersion 2），本目录不再提供该初值 |
 | Setting/set.json | v1.2 时代 | UI | 合并件 = EM 字段 + thermal 对象（联合算例形态）；纯热算例只留 schemaVersion + thermal，不复制 EM 字段 |
 | Model/source_em.json | 全时代 | UI | EM 源定义（meshFile/meshSha256 + 端口 triangleIds） |
 | Model/source_thermal.json | 全时代 | UI | 热源定义（meshFile 指向落位路径 + SHA + sources）；不含边界条件 |

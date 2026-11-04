@@ -2,8 +2,8 @@
   "manifestVersion": 1,
   "id": "thermal",
   "name": "薄层与四面体混合热路提取及温度后处理",
-  "version": "2026.11.02-native-1.0.5",
-  "apiVersion": 6,
+  "version": "2026.11.04-native-1.0.6",
+  "apiVersion": 7,
   "minApiVersion": 1,
   "cli": {
     "executables": [
@@ -26,8 +26,6 @@
         "{artifact:user/thermal.mesh}",
         "--materials",
         "{artifact:user/thermal.materials}",
-        "--settings",
-        "{artifact:user/thermal.extract_settings}",
         "--source",
         "{artifact:thermal/source.def}",
         "--boundary",
@@ -38,7 +36,6 @@
       "allowedArgs": [
         "--mesh",
         "--materials",
-        "--settings",
         "--source",
         "--boundary",
         "--simulation-settings"
@@ -74,12 +71,10 @@
         "{artifact:user/thermal.mesh}",
         "--materials",
         "{artifact:user/thermal.materials}",
-        "--settings",
-        "{artifact:user/thermal.extract_settings}",
         "--source",
         "{artifact:thermal/source.def}",
         "--op0",
-        "{dataRoot}/Result/thermal/post/thermal.op0",
+        "{dataRoot}/Model/thermal.op0",
         "--boundary",
         "{artifact:thermal/boundary.def}",
         "--simulation-settings",
@@ -88,7 +83,6 @@
       "allowedArgs": [
         "--mesh",
         "--materials",
-        "--settings",
         "--source",
         "--op0",
         "--boundary",
@@ -174,16 +168,6 @@
         }
       },
       {
-        "ref": "user/thermal.extract_settings",
-        "path": "Result/thermal/thermal_extract_control.json",
-        "accept": {
-          "schemaVersion": {
-            "min": 1,
-            "max": 1
-          }
-        }
-      },
-      {
         "ref": "thermal/source.def",
         "path": "Model/source_thermal.json",
         "maintainedBy": [
@@ -191,13 +175,14 @@
         ],
         "accept": {
           "schemaVersion": {
-            "min": 1,
-            "max": 1
+            "min": 2,
+            "max": 2
           },
           "fields": [
             "meshFile",
             "meshSha256",
-            "sources"
+            "sources",
+            "thermal"
           ]
         }
       },
@@ -237,7 +222,6 @@
     "artifacts": [
       "user/thermal.mesh",
       "user/thermal.materials",
-      "user/thermal.extract_settings",
       "thermal/source.def",
       "thermal/boundary.def",
       "user/thermal.simulation_settings"
@@ -265,8 +249,12 @@
       {
         "version": "2026.11.02-native-1.0.5",
         "note": "Setting/set_thermal.json contains SPICE simulation settings. Extraction control is temporarily Result/thermal/thermal_extract_control.json. --simulation-settings controls the op/probe directives; --settings continues to select extraction control."
+      },
+      {
+        "version": "2026.11.04-native-1.0.6",
+        "note": "DATA_LAYOUT 1.5: source_thermal.json schemaVersion 2 embeds required thermal extraction data; independent control file and --settings removed. OP0 binary default follows the actual source directory; standard manifest passes Model/thermal.op0. Post no longer reads or checks netlists; OP0 values required by the temperature map remain validated. Simulation settings schema/defaults unchanged; platform owns defaults."
       }
     ],
-    "dataLayoutRevision": "1.2 revision 2"
+    "dataLayoutRevision": "1.5"
   }
 }

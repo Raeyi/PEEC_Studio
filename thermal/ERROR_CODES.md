@@ -22,3 +22,5 @@
 边界专项：boundary_thermal.json 缺失/不可读 → exit3 QS-TH-IO-FILE；JSON错误、schemaVersion不为1、源中内嵌边界、边界中包含热源、无效温度/面选择、不支持的默认边界 → exit2 QS-TH-FMT-INPUT。边界路径越界 → exit2 QS-TH-CFG-PATH；提取后边界被修改 → post exit2 QS-TH-CFG-BINDING。--boundary 规则与 --source 相同。
 
 1.0.3取消用户结果绑定文件；缺少OP0仍为exit3 QS-TH-IO-FILE，OP0节点缺失/格式不符为exit2 QS-TH-FMT-INPUT；--result-binding为已移除参数，传入会报未知参数。
+
+1.0.6：source_thermal.json必须为schemaVersion=2并含thermal；缺失thermal或旧schema为exit2 QS-TH-FMT-INPUT。不读取独立控制件，--settings为未知参数(exit2)。OP0缺失为exit3 QS-TH-IO-FILE，默认位置为实际source的同目录/thermal.op0，无旧路径回退。post不检查网表，只检查映射所需节点数据；缺失温度仍为exit2。source(含thermal)、边界或仿真设置变化使旧提取绑定失效(exit2 QS-TH-CFG-BINDING)。

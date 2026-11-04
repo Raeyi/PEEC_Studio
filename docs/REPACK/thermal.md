@@ -1,12 +1,11 @@
 # thermal 模块重打包请求日志（REPACK/thermal）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.5）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.0.5（2026.11.02-native-1.0.5，apiVersion 6）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.5 修订 1）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.0.6（2026.11.04-native-1.0.6，apiVersion 7）**。
 
 ## 第 2 轮（2026-11-04 请求 → 待回执）
 
-状态：**待回执** —— 2026-11-04 用户已与 thermal 侧确认以下布局结论；自 thermal 下一版
-重发版起生效；现行包（1.0.5 时代）仍按 1.0.5 路径运行。DATA_LAYOUT 已升 **v1.5** 定形。
+状态：**已收口（2026-11-04 同日）** —— 1.0.6 重发版已收到并集成（模块目录替换 + 平台预检切换 + E2E 双通道实测通过；DATA_LAYOUT 升 v1.5 修订 1 定形提取控制载体）。
 
 ### 请求正文（2026-11-04，用户与 thermal 侧确认）
 
@@ -27,6 +26,26 @@
 5. **案例包同步**（如下一版仍提供 demo1_4.1 回归案例）：历史 OP0 位置迁至 Model/；
 6. 设置默认件（set_thermal.json）归平台管理不变（包内无需携带；格式/默认值变更
    发版说明注明即可，2026-11-04 会议定）。
+
+### 回执（2026-11-04，平台集成）
+
+收到：`thermal_module_20261104_1.0.6.zip`（2026.11.04-native-1.0.6，apiVersion 7）+
+`thermal_cases_20261104.zip`。核对：manifest（consumed 删控制件 / `--op0 {dataRoot}/Model/thermal.op0` /
+source.def 要求 schema 2 + thermal / `--settings` 移除）与 README（OP0 随 source 目录、传入
+--settings/--ports/--result-binding 报 exit=2、输出新增 stage_receipt.json、模块包不携带默认件）
+与 v1.5 契约一致；提取控制载体按 v1.5 ② 声明 = 内嵌 source_thermal.json（schemaVersion 2）。
+
+E2E 实测（2026-11-04）：
+- ① 直接案例跑：extract=0 / post=0；参考输出 14/14 一致（stage_receipt×2 时间戳 + 报告内
+  绝对路径为环境差异，物理产物逐字节一致）；基线 344.1037 K / 9564 行 / 12750 节点；
+- ② 平台流水线（task_layer thermal_basic）：inputs.validate 通过（5 件必需，无控制件、
+  无旧 OP0 路径）；全链 1.9s all stages done；post 未被跳过（OP0 在 Model/ 通过新预检）；
+  344.1037 K / 9564 行 / 12750 节点；post_binding schema 2（指纹与 vendor 案例一致）。
+
+集成动作：模块目录替换（repo + 交付包 staging）、pipelines post 预检 → `Model/thermal.op0`、
+templates 移除控制件初值、UI_API/ERROR_CODES 更新、案例包重新归档
+`dev/cases/thermal/demo1_4.1`（OP0 在 Model/；新增 开始测试.ps1 / 导入ALPS结果.ps1，
+导入目标即 Model/thermal.op0）。交付包升 **v1.2**（PEEC_Studio_20261104_v1.2.zip）。
 
 ### 平台实测（1.0.5 二进制，2026-11-04，demo1_4.1 案例直跑，供参考）
 
