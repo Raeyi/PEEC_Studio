@@ -212,7 +212,8 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
                                         Result/gds2geo/thermal/model_thermal.msh + 其 SHA-256，
                                         sources/fixed_temperature 用网格 elementary ID
 ③ UI: task.run thermal_basic         → 热路提取（post 无 OP0 时自动跳过）
-④（可选）OP0 就绪（Model/thermal.op0 + thermal_run.json）后重跑 → 温度后处理
+④（可选）OP0 就绪（Result/thermal/post/thermal.op0；thermal 1.0.5 只需此一件，
+            thermal_run.json 已取消）后重跑 → 温度后处理
 ```
 
 ```json
