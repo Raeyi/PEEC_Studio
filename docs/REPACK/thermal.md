@@ -1,7 +1,38 @@
 # thermal 模块重打包请求日志（REPACK/thermal）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.4 修订 1）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.0.5（2026.11.02-native-1.0.5，apiVersion 6）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.5）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.0.5（2026.11.02-native-1.0.5，apiVersion 6）**。
+
+## 第 2 轮（2026-11-04 请求 → 待回执）
+
+状态：**待回执** —— 2026-11-04 用户已与 thermal 侧确认以下布局结论；自 thermal 下一版
+重发版起生效；现行包（1.0.5 时代）仍按 1.0.5 路径运行。DATA_LAYOUT 已升 **v1.5** 定形。
+
+### 请求正文（2026-11-04，用户与 thermal 侧确认）
+
+致 thermal 模块团队。以下三点为已确认结论，请在下一版重发版落地：
+
+1. **OP0 默认路径 → `Model/` 目录**（`Model/thermal.op0`）：程序去 `source_thermal.json`
+   所在目录（Model/）读取；1.0.5 时代的 `Result/thermal/post/thermal.op0`（暂存路径，
+   1.0.5 README 中"临时路径待用户后续确定"所指）自下一版起不再使用；
+2. **移除 `thermal_extract_control.json` 独立文件**：程序不再消费（1.0.5 暂存的
+   `Result/thermal/thermal_extract_control.json` 位置问题的最终答案 = **移除该文件**）；
+   提取控制数据（四面体域/薄层/材料关联）的载体请在下一版 manifest/README 明确声明——
+   若移入 `source_thermal.json`，格式须写入发版说明（平台预检随 manifest consumed 走）；
+3. **OP0 与 SPICE 网表暂不做校验**（1.0.1 时代绑定校验不恢复）；
+4. **manifest 同步**（下一版）：consumed 移除 thermal_extract_control.json 条目；
+   post 阶段声明 OP0 默认路径 = Model/thermal.op0；
+5. **案例包同步**（如下一版仍提供 demo1_4.1 回归案例）：历史 OP0 位置迁至 Model/；
+6. 设置默认件（set_thermal.json）归平台管理不变（包内无需携带；格式/默认值变更
+   发版说明注明即可，2026-11-04 会议定）。
+
+### 平台侧动作（下一版集成时执行，无需贵方处理）
+
+- pipelines.json：thermal post 启动预检文件 → `Model/thermal.op0`；
+- DATA_LAYOUT v1.5 + 交付说明修订行；templates/ 移除 thermal_extract_control.json 初值
+  （过渡期保留 1.0.5 时代说明）；
+- E2E 重跑（demo1_4.1 案例，OP0 迁 Model/ 后）验证全链 + 数值基线
+  （344.1037 K / 9564 行 / 12750 节点）。
 
 ## 第 1 轮（2026-11-02 请求 → 2026-11-03 收口）
 
@@ -147,5 +178,5 @@ consumed 驱动，无需代码改动；新包到位后平台重跑 thermal_basic
 
 ## 未决项（非重打包）
 
-- **thermal_extract_control.json 存放位置待用户确认**（1.0.5 按用户最新指示暂存 `Result/thermal/`，平台现状已按实况接受并写入契约）。确认后开新轮次或出契约小修订，DATA_LAYOUT 相应升版。
+- ~~thermal_extract_control.json 存放位置待用户确认~~ → **已收口（2026-11-04）**：用户与 thermal 侧确认 = 下一版移除该文件 + OP0 迁 Model/ + 暂不做 OP0-网表校验（见第 2 轮；DATA_LAYOUT 升 v1.5）。
 - **设置默认件归平台管理**（set_thermal.json）：SPICE 仿真设置默认值由平台维护（平台包 templates/Setting/set_thermal.json，平台负责最终内容并传给 UI）；模块包**无需携带 set_thermal.json**——下一版若改动设置格式/默认值，在发版说明注明即可（2026-11-04 会议定，DATA_LAYOUT v1.4 修订 1 ①）。
