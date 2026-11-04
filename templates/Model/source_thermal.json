@@ -1,5 +1,5 @@
 {
-  "description": "模板示例（demo1_4.1 模型）：新建算例请替换为新模型热源定义与绑定值；边界条件写 Model/boundary_thermal.json，不内嵌本文件",
+  "description": "模板示例（demo1_4.1 模型，schemaVersion 2 = thermal 1.0.6 起格式）：新建算例请替换为新模型热源定义与绑定值；边界条件写 Model/boundary_thermal.json，不内嵌本文件；thermal 提取对象（体域/薄层/材料关联）随本文件交付（1.0.5 时代独立控制件 Result/thermal/thermal_extract_control.json 已取消）",
   "mesh_length_unit": "mm",
   "selection_id_type": "elementary_entity",
   "total_power_W": 2000,
@@ -33,7 +33,82 @@
       "assembly": "consistent_two_trace_thin_layer_source; integrate_material_footprint_on_reference_surface"
     }
   ],
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "meshFile": "Result/gds2geo/thermal/model_thermal.msh",
-  "meshSha256": "ebd53c3623f1b4f820875dffde0dc6fa8e2c3e801d9007f70a6cdb417f5b6e96"
+  "meshSha256": "ebd53c3623f1b4f820875dffde0dc6fa8e2c3e801d9007f70a6cdb417f5b6e96",
+  "thermal": {
+    "name": "demo1_4.1",
+    "selection_id_type": "elementary_entity",
+    "mesh_length_scale_to_m": 0.001,
+    "tetrahedral_domains": [
+      {
+        "elementary_volume": 4,
+        "material": {
+          "dimension": "volume",
+          "physical_material_id": 3
+        }
+      }
+    ],
+    "thin_layers": [
+      {
+        "name": "upper",
+        "visualization_volume": 2,
+        "reference_surfaces": [
+          3,
+          10
+        ],
+        "reference_position": "bottom",
+        "thickness_m": 5e-7,
+        "material_footprints": [
+          {
+            "surfaces": [
+              3
+            ],
+            "material": {
+              "dimension": "surface",
+              "physical_material_id": 4
+            }
+          },
+          {
+            "surfaces": [
+              10
+            ],
+            "material": {
+              "dimension": "surface",
+              "physical_material_id": 8
+            }
+          }
+        ]
+      },
+      {
+        "name": "lower",
+        "visualization_volume": 3,
+        "reference_surfaces": [
+          16
+        ],
+        "reference_position": "top",
+        "thickness_m": 5e-7,
+        "material_footprints": [
+          {
+            "surfaces": [
+              22
+            ],
+            "material": {
+              "dimension": "surface",
+              "physical_material_id": 4
+            }
+          },
+          {
+            "surfaces": [
+              18
+            ],
+            "material": {
+              "dimension": "surface",
+              "physical_material_id": 8
+            }
+          }
+        ]
+      }
+    ]
+  }
 }

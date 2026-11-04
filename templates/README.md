@@ -23,10 +23,10 @@
 | ~~Result/thermal/thermal_extract_control.json~~ | ~~thermal 1.0.5 时代~~ | — | **已取消（thermal 1.0.6，2026-11-04 集成）**：提取控制（thermal 对象）改内嵌于 Model/source_thermal.json（schemaVersion 2），本目录不再提供该初值 |
 | Setting/set.json | v1.2 时代 | UI | 合并件 = EM 字段 + thermal 对象（联合算例形态）；纯热算例只留 schemaVersion + thermal，不复制 EM 字段 |
 | Model/source_em.json | 全时代 | UI | EM 源定义（meshFile/meshSha256 + 端口 triangleIds） |
-| Model/source_thermal.json | 全时代 | UI | 热源定义（meshFile 指向落位路径 + SHA + sources）；不含边界条件 |
+| Model/source_thermal.json | 全时代（**thermal 1.0.6 起 schemaVersion 2**） | UI | 热源定义（meshFile 指向落位路径 + SHA + sources + **thermal 提取对象**（体域/薄层/材料关联））；不含边界条件 |
 | Model/boundary_thermal.json | thermal 1.0.5 起 | UI | 热边界条件（default_external_boundary + fixed_temperature），**必需输入**（经 --boundary 传入，SHA 入内部绑定）；1.0.1 时代内嵌于 source_thermal.json |
 
-（1.0.1 时代：boundary 字段内嵌于 source_thermal.json、无独立仿真设置文件；1.0.5 起按上表。1.0.5 的划分按用户最新指示实施，优先于 DATA_LAYOUT v1.3 上午的拆分文案。）
+（1.0.1 时代：boundary 字段内嵌于 source_thermal.json、无独立仿真设置文件；1.0.5 起按上表；1.0.6 起提取控制内嵌 source_thermal.json（schemaVersion 2），上表控制件行取消。1.0.5 的划分按用户最新指示实施，优先于 DATA_LAYOUT v1.3 上午的拆分文案。）
 
 ## 使用流程
 
