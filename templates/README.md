@@ -37,8 +37,10 @@
    - source_em.json：meshSha256 = 落位主网格 SHA-256；ports 的 triangleIds 在新网格上选取；
    - source_thermal.json：meshFile = Result/gds2geo/thermal/model_thermal.msh（落位路径），
      meshSha256 = 该文件 SHA-256；sources 的实体 ID 为新网格的 Elementary ID；
-   - thermal_extract_control.json：四面体域/薄层的 elementary ID / reference_surfaces 按新网格选取
-     （薄层参考面必须完整铺满）；set_thermal.json 为仿真设置，默认 {"analysis":"op","probe":["V(*)"]}
+   - source_thermal.json 的 thermal 提取对象（schemaVersion 2）：四面体域/薄层的 elementary ID /
+     reference_surfaces 按新网格选取（薄层参考面必须完整铺满，material_footprints 必须完整覆盖
+     reference_surfaces）；
+     set_thermal.json 为仿真设置，默认 {"analysis":"op","probe":["V(*)"]}
      即可（完整温度可视化需保留 V(*)）；
    - boundary_thermal.json：固定温度面 surface_entities 为新网格 Elementary ID；
 4. 跑 peec_basic / thermal_basic（OP0 就绪后 post 才可跑）。
