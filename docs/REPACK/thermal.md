@@ -14,7 +14,9 @@
 
 1. **OP0 默认路径 → `Model/` 目录**（`Model/thermal.op0`）：程序去 `source_thermal.json`
    所在目录（Model/）读取；1.0.5 时代的 `Result/thermal/post/thermal.op0`（暂存路径，
-   1.0.5 README 中"临时路径待用户后续确定"所指）自下一版起不再使用；
+   1.0.5 README 中"临时路径待用户后续确定"所指）自下一版起不再使用。注：平台已实测
+   1.0.5 二进制——其默认路径仍是 Result/thermal/post/（T2 失败），"去 source_thermal.json
+   目录读取"需下一版实现；manifest 的 --op0 路径须同步改（见下方实测）；
 2. **移除 `thermal_extract_control.json` 独立文件**：程序不再消费（1.0.5 暂存的
    `Result/thermal/thermal_extract_control.json` 位置问题的最终答案 = **移除该文件**）；
    提取控制数据（四面体域/薄层/材料关联）的载体请在下一版 manifest/README 明确声明——
@@ -25,6 +27,25 @@
 5. **案例包同步**（如下一版仍提供 demo1_4.1 回归案例）：历史 OP0 位置迁至 Model/；
 6. 设置默认件（set_thermal.json）归平台管理不变（包内无需携带；格式/默认值变更
    发版说明注明即可，2026-11-04 会议定）。
+
+### 平台实测（1.0.5 二进制，2026-11-04，demo1_4.1 案例直跑，供参考）
+
+| 测试 | 结果 |
+|---|---|
+| T0 基线（extract + post 原样） | exit=0；344.1037 K / 9564 行 / 12750 节点（基线一致） |
+| T1 删控制件后原样跑 extract | **exit=3，QS-TH-IO-FILE：Cannot read Result/thermal/thermal_extract_control.json** |
+| T2 OP0 只放 Model/ 后原样跑 post | **exit=3，QS-TH-IO-FILE：Cannot read operating-point file**（默认路径仍是 Result/thermal/post/） |
+| T3 控制件只放 Model/ 后原样跑 extract | **exit=3**（--settings 默认路径仍是旧位置） |
+| T4 OP0 放 Model/ + 显式 --op0 | **exit=0；数值与基线完全一致** |
+
+结论：
+- OP0 → Model/：1.0.5 **二进制已支持**（--op0 读任意路径，T4 通过）；**默认路径**仍是
+  Result/thermal/post/（T2），且 manifest argsTemplate 写死旧路径 → 落实需要 manifest
+  更新（改 --op0 路径，无需重编译二进制）或下一版改程序默认路径；
+- 移除控制件：1.0.5 **二进制不支持**（T1/T3 缺失即报错；控制数据未内嵌于
+  source_thermal.json）→ 下一版二进制须不再读取该独立文件，并明确提取控制数据载体
+  （见请求正文第 2 条）；
+- OP0 与网表暂不校验：1.0.5 现状即不校验（--result-binding 已取消），无需改动。
 
 ### 平台侧动作（下一版集成时执行，无需贵方处理）
 
