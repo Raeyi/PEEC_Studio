@@ -310,4 +310,26 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
   因任务层链接 QtCore，需额外带 4 个 DLL）。修复 `modules.list`：internal 模块此前被报成
   `kind=external` 且 `available=false`（按文件探测，而内建动作没有实体文件），
   会导致 UI 把"刷新端口绑定"的 `internal.handoff` 当成不可用而过滤掉。
-
+- 2026-11-05（P1 执行选择，分支 `feature/pipeline-optimization`）：`task.run` 新增可选
+  `selection` 参数（UI 驱动；CLI `run` 仍仅全链）：
+  ① `{"mode":"stages","stages":[...]}` 子集运行——未选中上游阶段记为**假定完成**
+  （`done` + `assumed:true` + `QS-TL-ASSUMED-DONE`，不参与失败/阻塞统计），其产出按在盘工件
+  供下游使用；② `{"mode":"resume","resumeTaskId":...}` 续跑——历史 `done` 且记录产出在盘
+  的阶段假定完成，历史 `assumed` 阶段重跑；pipeline 不匹配/阶段不存在/产出缺失分别以
+  `resume: pipeline mismatch` / `QS-TL-SEL-UNKNOWNSTAGE` / `QS-TL-SEL-DEP-MISSING` 拒绝；
+  ③ 子集/续跑在**创建任务前**做上游产出预检（不满足直接拒绝、不留目录），阶段 launch 前
+  再复检一次（可选阶段缺输入 → `QS-TL-SKIP-NOINPUT`）；
+  ④ `state.json` 顶层增 `selection`（用户原样）、阶段记录增 `assumed`；`task.started`
+  非全链时携带 `selection`，假定阶段各发一条 `task.stage.finished(assumed:true)`，
+  `task.finished.summary` 追加 `| assumed: ...`；
+  ⑤ `inputs.validate` 支持 `selection`：带选择时只校验执行入口（依赖不都在选中集的阶段）
+  的模块契约输入 + 其 `requires` 声明。全链路径行为不变（无 selection 的响应/通知与 P1 前一致）。
+  **上游产出守卫的实现机制（设计偏离，留档）**：三个计算层模块 manifest 的阶段级输入均为空
+  （`inputs:{}`；中间产物只记在 `consumesInternal/producesInternal`，不含平台可用的在盘路径），
+  故"未选中上游产出在盘存在"的守卫声明在 `pipelines.json` 各阶段的 `requires`（dataRoot 相对
+  路径，解析为 `PipelineStage.optionalInputs`，复用平台既有的 requires 机制，与
+  `thermal_basic.post` 的既有用法同型）：peec `solve`/post、gds `prepared`/`em`/`thermal`、
+  thermal `post` 共 6 处声明。未改动任何模块 manifest。
+  验收：`tools\p1_selection_test.py`（T1–T11 共 22 断言）+ `rpc_smoke.py`（8 断言）+
+  三流水线基线（peec S_parameter.csv 与参考逐字节一致、thermal 344.1037 K / 9564 数据行 /
+  networkNodes 12750 / 4 数值件逐字节一致、gds_full 14 件产物逐字节一致）。

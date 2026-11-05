@@ -33,6 +33,7 @@ void ResultStore::open(const QString& taskDir, const QString& taskId, const QStr
     m_elapsedMs = 0;
     m_stages.clear();
     m_inputs = QJsonObject();
+    m_selection = QJsonObject();
     m_started = QDateTime::currentDateTime();
     QDir().mkpath(m_dir);
     appendLog(QString("task %1 pipeline=%2 started at %3")
@@ -83,6 +84,7 @@ void ResultStore::persist()
     root["elapsedMs"] = m_elapsedMs;
     if (!m_inputs.isEmpty()) root["inputs"] = m_inputs;
     if (!m_providers.isEmpty()) root["providers"] = m_providers;
+    if (!m_selection.isEmpty()) root["selection"] = m_selection;
     QJsonArray stages;
     for (const StageRecord& s : m_stages) {
         QJsonObject so;
@@ -98,6 +100,7 @@ void ResultStore::persist()
         so["outputs"] = out;
         so["errorCode"] = s.errorCode;
         so["errorMessage"] = s.errorMessage;
+        if (s.assumed) so["assumed"] = true;
         stages.append(so);
     }
     root["stages"] = stages;

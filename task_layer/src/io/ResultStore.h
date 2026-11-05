@@ -26,6 +26,7 @@ struct StageRecord {
     QStringList outputs;     // 本阶段产出文件（校验通过的 outputChecks）
     QString errorCode;       // 如 QS-TL-MOD-EXEC
     QString errorMessage;
+    bool assumed = false;    // 合成记录：本任务未执行，按盘上工件/上次结果假定完成（P1 selection）
 };
 
 class ResultStore
@@ -41,6 +42,8 @@ public:
     void setInputs(const QJsonObject& inputs) { m_inputs = inputs; persist(); }
     // providers version snapshot: which module versions produced this task (traceability)
     void setProviders(const QJsonObject& providers) { m_providers = providers; persist(); }
+    // 执行选择留痕（P1）：task.run 的 selection 原样落盘（未传 selection 时不写，保持旧 state.json 形状）
+    void setSelection(const QJsonObject& sel) { m_selection = sel; persist(); }
 
     QString taskDir() const { return m_dir; }
     QString taskId() const { return m_taskId; }
@@ -56,6 +59,7 @@ private:
     QVector<StageRecord> m_stages;
     QJsonObject m_inputs;
     QJsonObject m_providers;   // providerId -> {version, apiVersion}
+    QJsonObject m_selection;   // selection 留痕（P1）
     QString m_status = "queued";
     QString m_summary;
     QDateTime m_started;

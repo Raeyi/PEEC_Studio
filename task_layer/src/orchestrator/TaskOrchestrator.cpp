@@ -20,7 +20,8 @@ struct PumpGuard {
 
 bool TaskOrchestrator::startTask(const QString& taskId, const PipelineDef& pipeline,
                                  const ModuleRegistry& registry, const PathResolver& resolver,
-                                 const QString& dataRoot, const QJsonObject& overrides)
+                                 const QString& dataRoot, const QJsonObject& overrides,
+                                 const Selection& sel)
 {
     if (m_busy) return false;   // 单任务实例：同一时刻只跑一条流水线
 
@@ -30,6 +31,8 @@ bool TaskOrchestrator::startTask(const QString& taskId, const PipelineDef& pipel
     m_resolver = resolver;
     m_dataRoot = dataRoot;
     m_overrides = overrides;
+    m_selection = sel;
+    m_assumed.clear();
     m_maxParallel = pipeline.maxParallel < 1 ? 1 : pipeline.maxParallel;
     m_cancelled = false;
     m_startMs = QDateTime::currentMSecsSinceEpoch();
@@ -48,9 +51,45 @@ bool TaskOrchestrator::startTask(const QString& taskId, const PipelineDef& pipel
         m_records.insert(s.id, rec);
     }
 
-    emit notify("task.started", QJsonObject{
-        {"taskId", taskId}, {"pipeline", pipeline.id},
-        {"ts", QDateTime::currentMSecsSinceEpoch()}});
+    // P1 执行选择：未选中阶段合成"假定完成"记录（Done + assumed=true），从待执行队列移除。
+    // 现成 isReady（Done 放行）/ propagateBlocked（非 Failed/Skipped 不阻断）保持不变；
+    // 合成记录经 stage.finished 通知进 state.json（审计可见，UI 可展示"来自上次/盘上工件"）。
+    if (!sel.isFull()) {
+        for (int i = m_pending.size() - 1; i >= 0; --i) {
+            const PipelineStage& st = m_pending.at(i);
+            if (sel.contains(st.id)) continue;
+            const auto it = m_records.find(st.id);
+            if (it != m_records.end()) {
+                it->status = StageStatus::Done;
+                it->assumed = true;
+                it->errorCode = "QS-TL-ASSUMED-DONE";
+                it->errorMessage = "not executed in this task; assumed done from on-disk artifacts or prior task";
+                it->startedAt = 0;
+                it->finishedAt = 0;
+            }
+            m_pending.remove(i);
+            m_assumed.insert(st.id);
+        }
+    }
+
+    QJsonObject started{{"taskId", taskId}, {"pipeline", pipeline.id},
+                         {"ts", QDateTime::currentMSecsSinceEpoch()}};
+    if (!sel.isFull()) started["selection"] = sel.toJson();
+    emit notify("task.started", started);
+    if (!sel.isFull()) {
+        for (const QString& sid : m_assumed.values().toList()) {
+            const auto it = m_records.constFind(sid);
+            if (it == m_records.constEnd()) continue;
+            emit notify("task.stage.finished", QJsonObject{
+                {"taskId", taskId}, {"stageId", it->id}, {"name", it->name},
+                {"module", it->moduleId},
+                {"status", stageStatusName(it->status)},
+                {"exitCode", 0}, {"startedAt", 0}, {"finishedAt", 0},
+                {"errorCode", it->errorCode}, {"errorMessage", it->errorMessage},
+                {"outputs", QJsonArray()},
+                {"assumed", true}});
+        }
+    }
     pump();
     return true;
 }
@@ -173,6 +212,7 @@ void TaskOrchestrator::pump()
         for (const PipelineStage& s : m_pipeline->stages) {
             const auto it = m_records.constFind(s.id);
             if (it == m_records.constEnd()) continue;
+            if (it->assumed) continue;   // P1：合成假定完成记录不参与失败/阻塞统计
             if (it->status == StageStatus::Failed) failedStages << s.id;
             else if (it->errorCode.startsWith("QS-TL-DEP-")) blockedStages << s.id;
         }
@@ -187,6 +227,9 @@ void TaskOrchestrator::pump()
     if (!blockedStages.isEmpty()) {
         summary += (summary.isEmpty() ? QString() : " | ");
         summary += "blocked: " + blockedStages.join(",");
+    }
+    if (!m_assumed.isEmpty()) {
+        summary += " | assumed: " + m_assumed.values().join(",");
     }
     finishTask(status, summary);
 }
@@ -205,19 +248,30 @@ void TaskOrchestrator::launchStage(const PipelineStage& s)
         return;
     }
 
+    // P1 防御性复检：selection 子集的入口阶段（依赖里有假定完成的合成记录）
+    // 启动前再查一次磁盘输入（防运行中被删）→ 缺失置 Failed（optional 阶段维持跳过语义）。
+    {
+        bool hasAssumedDep = false;
+        for (const QString& d : s.dependsOn)
+            if (m_assumed.contains(d)) { hasAssumedDep = true; break; }
+        if (hasAssumedDep) {
+            const QStringList missing = missingFileInputs(def, s);
+            if (!missing.isEmpty()) {
+                const QString msgCode = s.optional ? "QS-TL-SKIP-NOINPUT" : "QS-TL-SEL-DEP-MISSING";
+                const QString msgTpl = s.optional ? "optional stage skipped: inputs missing: %1"
+                                           : "selection entry recheck: inputs missing: %1";
+                setStageStatus(s, s.optional ? StageStatus::Skipped : StageStatus::Failed,
+                               msgCode, msgTpl.arg(missing.join("; ")));
+                return;
+            }
+        }
+    }
+
     // 可选阶段：必需输入或阶段 requires 前置文件缺失则跳过，不阻断主链（其下游按 blocked 处理）。
     // requires 用于 manifest 未声明的阶段专属输入（如 thermal post 的 OP0/thermal_run.json：
     // 按模块契约它们是显式 CLI 参数而非公共前置工件，平台须在启动前做存在性检查）。
     if (s.optional) {
-        QStringList missing;
-        const QStringList req = m_resolver.resolveList(def->contract.requiredInputs);
-        for (const QString& r : req)
-            if (!QFileInfo::exists(r)) missing << r;
-        for (const QString& p : s.optionalInputs) {
-            QString ap = m_dataRoot + "/" + p;
-            ap.replace('/', QDir::separator());
-            if (!QFileInfo::exists(QDir::cleanPath(ap))) missing << QDir::cleanPath(ap);
-        }
+        const QStringList missing = missingFileInputs(def, s);
         if (!missing.isEmpty()) {
             setStageStatus(s, StageStatus::Skipped, "QS-TL-SKIP-NOINPUT",
                            QString("optional stage skipped: inputs missing: %1")
@@ -253,6 +307,20 @@ void TaskOrchestrator::launchStage(const PipelineStage& s)
         {"module", s.moduleId}});
     runner->launch(*def, extraArgs, m_resolver, m_dataRoot, s.id, m_taskId,
                    def->timeoutSec);
+}
+
+QStringList TaskOrchestrator::missingFileInputs(const ModuleDef* def, const PipelineStage& s) const
+{
+    QStringList missing;
+    const QStringList req = m_resolver.resolveList(def->contract.requiredInputs);
+    for (const QString& r : req)
+        if (!QFileInfo::exists(r)) missing << r;
+    for (const QString& p : s.optionalInputs) {
+        QString ap = m_dataRoot + "/" + p;
+        ap.replace('/', QDir::separator());
+        if (!QFileInfo::exists(QDir::cleanPath(ap))) missing << QDir::cleanPath(ap);
+    }
+    return missing;
 }
 
 bool TaskOrchestrator::propagateBlocked()

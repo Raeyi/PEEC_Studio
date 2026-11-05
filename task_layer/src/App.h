@@ -67,8 +67,10 @@ private:
     QString taskDirOf(const QString& taskId) const;
     // 按 pipeline（或单个 module，或全部模块）的契约做输入检查；
     // inputs 为 UI 动态输入（如 portJson 路径）
+    // inputs 为 UI 动态输入（如 portJson 路径）；selection 为 P1 执行选择（stages/resume，缺省全链）
     QJsonObject inspectInputs(const QString& dataRoot, const QString& pipelineId,
-                              const QString& moduleId, const QJsonObject& inputs);
+                              const QString& moduleId, const QJsonObject& inputs,
+                              const QJsonObject& selection = QJsonObject());
 
     QString m_configDir;
     QString m_moduleRoot;

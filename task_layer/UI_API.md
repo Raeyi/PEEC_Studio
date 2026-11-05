@@ -246,7 +246,8 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 ```json
 {"jsonrpc":"2.0","id":3,"method":"inputs.validate","params":{
   "pipeline":"peec_basic",
-  "dataRoot":"D:/cases/demo/DATA"
+  "dataRoot":"D:/cases/demo/DATA",
+  "selection":{"mode":"stages","stages":["post"]}
 }}
 ```
 
@@ -262,6 +263,12 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 
 UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户（路径 + 原因），`warnings` 以次要样式提示。
 
+`selection`（P1 起，可选，语义与 `task.run` 相同）：带选择时只校验**执行入口**——
+"依赖不都在选中集"的阶段（resume 先归一为待跑集）——的模块契约输入，加上这些入口
+阶段在流水线 `requires` 中声明的上游中间产物（dataRoot 相对路径，如
+`Result/compact_em/extract/model.peec`）。全链校验（不带 `selection`）行为不变。
+假定完成阶段的产出不在 validate 期重复核验（`task.run` 期预检保证）。
+
 注意：这是**静态输入检查**（文件存在性、source_em.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。
 
 ### 4.5 task.run（启动任务）
@@ -269,17 +276,38 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 ```json
 {"jsonrpc":"2.0","id":4,"method":"task.run","params":{
   "pipeline":"peec_basic",
-  "dataRoot":"D:/cases/demo/DATA"
+  "dataRoot":"D:/cases/demo/DATA",
+  "selection":{"mode":"stages","stages":["post"]}
 }}
 ```
 ```json
-{"jsonrpc":"2.0","id":4,"result":{"taskId":"t-20261028-104233-7f3a1c"}}
+{"jsonrpc":"2.0","id":4,"result":{"taskId":"t-20261028-104233-7f3a1c",
+  "selection":{"mode":"stages","stages":["post"]}}}
 ```
 
 - `dataRoot` **必须是绝对路径**（任务层会把后端进程的工作目录设为它，传相对路径会被二次拼接）；
 - `taskId` 可省略，由任务层生成；UI 若要自己管理任务号，可传入（须唯一）；
 - 一个任务层进程**同时只能跑一个任务**，重复调用返回 `-32002`；
 - 该请求只是"启动"，真正完成靠 `task.finished` 通知。
+
+#### 执行选择 `selection`（P1 起；省略或 `{"mode":"full"}` 即全链运行，行为与 P1 前一致）
+
+| selection | 语义 |
+|---|---|
+| 省略 / `{"mode":"full"}` | 全流水线运行（默认） |
+| `{"mode":"stages","stages":["solve","post"]}` | 只跑指定阶段（可为空集）。未选中的上游阶段记为**假定完成**：`status=done` + `assumed:true` + `errorCode=QS-TL-ASSUMED-DONE`，不执行、不参与失败/阻塞统计；其产出按**在盘工件**作为下游输入 |
+| `{"mode":"resume","resumeTaskId":"t-..."}` | 续跑历史任务：历史任务中 `done` 且**记录产出全部在盘**的阶段假定完成，其余真实执行；历史任务中的 `assumed` 阶段不信任、重新执行；`resumeTaskId` 须在同一 dataRoot 下且 `pipelineId` 一致 |
+
+行为约定：
+
+- **创建前预检**：子集/续跑在创建任务**之前**校验"未选中上游产出在盘存在"（流水线 `requires` 声明的中间产物 + 模块契约输入）。不满足 → 直接返回 `QS-TL-SEL-DEP-MISSING`（`errorMessage` 列出具体路径），**不创建任务、不留目录**；
+- **阶段内复检**：每个阶段 launch 前再检一次（防运行期间文件被删）。可选阶段缺输入 → `QS-TL-SKIP-NOINPUT` 跳过；必需阶段缺输入 → `QS-TL-SEL-DEP-MISSING` 失败；
+- **状态落盘**：`state.json` 顶层增加 `selection`（用户原样传入的选择）与每阶段 `assumed` 标记；全链运行不写这两个字段（旧形态不变）；
+- **通知**：非全链时 `task.started` 带 `selection`；每个假定阶段在 `task.started` 后各发一条 `task.stage.finished`（`status=done`、`assumed:true`、`errorCode=QS-TL-ASSUMED-DONE`、`outputs=[]`）；`task.finished` 的 `summary` 末尾追加 `| assumed: <阶段列表>`；
+- **路由**：假定完成阶段按其在流水线中的 `artifacts` 路由照常生效；
+- **CLI**：`task_layer.exe run`（CLI 子命令）仍只支持全链；`selection` 仅通过 JSON-RPC（UI 侧）传入。
+
+续跑相关错误：pipeline 不匹配 → `resume: pipeline mismatch (state is for '<id>')`；历史阶段不在当前流水线 → `QS-TL-SEL-UNKNOWNSTAGE`；历史阶段记录产出在盘缺失 → `QS-TL-SEL-DEP-MISSING`。
 
 ### 4.6 模块独立执行（module.run）
 
@@ -392,6 +420,8 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
   "D:/cases/demo/DATA/Result/compact_em/solve/S_parameter.csv"]}
 ```
 
+P1 起（仅非全链任务）：顶层多 `selection`（用户原样传入），阶段记录多 `assumed` 布尔（假定完成阶段为 `true`，伴随 `errorCode=QS-TL-ASSUMED-DONE`、`outputs=[]`）。
+
 任务结束后仍可查询（任务层保留最近一次任务），UI 不必在运行中抢答。
 
 ### 4.10 task.cancel / shutdown
@@ -407,10 +437,10 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 
 | method | params |
 |---|---|
-| `task.started` | `{taskId, pipeline, ts}` |
+| `task.started` | `{taskId, pipeline, ts, selection?}` | `selection` 仅非全链时携带（用户原样传入的选择） |
 | `task.stage.started` | `{taskId, stageId, name}` |
 | `task.stage.log` | `{taskId, stageId, line}` | 后端 stdout/stderr 逐行转发（非结构化，见"五（补充）"） |
-| `task.stage.finished` | `{taskId, stageId, status, exitCode, errorCode, errorMessage, outputs[]}` |
+| `task.stage.finished` | `{taskId, stageId, status, exitCode, errorCode, errorMessage, outputs[], assumed?}` | 假定完成阶段（P1 执行选择）带 `assumed:true`，在 `task.started` 后即时发出 |
 | `task.finished` | `{taskId, status, summary, elapsedMs}` |
 | `task.cancelled` | `{taskId}` |
 
@@ -469,6 +499,9 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 | `QS-TL-DEP-BLOCKED` | 上游失败导致跳过 |
 | `QS-TL-DEP-SKIPPED` | 上游被跳过导致跳过 |
 | `QS-TL-SKIP-NOINPUT` | 可选阶段自身输入缺失 |
+| `QS-TL-SEL-UNKNOWNSTAGE` | 执行选择/stages 含流水线中不存在的阶段（或续跑的历史阶段不在当前流水线） |
+| `QS-TL-SEL-DEP-MISSING` | 未选中上游产出在盘缺失（创建前预检或阶段内复检；`errorMessage` 含具体路径） |
+| `QS-TL-ASSUMED-DONE` | 假定完成标记（非错误：执行选择下未选中阶段/续跑信任阶段不执行，直接按在盘产出记账） |
 | `QS-TL-CFG-UNKNOWNMODULE` | 流水线引用了未注册的模块（配置错误） |
 | `QS-TL-CFG-DEADLOCK` | 依赖无法解析/成环，任务被强制收尾（配置错误） |
 | `QS-TL-MOD-NOTCONFIGURED` | 内建动作未识别（internal 模块 command 配置错误） |

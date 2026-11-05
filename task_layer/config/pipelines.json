@@ -19,6 +19,9 @@
           "name": "频域求解",
           "dependsOn": [
             "extract"
+          ],
+          "requires": [
+            "Result/compact_em/extract/model.peec"
           ]
         },
         {
@@ -28,7 +31,11 @@
           "dependsOn": [
             "solve"
           ],
-          "optional": true
+          "optional": true,
+          "requires": [
+            "Result/compact_em/extract/model.peec",
+            "Result/compact_em/solve/S_parameter.csv"
+          ]
         }
       ]
     },
@@ -49,6 +56,9 @@
           "name": "几何准备",
           "dependsOn": [
             "source"
+          ],
+          "requires": [
+            "Result/gds2geo/source/model.geo"
           ]
         },
         {
@@ -57,6 +67,9 @@
           "name": "电磁网格",
           "dependsOn": [
             "prepared"
+          ],
+          "requires": [
+            "Result/gds2geo/prepared/em.geo"
           ]
         },
         {
@@ -65,6 +78,9 @@
           "name": "热网格（1102 起必需）",
           "dependsOn": [
             "prepared"
+          ],
+          "requires": [
+            "Result/gds2geo/prepared/thermal.geo"
           ]
         }
       ]
@@ -95,7 +111,8 @@
             "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh"
           },
           "requires": [
-            "Model/thermal.op0"
+            "Model/thermal.op0",
+            "Result/thermal/extract/ThermalNetList.sp"
           ]
         }
       ]

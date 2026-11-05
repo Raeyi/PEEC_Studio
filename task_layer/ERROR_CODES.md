@@ -69,6 +69,16 @@
 | `QS-TL-DEP-SKIPPED` | 上游阶段被跳过，本阶段连带跳过 | 随上游 | 同上 |
 | `QS-TL-SKIP-NOINPUT` | 可选阶段自身输入缺失，主动跳过（不算失败） | 是 | 需要该阶段时补齐输入 |
 
+### 2.5 执行选择（P1，2026-11-05 起；来源 `App.cpp` / `TaskOrchestrator.cpp`）
+
+`task.run` 的 `selection` 参数（stages 子集 / resume 续跑）引入。假定完成（assumed）是**记账行为不是错误**，但同样以 `errorCode` 显式标记，UI 按 `assumed:true` 字段区分展示。
+
+| errorCode | 触发条件 | 可恢复 | 处置 |
+| --- | --- | --- | --- |
+| `QS-TL-SEL-UNKNOWNSTAGE` | `selection.stages` 含流水线中不存在的阶段；或 resume 的历史阶段不在当前流水线 | 否（请求错误） | 修正选择/流水线配置 |
+| `QS-TL-SEL-DEP-MISSING` | 未选中上游产出在盘缺失（`errorMessage` 含具体路径）。两处触发：① 创建前预检（此时不创建任务）；② 阶段 launch 前复检（必需阶段失败） | 是 | 补齐上游产出（跑上游阶段或换完整算例）后重试 |
+| `QS-TL-ASSUMED-DONE` | 假定完成标记：执行选择下未选中的上游阶段、或 resume 信任的历史阶段，不执行，按在盘产出记账（`status=done`、`assumed=true`、`outputs=[]`） | —（非错误） | 无需处置；UI 展示为"假定完成/已跳过" |
+
 ## 三、计算层错误码透传规则
 
 任务层**不重新定义**计算层错误码，只做两件事：提取 + 透传。

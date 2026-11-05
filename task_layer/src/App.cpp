@@ -19,13 +19,62 @@ namespace task {
 
 namespace {
 // 流水线 stage 的 artifacts 覆盖 → 按 moduleId 归组（跨模块工件路由注入 rebind）
-QMap<QString, QMap<QString, QString>> artifactOverridesOf(const PipelineDef& pipe)
+// effectiveStages（P1 执行选择）：有效阶段集合（选中 + 上游闭包）；null = 全链（保持现行为）。
+// 子集模式只取有效集合内 stage 的路由，顺带消除"同模块两个 stage 同 ref 键 last-wins 覆盖"隐患。
+QMap<QString, QMap<QString, QString>> artifactOverridesOf(const PipelineDef& pipe,
+                                                          const QSet<QString>* effectiveStages = nullptr)
 {
     QMap<QString, QMap<QString, QString>> ov;
-    for (const PipelineStage& s : pipe.stages)
+    for (const PipelineStage& s : pipe.stages) {
+        if (effectiveStages && !effectiveStages->contains(s.id)) continue;
         for (auto it = s.artifacts.constBegin(); it != s.artifacts.constEnd(); ++it)
             ov[s.moduleId][it.key()] = it.value();
+    }
     return ov;
+}
+
+// P1 resume 归一：读上次任务 state.json → pipeline 一致性校验 + Done 阶段产出在盘核验
+// → stagesToRun（未完成重进）+ assumed（假定完成）。失败写 *error 并返回 false。
+bool normalizeResumeSelection(const PipelineDef& pipe, const QString& root,
+                              const QString& resumeTaskId, QStringList* stagesToRun,
+                              QSet<QString>* assumed, QString* error)
+{
+    const QString priorDir = QDir(root).filePath("Result/tasks/" + resumeTaskId);
+    QJsonObject prior;
+    if (!ResultStore::readTaskState(priorDir, &prior, error)) return false;
+    const QString priorPipe = prior.value("pipelineId").toString();
+    if (priorPipe != pipe.id) {
+        *error = "resume: pipeline mismatch (state is for '" + priorPipe + "')";
+        return false;
+    }
+    QSet<QString> stageIds;
+    for (const PipelineStage& s : pipe.stages) stageIds.insert(s.id);
+    QSet<QString> verified;
+    for (const QJsonValue& sv : prior.value("stages").toArray()) {
+        const QJsonObject so = sv.toObject();
+        const QString sid = so.value("id").toString();
+        if (so.value("status").toString() != "done") continue;
+        if (so.value("assumed").toBool()) continue;   // 上次任务的"假定完成"不构成实际执行：resume 时必须重跑
+        if (!stageIds.contains(sid)) {
+            *error = QStringLiteral("QS-TL-SEL-UNKNOWNSTAGE: prior stage '%1' not in current pipeline '%2'")
+                        .arg(sid, pipe.id);
+            return false;
+        }
+        QStringList missing;
+        for (const QJsonValue& o : so.value("outputs").toArray())
+            if (!QFileInfo::exists(o.toString())) missing << o.toString();
+        if (!missing.isEmpty()) {
+            *error = QStringLiteral("QS-TL-SEL-DEP-MISSING: resume: outputs of stage '%1' missing on disk: %2")
+                        .arg(sid, missing.join("; "));
+            return false;
+        }
+        verified.insert(sid);
+    }
+    stagesToRun->clear();
+    for (const PipelineStage& s : pipe.stages)
+        if (!verified.contains(s.id)) stagesToRun->append(s.id);
+    for (const QString& sid : verified) assumed->insert(sid);
+    return true;
 }
 } // namespace
 
@@ -152,28 +201,91 @@ int App::validateOnce(const QString& dataRoot, const QString& pipelineId,
 }
 
 QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineId,
-                               const QString& moduleId, const QJsonObject& inputs)
+                               const QString& moduleId, const QJsonObject& inputs,
+                               const QJsonObject& selection)
 {
     const QString root = QDir::cleanPath(QFileInfo(dataRoot).absoluteFilePath());
     PathResolver r;
     r.setBase(root, m_moduleRoot, m_binRoot,
               QDir(root).filePath("Result/tasks/_validate"));
     r.setInputs(inputs);
-    // 校验用临时 rebind：把契约路径展开到本 dataRoot（不改活动任务状态）
+    // P1 执行选择解析（与 task.run 同语义；入口集合与 rebind 共用）
+    QSet<QString> validateSelSet;
+    {
+        const QString selMode = selection.value("mode").toString();
+        if (selMode == "stages") {
+            for (const QJsonValue& v : selection.value("stages").toArray())
+                validateSelSet.insert(v.toString());
+        } else if (selMode == "resume") {
+            const PipelineDef* pp = m_loader.pipeline(pipelineId);
+            if (pp) {
+                QStringList toRun;
+                QSet<QString> assumed;
+                QString rerr;
+                if (!selection.value("resumeTaskId").toString().isEmpty() &&
+                    normalizeResumeSelection(*pp, root, selection.value("resumeTaskId").toString(),
+                                              &toRun, &assumed, &rerr))
+                    for (const QString& sid : toRun) validateSelSet.insert(sid);
+            }
+        }
+    }
+    // 校验用临时 rebind：把契约路径展开到本 dataRoot（不改活动任务状态）；
+    // P1 带 selection 时按有效阶段集合（选中 + 上游闭包）计算路由，与 task.run 一致
     QMap<QString, QMap<QString, QString>> vov;
-    if (!pipelineId.isEmpty() && m_loader.pipeline(pipelineId))
-        vov = artifactOverridesOf(*m_loader.pipeline(pipelineId));
+    if (!pipelineId.isEmpty() && m_loader.pipeline(pipelineId)) {
+        if (validateSelSet.isEmpty())
+            vov = artifactOverridesOf(*m_loader.pipeline(pipelineId));
+        else {
+            QSet<QString> effective;
+            QMap<QString, QStringList> depMap;
+            for (const PipelineStage& s2 : m_loader.pipeline(pipelineId)->stages)
+                depMap.insert(s2.id, s2.dependsOn);
+            QSet<QString> closure;
+            QStringList stack;
+            for (const QString& sid : validateSelSet) stack.append(sid);
+            while (!stack.isEmpty()) {
+                const QString cur = stack.takeLast();
+                if (closure.contains(cur)) continue;
+                closure.insert(cur);
+                for (const QString& d : depMap.value(cur))
+                    if (!closure.contains(d)) stack.append(d);
+            }
+            effective = closure;
+            vov = artifactOverridesOf(*m_loader.pipeline(pipelineId), &effective);
+        }
+    }
     m_registry.rebindDataRoot(root, vov.isEmpty() ? nullptr : &vov);
 
-    // 只校验"入口阶段"（无 dependsOn）的输入契约：这是"这条流水线能否启动"的判据。
+    // 只校验"入口阶段"的输入契约：这是"这条流水线能否启动"的判据。
+    // P1 带 selection 时：入口 = 选中且"依赖不都在选中集"的阶段（resume 已归一）；
+    // 假定完成阶段的产出在 task.run 期由 resume 预检保证（validate 期不重复在盘核验）。
     QStringList entryModuleIds;
+    QStringList entryRequires;   // P1：入口阶段的 requires（流水线声明的上游产出，dataRoot 相对）
     if (!moduleId.isEmpty()) {
         entryModuleIds << moduleId;
     } else if (!pipelineId.isEmpty()) {
         const PipelineDef* p = m_loader.pipeline(pipelineId);
         if (p) {
-            for (const PipelineStage& s : p->stages)
-                if (s.dependsOn.isEmpty()) entryModuleIds << s.moduleId;
+            if (!validateSelSet.isEmpty()) {
+                for (const PipelineStage& s : p->stages) {
+                    if (!validateSelSet.contains(s.id)) continue;
+                    // 执行入口：无依赖，或至少一个依赖未选中（其输入来自集合外，
+                    // 必须按契约/requires 校验在盘存在）
+                    bool entry = s.dependsOn.isEmpty();
+                    for (const QString& d : s.dependsOn)
+                        if (!validateSelSet.contains(d)) { entry = true; break; }
+                    if (!entry) continue;
+                    entryModuleIds << s.moduleId;
+                    for (const QString& rq : s.optionalInputs) entryRequires << rq;
+                }
+            } else {
+                for (const PipelineStage& s : p->stages) {
+                    if (s.dependsOn.isEmpty()) {
+                        entryModuleIds << s.moduleId;
+                        for (const QString& rq : s.optionalInputs) entryRequires << rq;
+                    }
+                }
+            }
         }
     } else {
         for (const PipelineDef& p : m_loader.allPipelines())
@@ -193,6 +305,14 @@ QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineI
             seen.insert(path);
             required << path;
         }
+    }
+
+    // P1：入口阶段的 requires（子集入口守卫；全链模式入口阶段无 requires，行为不变）
+    for (const QString& rq : entryRequires) {
+        const QString ap = QDir(root).filePath(rq);
+        if (seen.contains(ap)) continue;
+        seen.insert(ap);
+        required << ap;
     }
 
     bool ok = InputValidator::validate(required, {}, {}, &issues, &warnings);
@@ -268,6 +388,7 @@ void App::onNotify(const QString& method, const QJsonObject& params)
         rec.exitCode = params.value("exitCode").toInt();
         rec.errorCode = params.value("errorCode").toString();
         rec.errorMessage = params.value("errorMessage").toString();
+        rec.assumed = params.value("assumed").toBool();   // P1 假定完成
         // 保留启动时间（阶段记录是整体替换的）
         rec.startedAt = params.value("startedAt").toVariant().toLongLong();
         rec.finishedAt = params.value("finishedAt").toVariant().toLongLong();
@@ -400,7 +521,8 @@ void App::rpcValidateInputs(const QJsonValue& id, const QJsonObject& params)
     }
     m_transport->sendResponse(id, inspectInputs(dataRoot, params.value("pipeline").toString(),
                                                 params.value("module").toString(),
-                                                params.value("inputs").toObject()));
+                                                params.value("inputs").toObject(),
+                                                params.value("selection").toObject()));
 }
 
 void App::rpcRunTask(const QJsonValue& id, const QJsonObject& params)
@@ -452,21 +574,126 @@ bool App::startTaskWith(const QJsonValue& id, const PipelineDef& pipe,
                                "another task is running: " + m_activeTaskId);
         return false;
     }
+    const QString root = QDir::cleanPath(QFileInfo(dataRoot).absoluteFilePath());
+
+    // P1 执行选择（selection）：解析 + 校验 + 归一。失败即拒绝、不建任务、不动活动状态。
+    //   full（缺省）= 全链；stages = DAG 子集；resume = 基于上次任务 state.json 续跑（归一为 stages）。
+    Selection sel;
+    QJsonObject selRecord;   // 调用方原样 selection（state.json 留痕用，resume 保留原始形态）
+    const QJsonObject selObj = params.value("selection").toObject();
+    if (!selObj.isEmpty()) {
+        sel.mode = selObj.value("mode").toString("full");
+        for (const QJsonValue& v : selObj.value("stages").toArray()) sel.stages << v.toString();
+        sel.resumeTaskId = selObj.value("resumeTaskId").toString();
+        selRecord = selObj;
+        if (sel.mode == "stages") {
+            if (sel.stages.isEmpty()) {
+                m_transport->sendError(id, rpc::InvalidParams,
+                                       "selection.stages required for mode=stages");
+                return false;
+            }
+            QSet<QString> stageIds;
+            for (const PipelineStage& s : pipe.stages) stageIds.insert(s.id);
+            for (const QString& sid : sel.stages)
+                if (!stageIds.contains(sid)) {
+                    m_transport->sendError(id, rpc::InvalidParams,
+                        QStringLiteral("QS-TL-SEL-UNKNOWNSTAGE: stage '%1' not in pipeline '%2'")
+                            .arg(sid, pipe.id));
+                    return false;
+                }
+        } else if (sel.mode == "resume") {
+            if (sel.resumeTaskId.isEmpty()) {
+                m_transport->sendError(id, rpc::InvalidParams,
+                                       "selection.resumeTaskId required for mode=resume");
+                return false;
+            }
+            QSet<QString> assumed;
+            QString rerr;
+            if (!normalizeResumeSelection(pipe, root, sel.resumeTaskId,
+                                           &sel.stages, &assumed, &rerr)) {
+                m_transport->sendError(id, rpc::InvalidParams, rerr);
+                return false;
+            }
+            sel.mode = "stages";   // 编排器只看归一后的 stages；原始形态在 selRecord 留痕
+        } else if (sel.mode != "full") {
+            m_transport->sendError(id, rpc::InvalidParams,
+                "unknown selection.mode: " + sel.mode + " (full|stages|resume)");
+            return false;
+        }
+    }
+
     const QString taskId = params.value("taskId").toString();
     const QString tid = taskId.isEmpty()
         ? QStringLiteral("t%1").arg(QDateTime::currentMSecsSinceEpoch()) : taskId;
 
     m_activeTaskId = tid;
-    const QString root = QDir::cleanPath(QFileInfo(dataRoot).absoluteFilePath());
     m_activeDataRoot = root;
     m_activeTaskDir = QDir(root).filePath("Result/tasks/" + tid);
     m_activeInputs = params.value("inputs").toObject();
     m_resolver.setBase(root, m_moduleRoot, m_binRoot, m_activeTaskDir);
     m_resolver.setInputs(m_activeInputs);
-    const QMap<QString, QMap<QString, QString>> ov = artifactOverridesOf(pipe);
+    // P1：工件路由按有效阶段集合计算（选中 + 上游闭包；全链保持现行为）
+    const QMap<QString, QMap<QString, QString>> ov = [&]() {
+        if (sel.isFull()) return artifactOverridesOf(pipe);
+        QSet<QString> effective;
+        QMap<QString, QStringList> depMap;
+        for (const PipelineStage& s : pipe.stages) depMap.insert(s.id, s.dependsOn);
+        QSet<QString> closure;
+        QStringList stack = sel.stages;
+        while (!stack.isEmpty()) {
+            const QString cur = stack.takeLast();
+            if (closure.contains(cur)) continue;
+            closure.insert(cur);
+            const QStringList deps = depMap.value(cur);
+            for (const QString& d : deps)
+                if (!closure.contains(d)) stack.append(d);
+        }
+        effective = closure;
+        return artifactOverridesOf(pipe, &effective);
+    }();
     m_registry.rebindDataRoot(root, &ov);
+    // P1 子集入口依赖预检：选中阶段若依赖未选中上游，其产出契约必须已在盘上满足
+    //（复用 optional 阶段的 requiredInputs + optionalInputs 存在性检查）→ 缺失拒绝启动。
+    if (!sel.isFull()) {
+        QSet<QString> selectedSet;
+        for (const QString& sid : sel.stages) selectedSet.insert(sid);
+        QStringList problems;
+        for (const PipelineStage& s : pipe.stages) {
+            if (!selectedSet.contains(s.id)) continue;
+            bool hasUnselectedDep = false;
+            for (const QString& d : s.dependsOn)
+                if (!selectedSet.contains(d)) { hasUnselectedDep = true; break; }
+            if (!hasUnselectedDep) continue;
+            const ModuleDef* def = m_registry.module(s.moduleId);
+            if (!def) continue;   // 未注册模块由编排器启动期报错（现状行为）
+            QStringList missing;
+            const QStringList req = m_resolver.resolveList(def->contract.requiredInputs);
+            for (const QString& r : req)
+                if (!QFileInfo::exists(r)) missing << r;
+            for (const QString& p : s.optionalInputs) {
+                QString ap = root + "/" + p;
+                ap.replace('/', QDir::separator());
+                if (!QFileInfo::exists(QDir::cleanPath(ap))) missing << QDir::cleanPath(ap);
+            }
+            if (!missing.isEmpty())
+                problems << QStringLiteral("stage '%1': %2").arg(s.id, missing.join("; "));
+        }
+        if (!problems.isEmpty()) {
+            m_activeTaskId.clear();
+            m_activeDataRoot.clear();
+            m_activeTaskDir.clear();
+            m_activeInputs = QJsonObject();
+            m_transport->sendError(id, rpc::InvalidParams,
+                QStringLiteral("QS-TL-SEL-DEP-MISSING: unselected upstream outputs not satisfied: %1")
+                    .arg(problems.join(" | ")));
+            return false;
+        }
+    }
+
+
     m_store.open(m_activeTaskDir, tid, pipe.id);
     m_store.setInputs(m_resolver.resolvedInputs());
+    if (!selRecord.isEmpty()) m_store.setSelection(selRecord);
 
     // overrides 白名单校验（manifest allowedArgs）：非法键直接拒绝，不静默透传
     const QJsonObject overrides = params.value("overrides").toObject();
@@ -489,14 +716,16 @@ bool App::startTaskWith(const QJsonValue& id, const PipelineDef& pipe,
         }
     }
 
-    if (!m_orchestrator->startTask(tid, pipe, m_registry, m_resolver, root, overrides)) {
+    if (!m_orchestrator->startTask(tid, pipe, m_registry, m_resolver, root, overrides, sel)) {
         m_activeTaskId.clear();
         m_activeTaskDir.clear();
         m_activeInputs = QJsonObject();
         m_transport->sendError(id, rpc::InternalError, "task failed to start");
         return false;
     }
-    m_transport->sendResponse(id, QJsonObject{{"taskId", tid}, {"pipeline", pipe.id}});
+    QJsonObject resp{{"taskId", tid}, {"pipeline", pipe.id}};
+    if (!selRecord.isEmpty()) resp["selection"] = selRecord;
+    m_transport->sendResponse(id, resp);
     return true;
 }
 
