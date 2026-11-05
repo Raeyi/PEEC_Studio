@@ -3,6 +3,7 @@
 v1.2 · 2026-11-02 · 读者：模块团队负责人。前置阅读：DATA_LAYOUT.md、MODULE_MANIFEST_SPEC.md。
 v1.2 变更：① 包内只含四件套，不再携带 `examples/`、`templates/`（统一各模块包结构）；② 新增**案例包交付**要求（§1.1，包外单独交付）；③ 输入文件名改名 `port_em.json` → `source_em.json`、`port_thermal.json` → `source_thermal.json`，新增预留件 `boundary_em.json`、`boundary_thermal.json`（DATA_LAYOUT v1.2）。
 修订（2026-11-04，随 DATA_LAYOUT v1.4 修订 1）：① **设置默认件归平台管理**（set_em.json / set_thermal.json，初值在平台包 templates/；平台负责最终内容并传给 UI；模块包无需携带 set_*.json，设置格式/默认值变更在发版说明注明即可）；② peec_basic 流水线移除 plot 阶段（绘图交前端；compact_em v1.3 重发版起不再提供 plotter exe）。
+修订（2026-11-05，随 DATA_LAYOUT v1.5 修订 2）：① **EM 侧设置定形（compact_em v1.3 集成）**：`set_em.json` 为唯一 JSON 设置（旧 `set.json` 不再读取，templates/ 初值件删除）；② 绘图程序与全部 Touchstone sNp 导出（含 legacy 隐式导出）取消（随 compact_em v1.3 生效），S 参数由前端自 `S_parameter.csv` 计算（模块 `--s-columns full` 可选输出 dB/相位列）；③ 设置文件整体纳入 artifacts/receipt 指纹（内容变化后旧上游结果不可复用）；④ compact_em 案例包归档更新（standard = v1.3 交付案例、新增 two_layer_surface_port）。
 机器校验工具：`docs/module.manifest.schema.json`（JSON Schema draft-07，平台方提供）。
 
 ## 一、交付四件套
@@ -21,7 +22,7 @@ v1.2 变更：① 包内只含四件套，不再携带 `examples/`、`templates/
 
 每次交付随附 **≥1 个完整可跑案例**（供平台 dev_case 回归与联调自测）：
 
-- 案例 = 一个完整 dataRoot 布局：`Model/` + `Setting/`（含 `source_em.json` 等 UI 输入文件与求解设置 `set.json`/`set_em.json`）；涉及网格的案例连网格一起给（不引用外部资源）；
+- 案例 = 一个完整 dataRoot 布局：`Model/` + `Setting/`（含 `source_em.json` 等 UI 输入文件与求解设置 `set_em.json`（EM）/ `set_thermal.json`（热））；涉及网格的案例连网格一起给（不引用外部资源）；
 - 每案例一份 README：输入怎么来的、**预期输出/验收点**（关键产物、字段或数值参考）、已知局限；
 - 案例目录命名 `<module>_cases_YYYYMMDD/`，**与模块包分开交付**（放进模块包会被打回）；平台方归档到 `dev/cases/<module>/` 后用于 dev_case 回归（§五）。
 
@@ -41,7 +42,7 @@ v1.2 变更：① 包内只含四件套，不再携带 `examples/`、`templates/
 3. 按 EXE 目录解析数据路径的代码分支 → 改按 dataRoot 参数（R1）；
 4. 输出位置迁到 `Result/<providerId>/<stageId>/`（对照 DATA_LAYOUT §二逐项改）；
 5. 阶段状态文件统一命名 `stage_receipt.json`（可选写，schema 见 DATA_LAYOUT §七）；
-6. `set.txt` → JSON 求解设置（v1.2 时代 `set.json`；v1.3 起 `set_em.json`；格式见 DATA_LAYOUT §八；过渡期两文件并存时 JSON 优先）。
+6. `set.txt` → JSON 求解设置（v1.2 时代 `set.json`；v1.3 起 `set_em.json`，2026-11-05 集成起旧 set.json 不再读取；格式见 DATA_LAYOUT §八；set.txt 单独存在仍可读取并打弃用 warning，并存时 JSON 优先、坏 JSON 不回退）。
 
 gds2geo 具体项：
 - 四个 exe 的数据路径解析收敛到显式参数（当前 --gds/--tech/--output-dir 已满足，manifest argsTemplate 传绝对路径即可，**不必强制加 --data-root**）;

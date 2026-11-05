@@ -1,9 +1,17 @@
-# 标准无损介质三文件输入
+# standard — compact_em 案例（20261104 v1.3 交付案例，2026-11-05 平台归档）
 
-本目录是只读输入样品。先复制到安装目录外的新dataRoot，再运行四程序；不要直接把包内examples目录作为dataRoot。
+独立算例（无需 gds_full）：Model/（model_em.msh 主网格 + matdb.json + source_em.json）
++ Setting/set_em.json（compact_em v1.3 唯一 JSON 设置，schemaVersion 1）。
 
-输入：Model下唯一.msh、matdb.json、port_em.json及Setting/set.json。配置来自原对应Cases样例的保值平铺转换，MNA权重/频率等未改。模型变化需重绑端口SHA-256。
+## 基线（2026-11-05，PEEC_Studio v2.0 平台全链 task_layer run peec_basic）
 
-提取与求解可用默认minimal模式；源图须两上游都--export post，Post再--source-plots j,qe,ve。场图另需显式准备私有采样网格，不能把第二份msh放入Model。
+- 3 阶段 extract→solve→post 全部 done（~2.5s）
+- S_parameter.csv = 表头 + 100 频点 = 101 行（N_FP=100，1–10 GHz 线性）
+- 与 11-02 v1.2 基线对照：maxRel 7.1e-12（数值一致）
+- 运行窗口 WER 干净（无 0xC0000005 等崩溃记录）
 
-样例仅用于内部一致性和流程回归，不构成外部电磁精度基准。
+## 注意
+
+- 设置文件名必须是 set_em.json（compact_em v1.3 起；旧 set.json 不再读取）；
+- 网格固定名 model_em.msh（平台落位名）；
+- 本案例不生成 Touchstone / S 参数 SVG（v1.3 起绘图程序取消）。

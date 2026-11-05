@@ -1,6 +1,6 @@
 # Compact CLI 错误码表 v0.1
 
-登记日期：2026-10-22。依据用户提供的《QS-PEEC 错误码与异常处理规范 v0.1》，仅登记当前 CLI 实际使用的子集及以下增量。本文档是本仓库版本化登记，未改写微信附件或历史交付包。
+登记日期：2026-10-22。依据用户提供的《QS-PEEC 错误码与异常处理规范 v0.1》，登记当前 CLI 使用的子集、增量及明确标记的历史项。当前交付为 2026.11.04-v1.3 / API 3。本文档是本仓库版本化登记，未改写微信附件或历史交付包。
 
 `Common/QSError.h` 定义 `qs::Error` 与统一顶层序列化。失败退出码为非零；机器判别使用 JSON 的 `code`，不解析英文字符串。stderr 与 `Result/logs/compact_em/<module>-<trace_id>.jsonl` 的错误记录相同，均为 UTF-8。输出目录未解析或不可写时至少保留 stderr；日志写失败另发 `QS-INTERNAL-LOG-NOT_WRITABLE` warning。每次程序调用生成一个 trace_id，消息包含 module、severity、message_dev、message_user_zh、user_action、file_refs、recoverable。`user_action` 是动作键，当前 CLI 不实施前端 UI。
 
@@ -15,12 +15,12 @@
 | `QS-COMM-DATA-STALE` | 阶段记录的输入/输出指纹与当前文件不同，或执行期间输入变化。 |
 | `QS-FMT-INPUT-AMBIGUOUS` | 输入目录含多个网格/材料候选，无法唯一选择。 |
 | `QS-FMT-MSH-INVALID` | 共享网格读取器拒绝格式、元素或标签契约；不冒称所有失败均为版本问题。 |
-| `QS-FMT-SETTING-INVALID` | CLI选项缺值、数值格式、范围、重复项或已移除配置项。 |
+| `QS-FMT-SETTING-INVALID` | CLI选项缺值、数值格式、范围、重复项或已移除配置项；v1.3 还包括缺失的选中设置文件、坏 set_em.json 和已移除的 --export touchstone。 |
 | `QS-FMT-SETTING-UNKNOWN_KEY` | 共享设置解析器不认识键名，包括无效PORT_Z0_N后缀。 |
 | `QS-IO-FILE-OPERATION_FAILED` | filesystem_error没有可可靠细分的文件系统原因，保留系统error_code与路径。 |
 | `QS-IO-FILE-WRITE_FAILED` | 输出打开、flush、close、阶段状态或发布失败，但没有可靠系统原因证据；不伪装磁盘满或权限拒绝。 |
 | `QS-MAT-MODEL-UNSUPPORTED` | 模型实际使用有损体材料、非导体表面或不满足导体表面属性约束；当前实 P/L 流程不装配这些模型。正电导导体表面按 PEC 近似计算。 |
-| `QS-POST-PLOT-FAILED` | 外部GNUplot执行失败或未生成所要求的文件。 |
+| `QS-POST-PLOT-FAILED` | 历史 S 参数 Plotter 的外部 GNUplot 失败；v1.3 不交付此程序，该历史路径不由当前三程序触发。 |
 | `QS-POST-PORT-OUT_OF_RANGE` | POST_PORT不在已加载端口范围。 |
 | `QS-SOLV-MODE-UNSUPPORTED` | Solver_SET=1时域实现尚未验收，CLI在计算前拒绝。 |
 
@@ -37,7 +37,7 @@
 | `QS-VAL-DIM-MISMATCH` | 方阵、B2N列数/行数或内部装配尺寸契约不匹配。 |
 | `QS-VAL-OUT_OF_RANGE` | 支路端点、扫描或数值参数越界。 |
 | `QS-VAL-UNIT-MISMATCH` | 材料属性的单位不符。 |
-| `QS-IO-FILE-NOT_FOUND` | 必需设置、模型、材料、矩阵、端口、CSV或所要求的GNUplot可执行文件不存在。 |
+| `QS-IO-FILE-NOT_FOUND` | 必需模型、材料、矩阵、源定义等不存在；当前设置缺失改报 SETTING-INVALID。GNUplot 可执行文件缺失仅属历史 Plotter。 |
 | `QS-IO-FILE-PERMISSION_DENIED` | 文件存在但无法打开，限相关输入读取边界。 |
 | `QS-IO-FILE-CORRUPTED` | 矩阵/PORT/阶段记录/后处理源格式不完整、尾部垃圾或坏读；也包括 `source_em.json` 的网格 SHA-256 不匹配。 |
 | `QS-IO-FILE-MAGIC_BAD` | 二进制矩阵非PEECMAT1。 |
@@ -60,10 +60,16 @@
 
 各阶段artifacts.json是必需的内部数据一致性附件，包含schemaVersion=1、provider、stage和实际inputs/outputs的相对路径/SHA-256。它不记录任务状态。输出批次先完成关闭与检查，索引最后原子发布；发布中断后旧索引与新文件不匹配时下游拒绝混合批次。输入在执行期间变化同样拒绝发布新索引。
 
-索引缺失、坏格式或指纹不符须重跑上游；完整旧结果只有与当前输入匹配时才可继续消费。整个实际选中的set.json或过渡set.txt纳入指纹。外部自定义CSV仍作格式及本次读取前后校验，数据路径限制在共享输入和本模块产物内。B2N/PORT保持0-based、-1地节点，V1模型包与V2源快照不改变。
+索引缺失、坏格式或指纹不符须重跑上游；完整旧结果只有与当前输入匹配时才可继续消费。整个实际选中的 set_em.json 或过渡 set.txt 纳入指纹。历史 set.json 索引仅作失效识别，不允许复用为新设置批次。外部自定义CSV仍作格式及本次读取前后校验，数据路径限制在共享输入和本模块产物内。B2N/PORT保持0-based、-1地节点，V1模型包与V2源快照不改变。
 
 stage_receipt.json只作可选自证；缺失、损坏或写失败不作为消费者前置条件。任务调度仅由task_layer维护；模块完全不读写Result/tasks。锁通过.locks/compact_em.run.lock句柄实现，锁文件存在不等于活动占用。
 
-## API 2 接入行为
+## API 3 当前接入行为
+
+0 表示成功，1 表示已知或标准异常失败；Extractor 未知异常返回 2，其余程序返回 1。三阶段为 extract/solve/post；不再提供 Plotter 或 Touchstone。缺 data-root、路径越界、非法 runtime、设置缺失/坏 JSON/已知参数及显式 touchstone 请求报 QS-FMT-SETTING-INVALID；存在但不可读的设置仍保留 QS-IO-FILE-PERMISSION_DENIED。未知平铺键继续忽略。
+
+唯一 JSON 设置名为 Setting/set_em.json；set.txt 单独存在时可读并 warning，并存时 JSON 优先，坏 JSON 不回退。Windows 同目录 SET_EM.json 与 set_em.json 是同一文件名，旧模块化内容不会被兼容解析；须显式转换到另一个目录。缺设置指纹所需文件、选件切换、任意字节变化及旧 set.json 上游索引导致 QS-COMM-DATA-STALE；上游索引缺失仍为 QS-COMM-DEPS-NOT_READY。receipt 写失败仅 warning，不改变计算退出码。
+
+## API 2 历史接入行为（2026.11.02）
 
 0表示成功，1表示已知或标准异常失败；Extractor未知异常返回2，其余程序返回1。缺data-root、路径越界、非法runtime/设置JSON/已知参数报QS-FMT-SETTING-INVALID；未知新设置JSON键按v1.2忽略。缺内部artifacts索引报QS-COMM-DEPS-NOT_READY，索引/实际文件不一致报QS-COMM-DATA-STALE。receipt写入失败只warning，不改变退出码。端口固定名source_em.json，缺失时报QS-IO-FILE-NOT_FOUND，不自动读取旧名port_em.json；源定义坏JSON报QS-FMT-JSON-INVALID。设置为set.json，日志Result/logs/compact_em。

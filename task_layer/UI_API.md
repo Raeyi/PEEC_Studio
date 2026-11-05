@@ -181,7 +181,7 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 | pipeline | 说明 |
 |---|---|
 | `gds_full` | **建模**：源模型 → 几何准备 → 电磁网格 → 热网格（1102 版起四段全必需）；EM 主网格 + 材料由任务层 **publisher 自动落位到 `Model/`**，热网格保留在 `Result/gds2geo/thermal/`（v1.1 布局，无 handoff）。gds2geo 1102 版需要的 gmsh 4.11.1 由 task_layer 经子进程环境变量 `GDS2GEO_GMSH_EXECUTABLE` 自动注入，UI 无需处理 |
-| `peec_basic` | **电磁**：PEEC 提取 → 频域求解 → 源/场后处理（post 段可选）；S 参数绘图由前端完成（平台自 2026-11-04 / v1.1 起不再跑 plot 阶段；compact_em v1.3 重发版起不再提供 plotter exe） |
+| `peec_basic` | **电磁**：PEEC 提取 → 频域求解 → 源/场后处理（post 段可选）；S 参数绘图由前端完成（plot 阶段自 2026-11-04 / v1.1 起移除；绘图程序与 Touchstone 导出随 compact_em v1.3 一并取消，2026-11-05 起生效） |
 | `thermal_basic` | **热**：热路提取（thermal.extract，必需）→ 温度后处理（thermal.post，可选，无 OP0 时自动跳过）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），热链三件由 UI 写入：`Model/source_thermal.json`（热源 + thermal 提取对象（体域/薄层/材料关联），**thermal 1.0.6 起必需 schemaVersion 2**；1.0.5 时代提取控制为独立文件 `Result/thermal/thermal_extract_control.json`，已取消）+ `Model/boundary_thermal.json`（边界条件，必需，thermal 1.0.5 起；1.0.1 时代内嵌于 source_thermal.json）+ `Setting/set_thermal.json`（SPICE 仿真设置 analysis/probe，thermal 1.0.5 起）；post 依赖 `Model/thermal.op0`（ALPS 结果，1.0.6 起标准位置；1.0.5 时代为 Result/thermal/post/，已废止） |
 
 进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。
@@ -195,7 +195,7 @@ stage 对象另有两个可选字段（仅当配置了才出现）：
 ① UI: task.run gds_full          → publisher 自动落位 Model/model_em.msh + matdb.json
                                    （此时还没有端口文件，建模照样成功；旧网格自动替换）
 ② UI: 加载 model_em.msh 渲染      → 用户选三角面 → 写 Model/source_em.json（规范名，v1.2）
-                                   同时写求解设置（v1.2 时代 Setting/set.json 平铺 EM 设置，schemaVersion=1；v1.3 起 Setting/set_em.json）
+                                   同时写求解设置（EM 链只读 Setting/set_em.json，平铺 schemaVersion=1；compact_em v1.3 起生效（2026-11-05），旧 set.json 不再读取）
                                    （格式见 DATA_LAYOUT §八；样例随平台交付包 templates/ 与案例包提供）
 ③ UI: inputs.validate（可选）     → 跑前体检：文件存在 + 端口↔网格 SHA-256 绑定
 ④ UI: task.run peec_basic        → 提取 → 求解 → S 参数
@@ -358,9 +358,10 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 为后续模块预留。
 
 - 当前 `peec_basic` 的输入全部是固定名：`Model/model_em.msh`、`Model/matdb.json`、
-  求解设置（v1.2 时代 `Setting/set.json`；v1.3 起 `Setting/set_em.json`；compact_em v1.2 版起 set.txt 弃用；
-  样例随平台交付包 templates/ 提供）。
-- UI 要改求解设置（FS/FE/N_FP 等）直接写 dataRoot 的 `Setting/`，不经任务层代理；
+  求解设置（`Setting/set_em.json`，平铺 schemaVersion=1，compact_em v1.3 起生效（2026-11-05）；旧 set.json 不再读取；
+  compact_em v1.2 版起 set.txt 弃用；样例随平台交付包 templates/ 提供）。
+- UI 要改求解设置（FS/FE/N_FP 等）直接写 dataRoot 的 `Setting/`，不经任务层代理；设置文件整体纳入模块 artifacts/receipt 指纹，内容变化后旧上游结果不可复用（需重新提取/求解）；
+- S 参数 CSV（`S_parameter.csv`）默认列为 `frequency_Hz` + `S<i>_<j>_real`/`S<i>_<j>_imag`（1-based，i=响应端口、j=激励端口，S 无量纲；SI 赫兹）；模块支持 `--s-columns full`（附加模块计算的 dB/相位列），平台默认 RI 列，前端按 dB = 20·log10(|Sij|)、相位 = atan2(imag, real) 换算；
 - `inputs.validate` 会校验必需输入文件存在、`meshFile` 存在且哈希与主网格一致。
 
 ### 4.9 task.status / task.result
@@ -493,7 +494,7 @@ dataRoot = <部署根>/cases/<项目名>/DATA
 <case>\DATA\
 ├── Model\        主网格 *.msh（恰好一份）、matdb.json、source_em.json（规范名，v1.2）
 │                 + boundary_em.json（预留）；平台预检仍兼容旧名 port_em.json（compact_em 不再读旧名）
-├── Setting\      求解设置：v1.2 时代 set.json / v1.3 起 set_em.json + set_thermal.json（SPICE 仿真设置）
+├── Setting\      求解设置：set_em.json（EM，compact_em v1.3 起生效）+ set_thermal.json（SPICE 仿真设置）；v1.2 时代合并件 set.json 已废止
 ├── Result\
 │   ├── compact_em\  模块产物区（按 stage 子目录）：extract\ solve\ post\（plot\ 目录自 v1.1 起不再生成）
 │   ├── logs\compact_em\  诊断 jsonl

@@ -6,7 +6,7 @@
 
 | 文件 | 版本位置 |
 |---|---|
-| DATA_LAYOUT.md | 文档头部（现 v1.4）+ §十 变更记录 |
+| DATA_LAYOUT.md | 文档头部（现 v1.5 修订 2）+ §十 变更记录 |
 | MODULE_MANIFEST_SPEC.md | 文档头部 |
 | MODULE_ONBOARDING.md | 文档头部 |
 | module.manifest.schema.json | schemaVersion 字段 |
@@ -24,7 +24,7 @@
 - 轮次模板参考 REPACK/thermal.md 第 1 轮；
 - 非重打包的跟办事项（如案例包催收、待用户确认项）进文件尾部「## 未决项」段，办结后删除。
 
-现有日志：REPACK/thermal.md（第 1 轮已收口）、REPACK/compact_em.md（第 1 轮待回执）、REPACK/gds2geo.md（第 1 轮已收口 + 案例包未决项）。新模块接入时各建一份。
+现有日志：REPACK/thermal.md（第 1、2 轮已收口）、REPACK/compact_em.md（第 1 轮已收口，2026-11-05）、REPACK/gds2geo.md（第 1 轮已收口 + 案例包未决项）。新模块接入时各建一份。
 
 ## 三、归档（archive/）
 
@@ -34,7 +34,7 @@
 ## 四、对外发布（zip 命名）
 
 - **契约包** `docs_<DATA_LAYOUT 版本>.zip`（如 docs_1.4.zip）：内容 = 活契约文档 + docs/README.md + REPACK/*.md；版本跟契约走，**契约升版才重打**，不带日期；
-- **主交付包** `PEEC_Studio_YYYYMMDD_vX.Y.zip`：交付快照 + 交付包版本号（2026-11-03 起启用；当前最新 **v1.2** = 2026-11-04 构建：thermal 1.0.6（OP0 → Model/、独立控制件取消、apiVersion 7）+ templates/ + DATA_LAYOUT v1.5 修订 1）；
+- **主交付包** `PEEC_Studio_YYYYMMDD_vX.Y.zip`：交付快照 + 交付包版本号（2026-11-03 起启用；当前最新 **v2.0** = 2026-11-05 构建：compact_em v1.3（set_em.json 唯一设置、绘图/Touchstone 取消、P0 修复平台验证通过）+ thermal 1.0.6（OP0 → Model/、独立控制件取消、apiVersion 7）+ templates/ + DATA_LAYOUT v1.5 修订 1）；
   升版规则：交付包每次重打小版本 +0.1（内容集成/修正，如换模块目录、配置、文档）；引入平台大能力或契约跨大版本（如 compact_em v1.3 + DATA_LAYOUT v1.5 集成）大版本 +1.0；
   **日期 = 该版本的构建日期（此版本最终重打包的日期）**，版本变化则日期与版本号同时更新；版本对应内容记在 git 提交与《给UI负责人的交付说明.md》修订行；
 - 案例包 / 模块包：按 vendor 交付命名；平台归档到 dev/cases/<模块>/，不作为契约件。

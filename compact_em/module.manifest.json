@@ -2,14 +2,13 @@
   "manifestVersion": 1,
   "id": "compact_em",
   "name": "Compact EM 电磁求解链",
-  "version": "2026.11.02",
-  "apiVersion": 2,
+  "version": "2026.11.04-v1.3",
+  "apiVersion": 3,
   "minApiVersion": 1,
   "cli": {
     "executables": [
       "PEEC_Model_Extractor.exe",
       "PEEC_Solver.exe",
-      "PEEC_S_Parameter_Plotter.exe",
       "PEEC_Post_Processing.exe"
     ],
     "dataRootArg": "--data-root",
@@ -57,7 +56,7 @@
         "--runtime-dir",
         "{runtimeDir}",
         "--export",
-        "post,touchstone"
+        "post"
       ],
       "optional": false,
       "allowedArgs": [
@@ -81,32 +80,6 @@
         "compact_em/solve.response",
         "compact_em/solve.post"
       ]
-    },
-    {
-      "id": "plot",
-      "executable": "PEEC_S_Parameter_Plotter.exe",
-      "argsTemplate": [
-        "--data-root",
-        "{dataRoot}",
-        "--runtime-dir",
-        "{runtimeDir}"
-      ],
-      "optional": true,
-      "allowedArgs": [
-        "--format"
-      ],
-      "exitCodes": {
-        "0": "ok",
-        "1": "failure"
-      },
-      "errorContract": {
-        "type": "qs-json-stderr",
-        "traceLog": "Result/logs/compact_em/S_Parameter_Plotter-{trace_id}.jsonl"
-      },
-      "consumesInternal": [
-        "compact_em/solve.response"
-      ],
-      "producesInternal": []
     },
     {
       "id": "post",
@@ -191,7 +164,7 @@
       },
       {
         "ref": "user/solver.set",
-        "path": "Setting/set.json",
+        "path": "Setting/set_em.json",
         "accept": {
           "schemaVersion": {
             "min": 1,
@@ -222,7 +195,12 @@
       {
         "version": "2026.11.02",
         "note": "DATA_LAYOUT v1.2: Model/source_em.json replaces port_em.json; em/source.def replaces em/ports.def; defaultTemplate removed; examples and settings are delivered in a separate case package."
+      },
+      {
+        "version": "2026.11.04-v1.3",
+        "note": "API 3 / DATA_LAYOUT v1.4 revision 1 EM requirements: Setting/set_em.json is the only accepted JSON settings name; deprecated set.txt remains supported with a warning. Old set.json artifact indexes are stale. The delivered stages/executables are extract, solve and post; the S-parameter Plotter and all Touchstone sNp exports (including legacy implicit export) are removed. Missing selected settings now report QS-FMT-SETTING-INVALID. The module directory contains only three executables, manifest, README and ERROR_CODES; schemas, technical notes and inventories are delivered outside it. This batch also includes the existing 2026-11-04 mainline PEC reference ground, real-system/memory optimizations and low-frequency full-charge accuracy fixes; differences from the 2026-11-02 numerical baseline are documented separately."
       }
-    ]
+    ],
+    "dataLayoutRevision": "1.3"
   }
 }

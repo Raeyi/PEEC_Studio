@@ -21,3 +21,7 @@ task_layer/dist/
 **/DATA/runtime/
 **/.peec-data.lock
 **/*.lock
+# ===== 工作/诊断文件（不入仓） =====
+.dht_analysis/
+.dsh-acl-reports/
+task_layer/config/*.v1.bak

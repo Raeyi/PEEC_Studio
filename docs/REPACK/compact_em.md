@@ -1,11 +1,47 @@
 # compact_em 模块重打包请求日志（REPACK/compact_em）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.4 修订 1）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**v1.2（2026-11-02，API 2）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.5 修订 2）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**v1.3（2026-11-04，API 3，2026-11-05 集成）**。
 
-## 第 1 轮（2026-11-02 请求 → 待回执）
+## 第 1 轮（2026-11-02 请求 → 2026-11-05 回执，已收口）
 
-状态：**待回执** —— v1.3 重发包（set_em.json）未交付。关联状态：P0 间歇性 0xC0000005 崩溃 vendor 于 2026-11-03 确认**已修复并合入主线**；平台将在 v1.3 重发版上验证（全链 + WER 干净 + 数值基线 101 行 S 参数）。
+状态：**已收口** —— v1.3 重发包 2026-11-05 交付并集成（平台交付包 v2.0 / PEEC_Studio_20261105）。P0 间歇性 0xC0000005：vendor 声明已修复（vendor 稳定性证据：两案例各 20 轮共 120 次阶段调用全部成功 + 运行窗口 WER 查询干净）；**平台复核：11-02 崩溃模型（v12_crash1）于 v1.3 上全链完成（21.4s，20 频点全扫），崩溃未复现；平台运行窗口 WER 干净**。
+
+### 回执（2026-11-05）
+
+**交付**：`Compact_EM_Delivery_20261104_v1.3_docs1.zip`（9,284,983 B，2026-11-04 18:37）：`compact_em/` 六文件（三 exe + manifest + README + ERROR_CODES，SHA256SUMS 全量校验通过）+ `compact_em_cases_20261104/`（standard、two_layer_surface_port）+ `technical/` + `validation/` + RELEASE_NOTES.md + SHA256SUMS.txt。
+
+**请求落实核对**：
+
+| 请求 | 结果 |
+|---|---|
+| set_em.json 唯一 JSON 设置（manifest consumed = `Setting/set_em.json`，schemaVersion 1；set.json 不再读取、无双名过渡；set.txt 弃用 warning、JSON 优先、坏 JSON 不回退） | ✅ 按请求实施（manifest + README + ERROR_CODES 一致） |
+| manifest：dataLayoutRevision "1.3"、breakingChanges 增条、consumed 路径更新 | ✅ 已实施（另 apiVersion 3；平台 task_layer（11-02 17:28 构建）实测接受该 manifest，注册/全链正常） |
+| 移除 plot 阶段 / PEEC_S_Parameter_Plotter.exe / Touchstone 导出 | ✅ 交付无 plotter；stages 仅 extract/solve/post；`touchstone` 非受支持导出名（显式旧导出报 QS-FMT-SETTING-INVALID）；s2p/SVG 不再生成 |
+| 发版说明注明设置格式/默认值变化（11-04 会议补充 ①） | ✅ RELEASE_NOTES.md：字段/默认值/单位/解析精度不变，新增 `GROUND_PLANE_ENABLED`/`GROUND_PLANE_Z_METERS`（无限 PEC 参考地，默认关闭）；默认设置由平台 templates/ 管理（安装包不附设置件） |
+| 案例包两案例 Setting 改名 set_em.json | ✅ standard 内容逐字节不变（与平台 11-02 基线案例 set.json 同字节，已核实）；two_layer_surface_port 同现版 |
+| SHA256SUMS.txt 覆盖全部交付文件 | ✅ 已覆盖（模块六文件逐一核验通过） |
+
+**新增能力（超出第 1 轮请求，发版说明已注明）**：无限 PEC 参考地（镜像源，默认关闭）、实数缩减求解、辅助关联稀疏化、内存准入与有界积分复用、低频完整电荷精度回退、独立电流激励 Z 计算；S CSV `--s-columns full` 可选输出模块计算的 dB/相位列（平台流水线默认 RI 列）。数值影响见下方平台 E2E。
+
+**平台 E2E（2026-11-05，task_layer run peec_basic，3 阶段全链）**：
+
+| 案例 | 结果 |
+|---|---|
+| standard N_FP=101 | done 2.7s，101 数据行 |
+| standard N_FP=100（= 基线案例） | done 2.5s，101 行（表头 + 100 频点）；**与 11-02 v1.2 基线 maxRel 7.1e-12（数值一致）** |
+| two_layer_surface_port（表面端口） | done 0.36s（平台固定名落位后） |
+| v12_crash1（P0 回归，N_FP=20） | done 21.4s，20 频点全扫完成（v1.2 时代 0xC0000005 未复现） |
+
+- WER：运行窗口内无三程序相关 1000/1001 条目（干净）；
+- solve 目录无 Touchstone/SVG（artifacts.json + Post_Source.txt + stage_receipt.json + S_parameter.csv）；
+- 歧义检查生效：Model/ 双网格候选被 QS-FMT-INPUT-AMBIGUOUS 拒收（平台落位行为一致）。
+
+**偏差/备注**：① manifest dataLayoutRevision 声明 "1.3"（EM 条款出处），平台契约运行于 v1.5 修订 2，无冲突（EM 侧布局自 v1.3 起未变）；② two_layer_surface_port 独立案例网格名为 model2.msh，平台归档时按固定名 model_em.msh 落位（同字节，meshSha256 不变，source_em.json meshFile 已更新）；③ 设置文件整体纳入 artifacts/receipt 指纹（vendor 行为），内容变化后旧上游结果不可复用——与平台缓存规则一致。
+
+**平台侧动作（2026-11-05 完成）**：模块目录替换（六文件）；modules.json 移除 peec.plotter 路由；templates/ 删除 set.json（set_em.json 为现行默认值）；UI_API / ERROR_CODES / DATA_LAYOUT（**v1.5 修订 2**）更新；dev/cases 归档更新（standard = v1.3 案例 + 新增 two_layer_surface_port）；交付包升 **v2.0（PEEC_Studio_20261105）**。
+
+**收口**：第 1 轮关闭（2026-11-05）。compact_em 无未决 REPACK 请求。
 
 ### 2026-11-04 会议补充（并入 v1.3 重发要求）
 

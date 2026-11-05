@@ -7,81 +7,102 @@
       "kind": "external",
       "provider": "compact_em",
       "stage": "extract",
-      "searchDirs": ["{MODULE_ROOT}/compact_em"]
+      "searchDirs": [
+        "{MODULE_ROOT}/compact_em"
+      ]
     },
     "peec.solver": {
       "displayName": "等效电路模型 · 频域求解",
       "kind": "external",
       "provider": "compact_em",
       "stage": "solve",
-      "searchDirs": ["{MODULE_ROOT}/compact_em"]
-    },
-    "peec.plotter": {
-      "displayName": "等效电路模型 · S 参数绘图",
-      "kind": "external",
-      "provider": "compact_em",
-      "stage": "plot",
-      "searchDirs": ["{MODULE_ROOT}/compact_em"]
+      "searchDirs": [
+        "{MODULE_ROOT}/compact_em"
+      ]
     },
     "peec.post": {
       "displayName": "等效电路模型 · 源/场后处理",
       "kind": "external",
       "provider": "compact_em",
       "stage": "post",
-      "searchDirs": ["{MODULE_ROOT}/compact_em"]
+      "searchDirs": [
+        "{MODULE_ROOT}/compact_em"
+      ]
     },
     "phys.model_parse": {
       "displayName": "物理模型解析（GDS2GEO 源模型）",
       "kind": "external",
       "provider": "gds2geo",
       "stage": "source",
-      "env": { "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe" },
-      "searchDirs": ["{MODULE_ROOT}/gds2geo"]
+      "env": {
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe"
+      },
+      "searchDirs": [
+        "{MODULE_ROOT}/gds2geo"
+      ]
     },
     "gds.prepare": {
       "displayName": "几何准备（热/电磁目标派生）",
       "kind": "external",
       "provider": "gds2geo",
       "stage": "prepared",
-      "env": { "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe" },
-      "searchDirs": ["{MODULE_ROOT}/gds2geo"]
+      "env": {
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe"
+      },
+      "searchDirs": [
+        "{MODULE_ROOT}/gds2geo"
+      ]
     },
     "gds.mesh_em": {
       "displayName": "电磁网格生成",
       "kind": "external",
       "provider": "gds2geo",
       "stage": "em",
-      "env": { "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe" },
-      "searchDirs": ["{MODULE_ROOT}/gds2geo"]
+      "env": {
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe"
+      },
+      "searchDirs": [
+        "{MODULE_ROOT}/gds2geo"
+      ]
     },
     "gds.mesh_thermal": {
       "displayName": "热网格生成（1102 起必需）",
       "kind": "external",
       "provider": "gds2geo",
       "stage": "thermal",
-      "env": { "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe" },
-      "searchDirs": ["{MODULE_ROOT}/gds2geo"]
+      "env": {
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe"
+      },
+      "searchDirs": [
+        "{MODULE_ROOT}/gds2geo"
+      ]
     },
     "thermal.extract": {
       "displayName": "热路提取（薄层/四面体混合）",
       "kind": "external",
       "provider": "thermal",
       "stage": "extract",
-      "searchDirs": ["{MODULE_ROOT}/thermal"]
+      "searchDirs": [
+        "{MODULE_ROOT}/thermal"
+      ]
     },
     "thermal.post": {
       "displayName": "温度后处理（OP0 映射，可选）",
       "kind": "external",
       "provider": "thermal",
       "stage": "post",
-      "searchDirs": ["{MODULE_ROOT}/thermal"]
+      "searchDirs": [
+        "{MODULE_ROOT}/thermal"
+      ]
     },
     "sim.solver": {
       "displayName": "仿真求解（MNA/ALPS，待接入）",
       "kind": "dll",
       "provider": "sim_solver",
       "stage": "solve",
-      "searchDirs": ["{BIN}/modules/sim_solver"],
+      "searchDirs": [
+        "{BIN}/modules/sim_solver"
+      ],
       "workerHost": "{BIN}/worker_host.exe"
     },
     "opt.optimizer": {
@@ -89,7 +110,9 @@
       "kind": "dll",
       "provider": "opt_optimizer",
       "stage": "optimize",
-      "searchDirs": ["{BIN}/modules/opt_optimizer"],
+      "searchDirs": [
+        "{BIN}/modules/opt_optimizer"
+      ],
       "workerHost": "{BIN}/worker_host.exe"
     },
     "post.engine": {
@@ -97,7 +120,9 @@
       "kind": "dll",
       "provider": "post_engine",
       "stage": "process",
-      "searchDirs": ["{BIN}/modules/post_engine"],
+      "searchDirs": [
+        "{BIN}/modules/post_engine"
+      ],
       "workerHost": "{BIN}/worker_host.exe"
     }
   }

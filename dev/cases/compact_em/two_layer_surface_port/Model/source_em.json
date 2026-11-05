@@ -1,8 +1,30 @@
 {
-  "meshFile": "model2.msh",
+  "meshFile": "model_em.msh",
   "meshSha256": "d791fb96b0d57aca43c66126765f188b35c1f54fe1057ba2a5c32d2bc9ebb896",
   "ports": [
-    {"impedanceOhm": 120, "direction": [0, 0, 1], "triangleIds": [241, 25]},
-    {"impedanceOhm": 120, "direction": [0, 0, -1], "triangleIds": [128, 185]}
+    {
+      "impedanceOhm": 120,
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "triangleIds": [
+        241,
+        25
+      ]
+    },
+    {
+      "impedanceOhm": 120,
+      "direction": [
+        0,
+        0,
+        -1
+      ],
+      "triangleIds": [
+        128,
+        185
+      ]
+    }
   ]
 }
