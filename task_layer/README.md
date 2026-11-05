@@ -36,9 +36,10 @@ UI 用 `QProcess::start("task_layer.exe", {"serve", ...})` 启动任务层，
 |---|---|---|
 | `ping` | — | `{pong, app, schemaVersion}` |
 | `modules.list` | — | `{modules:[{id,displayName,kind,command,available,resolvedPath}]}`（`available` 为可用性探测结果） |
-| `pipelines.list` | — | `{pipelines:[{id,displayName,stages:[{id,module,optional,dependsOn}]}]}` |
+| `pipelines.list` | — | `{pipelines:[{id,displayName,description,maxParallel,stages:[{id,module,name,optional,dependsOn, ref?,requires?,params?,userGate?,artifacts?}]}]}`（P2 起 v2 配置阶段带 `ref` 物化溯源；可选字段非空才出现） |
 | `inputs.validate` | `{dataRoot, pipeline?, module?, inputs?}` | `{valid, checked, issues:[{path,reason,detail}], warnings, inputs?}` |
-| `task.run` | `{pipeline, dataRoot, taskId?, overrides?, inputs?}` | `{taskId, pipeline}` |
+| `task.run` | `{pipeline, dataRoot, taskId?, inputs?, selection?, overrides?}` | `{taskId, pipeline}` |
+| `task.provideInput` | `{taskId, stageId, values?}` | `{taskId, stageId, accepted}`（用户闸门等待中的阶段提供输入；`QS-TL-INPUT-NOTWAITING` 非等待时拒绝） |
 | `module.run` | `{moduleId, dataRoot, taskId?, inputs?}` | `{taskId, pipeline}` |
 | `task.cancel` | `{taskId}` | `{cancelled}` |
 | `task.status` | `{taskId}` | state.json 内容（各阶段状态） |
@@ -356,3 +357,23 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
   文档语义（`running`）不符 → 任务启动且仍 busy 时写 `running`（全假定任务同步收尾不覆写）。
   验收：`tools\gate_test.py`（T1–T5：三缺法 awaiting / 白名单拒绝 / 等待中 cancel / 断连 cancel /
   8s 无死锁回归 / job.args CLI 注入 / providedInputs 留痕）；全链基线回归另跑。
+- 2026-11-05（P2 阶段库 + ref 组合，同分支）：`pipelines.json` 升至 **schemaVersion 2**
+  （v1 全内联格式继续兼容；>=3 拒绝）：顶层新增 `stages` 阶段库对象（key = ref，条目为同一
+  模块接线的库级默认 `{module(必填), name?, params?, artifacts?, requires?, optional?, userGate?}`），
+  pipeline 阶段条目改 `{id, ref, dependsOn, [本地覆盖]}`；`ref` 与内联 `module` 必须恰有其一。
+  ① **物化**在加载期完成（`PipelineLoader` 解析出与 v1 完全相同的 `PipelineStage` 结构，
+  编排器/运行器无感）：params/artifacts 按键级合并（本地键赢）、requires/optional/name 本地有则
+  本地否则库定义（name 兜底 stage id）、userGate 库定义为默认且本地只能 extends 新增键
+  （库级闸门键不可被本地覆盖/取消）、dependsOn/id 恒为本地；未知 ref 加载期 fail-fast
+  （serve 启动即 ErrConfig 退出 2）。② 阶段 `params`（此前为死字段）接线到模块 CLI：
+  按 `--key value` 追加，与 overrides/闸门值同一机制，加载期对照 manifest `allowedArgs`
+  白名单 fail-fast（模块注册存在性仍留启动期）；同键时最具体者赢（闸门值 > overrides >
+  params，`ModuleRunner::dedupeInjectedArgs` 扩展为注入段内同 flag 保留最后一次出现，
+  CLI 与 job.json 不产生重复 flag）。③ `pipelines.list` 载荷补全物化字段
+  （`ref`/`requires`/`params`/`userGate`，非空才出现）。④ 内置三流水线迁移 v2 形态：
+  接线（name/requires/optional/artifacts/userGate）全部上收阶段库、本地仅留 DAG，
+  物化结果与 v1 逐字段等价（验收①以 P1 提交的 v1 配置对照 pipelines.list 全载荷）。
+  验收：`tools\p2_stage_lib_test.py`（18 断言：v1/v2 物化等价 / 未知 ref 拒载 / 合并规则 /
+  同 ref 双链独立覆盖 / params 白名单拒载 / ref 溯源）；回归四套件（rpc_smoke、
+  p1_selection_test、baseline_e2e 三流水线字节红线、gate_test）均按 v2 配置重跑通过。
+  未改动任何模块 manifest（计划五不碰清单保持）。

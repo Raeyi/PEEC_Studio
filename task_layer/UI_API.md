@@ -156,26 +156,57 @@ task_layer.exe serve [--config <目录>] [--bin <目录>] [--module-root <目录
 {"jsonrpc":"2.0","id":2,"method":"pipelines.list","params":{}}
 ```
 
-返回片段：
+返回片段（P2 起内置配置为 schemaVersion 2，阶段带 `ref` 物化溯源）：
 
 ```json
 {"jsonrpc":"2.0","id":2,"result":{"pipelines":[
-  {"id":"peec_basic","displayName":"电磁基本链路（PEEC 三段）",
-   "stages":[{"id":"extract","module":"peec.model_extract","optional":false,"dependsOn":[]},
-             {"id":"solve","module":"peec.solver","optional":false,"dependsOn":["extract"]},,
-             {"id":"post","module":"peec.post","optional":true,"dependsOn":["solve"]}]},
+  {"id":"peec_basic","displayName":"电磁基本链路（PEEC 三段）","maxParallel":1,
+   "stages":[{"id":"extract","module":"peec.model_extract","name":"PEEC 模型提取",
+              "ref":"em.model_extract","optional":false,"dependsOn":[]},
+             {"id":"solve","module":"peec.solver","name":"频域求解",
+              "ref":"em.solver","optional":false,"dependsOn":["extract"],
+              "requires":["Result/compact_em/extract/model.peec"]},
+             {"id":"post","module":"peec.post","name":"源/场后处理",
+              "ref":"em.post","optional":true,"dependsOn":["solve"],
+              "requires":["Result/compact_em/extract/model.peec",
+                          "Result/compact_em/solve/S_parameter.csv"]}]},
   {"id":"thermal_basic","displayName":"热基本链路（thermal 两段）",
-   "stages":[{"id":"extract","module":"thermal.extract","optional":false,"dependsOn":[],
+   "stages":[{"id":"extract","module":"thermal.extract","name":"热路提取",
+              "ref":"thermal.extract","optional":false,"dependsOn":[],
               "artifacts":{"user/thermal.mesh":"Result/gds2geo/thermal/model_thermal.msh"}},
-             {"id":"post","module":"thermal.post","optional":true,"dependsOn":["extract"],
+             {"id":"post","module":"thermal.post","name":"温度后处理（OP0 映射）",
+              "ref":"thermal.post","optional":true,"dependsOn":["extract"],
               "artifacts":{"user/thermal.mesh":"Result/gds2geo/thermal/model_thermal.msh"},
-              "requires":["Model/thermal.op0"]}]}
+              "requires":["Model/thermal.op0",
+                          "Result/thermal/extract/ThermalNetList.sp"]}]}
 ]}}
 ```
 
-stage 对象另有两个可选字段（仅当配置了才出现）：
+stage 对象字段：`id / module / name / optional / dependsOn` 必有；以下仅当非空才出现：
 - `artifacts`：`{ref: dataRoot 相对路径}`，跨模块工件路由——该阶段启动时，ref 对应的输入文件按此路径解析（覆盖模块 manifest 的默认位置）；
-- `requires`：dataRoot 相对路径数组，可选阶段的启动前置文件，缺失时该阶段以 `QS-TL-SKIP-NOINPUT` 跳过（不阻断主链）。
+- `requires`：dataRoot 相对路径数组，可选阶段的启动前置文件，缺失时该阶段以 `QS-TL-SKIP-NOINPUT` 跳过（不阻断主链）；
+- `ref`（P2 起）：阶段库引用（schemaVersion 2 形态的物化溯源；v1 内联形态无此字段）；
+- `params`（P2 起）：object，阶段参数（阶段库 + 本地覆盖按键级合并的物化结果），启动时按 `--key value` 追加进模块 CLI；
+- `userGate`（P1.5 起）：闸门定义（结构与 `task.provideInput` 见下文"用户闸门"小节）。
+
+#### 阶段库与 ref 组合（`pipelines.json` schemaVersion 2，P2 起）
+
+`pipelines.json` 顶层可定义 `stages` 对象（阶段库）：key = ref，条目为同一模块接线的**库级默认**：`{module(必填), name?, params?, artifacts?, requires?, optional?, userGate?}`。
+pipeline 的阶段条目此时写 `{id, ref, dependsOn, [本地覆盖]}`；`ref`（引用库）与 `module`（v1 内联形态）必须恰有其一，同时出现或缺失 → 加载期拒绝。
+物化规则（加载期完成，运行期行为与 v1 内联完全一致）：
+
+| 字段 | 规则 |
+|---|---|
+| `params` / `artifacts` | 对象按键合并，本地键赢 |
+| `requires` / `optional` / `name` | 本地有则本地，否则库定义（name 再兜底 stage id） |
+| `userGate` | 库定义为默认；本地可 extends（新增键），**库级闸门键不可被本地覆盖/取消** |
+| `dependsOn` / `id` | 恒为本地（DAG 局部信息） |
+
+- 未知 `ref` → **加载期 fail-fast**（config error；serve 启动即返回 `ErrConfig` 并以退出码 2 结束）。
+- `params` 键在加载期对照模块 manifest `allowedArgs` 白名单校验（fail-fast）；模块注册存在性仍留启动期（`QS-TL-CFG-UNKNOWNMODULE`，现状）。
+- `params` CLI 化：按 `--key value` 追加，与 overrides / 闸门值同一机制；同键时最具体者赢（顺序：闸门值 > 任务级 overrides > 阶段 params，ModuleRunner 去重保留尾随出现，模块 CLI 与 job.json 中只出现一次）。
+- 同一 ref 可被多条链引用，各自本地覆盖互不串扰（物化在引用处完成）。
+- `schemaVersion >= 3` → 加载期拒绝。内置三流水线已迁移 v2 形态（接线全部上收阶段库，本地仅留 DAG），物化结果与 v1 逐字段等价（见 task_layer/README.md 变更记录 P2 条）。
 
 **当前可用状态**（重要）：
 

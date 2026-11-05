@@ -1,6 +1,72 @@
 {
-  "schemaVersion": 1,
-  "_comment": "handoff 阶段已移除（v1.1 布局规范：正式件由 publisher 按 manifest publishTo 落位，见 docs/DATA_LAYOUT.md D3）",
+  "schemaVersion": 2,
+  "_comment": "handoff 阶段已移除（v1.1 布局规范：正式件由 publisher 按 manifest publishTo 落位，见 docs/DATA_LAYOUT.md D3）。v2（P2）：顶层 stages = 阶段库（同一模块接线的库级默认：模块/参数/工件路由/前置/可选/闸门），pipeline 阶段经 ref 引用 + 本地覆盖（params/artifacts 键级合并本地赢；requires/optional 本地有则本地赢；userGate 本地只能 extends 新增键）。物化规则与 v1 等价性见 task_layer/README.md 变更记录（P2）",
+  "stages": {
+    "em.model_extract": {
+      "module": "peec.model_extract",
+      "name": "PEEC 模型提取"
+    },
+    "em.solver": {
+      "module": "peec.solver",
+      "name": "频域求解",
+      "requires": [
+        "Result/compact_em/extract/model.peec"
+      ]
+    },
+    "em.post": {
+      "module": "peec.post",
+      "name": "源/场后处理",
+      "optional": true,
+      "requires": [
+        "Result/compact_em/extract/model.peec",
+        "Result/compact_em/solve/S_parameter.csv"
+      ]
+    },
+    "em.source": {
+      "module": "phys.model_parse",
+      "name": "源模型解析（gds2geo）"
+    },
+    "em.prepare": {
+      "module": "gds.prepare",
+      "name": "几何准备",
+      "requires": [
+        "Result/gds2geo/source/model.geo"
+      ]
+    },
+    "em.mesh": {
+      "module": "gds.mesh_em",
+      "name": "电磁网格",
+      "requires": [
+        "Result/gds2geo/prepared/em.geo"
+      ]
+    },
+    "em.mesh_thermal": {
+      "module": "gds.mesh_thermal",
+      "name": "热网格（1102 起必需）",
+      "requires": [
+        "Result/gds2geo/prepared/thermal.geo"
+      ]
+    },
+    "thermal.extract": {
+      "module": "thermal.extract",
+      "name": "热路提取",
+      "artifacts": {
+        "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh"
+      }
+    },
+    "thermal.post": {
+      "module": "thermal.post",
+      "name": "温度后处理（OP0 映射）",
+      "optional": true,
+      "artifacts": {
+        "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh"
+      },
+      "requires": [
+        "Model/thermal.op0",
+        "Result/thermal/extract/ThermalNetList.sp"
+      ]
+    }
+  },
   "pipelines": {
     "peec_basic": {
       "displayName": "电磁基本链路（PEEC 三段）",
@@ -9,32 +75,21 @@
       "stages": [
         {
           "id": "extract",
-          "module": "peec.model_extract",
-          "name": "PEEC 模型提取",
+          "ref": "em.model_extract",
           "dependsOn": []
         },
         {
           "id": "solve",
-          "module": "peec.solver",
-          "name": "频域求解",
+          "ref": "em.solver",
           "dependsOn": [
             "extract"
-          ],
-          "requires": [
-            "Result/compact_em/extract/model.peec"
           ]
         },
         {
           "id": "post",
-          "module": "peec.post",
-          "name": "源/场后处理",
+          "ref": "em.post",
           "dependsOn": [
             "solve"
-          ],
-          "optional": true,
-          "requires": [
-            "Result/compact_em/extract/model.peec",
-            "Result/compact_em/solve/S_parameter.csv"
           ]
         }
       ]
@@ -46,41 +101,28 @@
       "stages": [
         {
           "id": "source",
-          "module": "phys.model_parse",
-          "name": "源模型解析（gds2geo）",
+          "ref": "em.source",
           "dependsOn": []
         },
         {
           "id": "prepared",
-          "module": "gds.prepare",
-          "name": "几何准备",
+          "ref": "em.prepare",
           "dependsOn": [
             "source"
-          ],
-          "requires": [
-            "Result/gds2geo/source/model.geo"
           ]
         },
         {
           "id": "em",
-          "module": "gds.mesh_em",
-          "name": "电磁网格",
+          "ref": "em.mesh",
           "dependsOn": [
             "prepared"
-          ],
-          "requires": [
-            "Result/gds2geo/prepared/em.geo"
           ]
         },
         {
           "id": "thermal",
-          "module": "gds.mesh_thermal",
-          "name": "热网格（1102 起必需）",
+          "ref": "em.mesh_thermal",
           "dependsOn": [
             "prepared"
-          ],
-          "requires": [
-            "Result/gds2geo/prepared/thermal.geo"
           ]
         }
       ]
@@ -92,27 +134,14 @@
       "stages": [
         {
           "id": "extract",
-          "module": "thermal.extract",
-          "name": "热路提取",
-          "dependsOn": [],
-          "artifacts": {
-            "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh"
-          }
+          "ref": "thermal.extract",
+          "dependsOn": []
         },
         {
           "id": "post",
-          "module": "thermal.post",
-          "name": "温度后处理（OP0 映射）",
+          "ref": "thermal.post",
           "dependsOn": [
             "extract"
-          ],
-          "optional": true,
-          "artifacts": {
-            "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh"
-          },
-          "requires": [
-            "Model/thermal.op0",
-            "Result/thermal/extract/ThermalNetList.sp"
           ]
         }
       ]

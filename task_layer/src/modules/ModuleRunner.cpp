@@ -101,9 +101,25 @@ namespace {
 // 两次使模块解析顺序依赖。--key=value 形式不在 v1 范围（供应商模板均为空格形式）。
 void dedupeInjectedArgs(QStringList* base, const QStringList& injected)
 {
-    for (int gi = 0; gi + 1 < injected.size(); gi += 2) {
-        const QString flag = injected.at(gi);
-        if (!flag.startsWith("--") || flag.contains('=')) continue;
+    // 1) 注入段内部：同一 flag 保留最后一次出现（任务级 overrides / 闸门值覆盖
+    //    配置级 params；注入段恒为成对 --key value）
+    QHash<QString, int> lastAt;
+    for (int i = 0; i + 1 < injected.size(); i += 2) {
+        const QString flag = injected.at(i);
+        if (flag.startsWith("--") && !flag.contains('='))
+            lastAt.insert(flag, i);
+    }
+    QStringList deduped;
+    for (int i = 0; i + 1 < injected.size(); i += 2) {
+        const QString flag = injected.at(i);
+        if (flag.startsWith("--") && !flag.contains('=') && lastAt.value(flag, -1) != i)
+            continue;
+        deduped << flag << injected.at(i + 1);
+    }
+    // 2) manifest 模板（base 段）已含同一 --key：删除模板侧出现（flag + 其值），
+    //    保留注入值（尾随胜）
+    for (int di = 0; di + 1 < deduped.size(); di += 2) {
+        const QString flag = deduped.at(di);
         const int baseEnd = base->size();
         for (int bi = 0; bi < baseEnd; ++bi) {
             if (base->at(bi) != flag) continue;

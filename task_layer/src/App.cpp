@@ -115,6 +115,24 @@ bool App::loadConfig(QString* detail)
         if (detail) *detail = err;
         return false;
     }
+    // P2：阶段 params 白名单（manifest allowedArgs，--key 形式），加载期 fail-fast；
+    // 模块注册存在性仍留启动期（QS-TL-CFG-UNKNOWNMODULE，现状）
+    for (const PipelineDef& pd : m_loader.allPipelines()) {
+        for (const PipelineStage& st : pd.stages) {
+            const ModuleDef* md = m_registry.module(st.moduleId);
+            if (!md) continue;
+            for (auto pit = st.params.constBegin(); pit != st.params.constEnd(); ++pit) {
+                const QString key = pit.key().startsWith("--") ? pit.key()
+                                                               : "--" + pit.key();
+                if (!md->allowedArgs.contains(key)) {
+                    if (detail) *detail = QString(
+                        "pipeline '%1': stage '%2': param '%3' not in allowedArgs of module '%4'")
+                        .arg(pd.id, st.id, pit.key(), st.moduleId);
+                    return false;
+                }
+            }
+        }
+    }
     return true;
 }
 
@@ -512,9 +530,17 @@ void App::rpcListPipelines(const QJsonValue& id)
             so["module"] = s.moduleId;
             so["name"] = s.name;
             so["optional"] = s.optional;
+            if (!s.ref.isEmpty()) so["ref"] = s.ref;   // P2 物化溯源（v2 形态）
             QJsonArray deps;
             for (const QString& d : s.dependsOn) deps.append(d);
             so["dependsOn"] = deps;
+            if (!s.optionalInputs.isEmpty()) {
+                QJsonArray req;
+                for (const QString& r : s.optionalInputs) req.append(r);
+                so["requires"] = req;
+            }
+            if (!s.params.isEmpty()) so["params"] = s.params;   // P2 物化（库+本地合并）
+            if (!s.userGate.isEmpty()) so["userGate"] = s.userGate;
             QJsonObject arts;
             for (auto ait = s.artifacts.constBegin(); ait != s.artifacts.constEnd(); ++ait)
                 arts[ait.key()] = ait.value();

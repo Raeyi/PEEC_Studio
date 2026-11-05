@@ -24,7 +24,7 @@
 | -32001 | TaskNotFound | taskId 不存在或已过期清理 | 刷新任务列表 |
 | -32002 | TaskAlreadyRunning | 已有任务在运行（当前单任务串行） | 禁用"开始"按钮，等 `task.finished` |
 | -32003 | InputInvalid | `inputs.validate` / `task.run` 输入校验失败 | 展示 `error.data.issues[]`（逐条路径+原因） |
-| -32004 | ConfigError | modules.json / pipelines.json 加载或 schema 失败 | 提示部署不完整，看 stderr |
+| -32004 | ConfigError | modules.json / pipelines.json 加载或 schema 失败（P2 起含加载期 fail-fast：阶段库未知 ref、`ref`/`module` 互斥、schemaVersion >= 3、阶段 params 键不在模块 `allowedArgs` 白名单；serve 模式下启动即返回本错误并以退出码 2 结束） | 提示部署不完整，看 stderr |
 | -32005 | ModuleExecFailed | 模块执行失败（`module.run` 同步返回时） | 展示 `error.data.errorCode` |
 
 ## 二、阶段层错误码（`QS-TL-*`）

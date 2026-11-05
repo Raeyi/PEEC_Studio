@@ -439,8 +439,15 @@ bool TaskOrchestrator::launchStage(const PipelineStage& s)
             this, &TaskOrchestrator::onStageFinished);
     m_running.insert(s.id, runner);
 
-    // 阶段参数覆盖：overrides[stageId] = {key: value}，按 "--key value" 追加
     QStringList extraArgs;
+    // P2 阶段 params（阶段库 + 本地物化结果）：按 "--key value" 追加；
+    // 顺序 = params（配置级）→ overrides（任务级）→ 闸门值（运行级），同键时
+    // ModuleRunner 去重保留尾随（最具体者赢）。
+    for (auto pit = s.params.constBegin(); pit != s.params.constEnd(); ++pit)
+        extraArgs << (pit.key().startsWith("--") ? pit.key() : QString("--") + pit.key())
+                  << pit.value().toVariant().toString();
+
+    // 阶段参数覆盖：overrides[stageId] = {key: value}，按 "--key value" 追加
     const QJsonObject ov = m_overrides.value(s.id).toObject();
     for (auto oit = ov.begin(); oit != ov.end(); ++oit) {
         const QString k = oit.key();
