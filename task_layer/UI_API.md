@@ -111,8 +111,9 @@ task_layer.exe serve [--config <目录>] [--bin <目录>] [--module-root <目录
 | `ping` | — | `{pong, app, schemaVersion}` |
 | `modules.list` | — | `{modules:[{id,displayName,kind,command,available,resolvedPath}]}` |
 | `pipelines.list` | — | `{pipelines:[{id,displayName,stages:[...]}]}` |
-| `inputs.validate` | `{dataRoot, pipeline?, module?, inputs?}` | `{valid, checked, issues, warnings}` |
-| `task.run` | `{pipeline, dataRoot, taskId?, inputs?}` | `{taskId, pipeline}` |
+| `inputs.validate` | `{dataRoot, pipeline?, module?, inputs?, selection?}` | `{valid, checked, issues, warnings}` |
+| `task.run` | `{pipeline, dataRoot, taskId?, inputs?, selection?, overrides?}` | `{taskId, pipeline, selection?}` |
+| `task.provideInput`（P1.5） | `{taskId, stageId, values?}` | `{taskId, stageId, accepted}` |
 | `module.run` | `{moduleId, dataRoot, taskId?, inputs?}` | `{taskId, pipeline}` ← **单独启动一个模块** |
 | `task.cancel` | `{taskId}` | `{cancelled}` |
 | `task.status` | `{taskId}` | `state.json` 内容 |
@@ -309,6 +310,51 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 
 续跑相关错误：pipeline 不匹配 → `resume: pipeline mismatch (state is for '<id>')`；历史阶段不在当前流水线 → `QS-TL-SEL-UNKNOWNSTAGE`；历史阶段记录产出在盘缺失 → `QS-TL-SEL-DEP-MISSING`。
 
+#### 用户闸门 `userGate`（P1.5 起）与 `task.provideInput`
+
+流水线阶段可声明 `userGate`（`pipelines.json` 阶段级可选键；缺省 = 无闸门，行为不变），
+让流水线**跑到一半停下来等 UI**（三种交互形态按需组合）：
+
+| 形态 | 键 | 说明 |
+|---|---|---|
+| F1 产出文件 | `"waitForFiles": ["Model/source_em.json"]` | 等文件出现（dataRoot 相对；**无文件监听**——UI 写完文件后必须调 `task.provideInput` 作为唤醒事件，平台只在收到调用时复检） |
+| F2 产出 CLI 参数 | `"inputs": [{"name":"nfp","type":"number","required":true,"description":"频点数"}]` | 值经 `task.provideInput` 的 `values` 传入，**每个键过 manifest `allowedArgs` 白名单**（与 overrides 同一校验路径），拼为该阶段 CLI `--name value` |
+| F3 纯确认 | `"confirm": true` | 等显式确认（调用 `task.provideInput` 即确认，`values` 可为空对象） |
+
+运行语义：阶段就绪（依赖全 done）但闸门未满足 → 阶段置 `WaitingInput`（序列化名
+`"waiting"`，非终态）、**不启动**、任务保持 busy，发新通知 `task.stage.awaiting`；
+闸门全满足后该阶段才真正启动。等待时间**不计入**模块超时（超时自启动起算）；任务级
+idle 上限 v1 不设。等待中的阶段可被 `task.cancel`（→ Skipped/`QS-TL-CANCEL`）；
+UI 断连按既有 inputClosed→cancel 逻辑收尾。
+
+```json
+// 阶段进入/保持等待（可多次：每次 provideInput 后仍未满足会重发，携带最新缺失明细）
+{"jsonrpc":"2.0","method":"task.stage.awaiting","params":{
+  "taskId":"t-...","stageId":"extract","name":"PEEC 模型提取","module":"peec.model_extract",
+  "gate":{"waitForFiles":["Model/source_em.json"],"confirm":true,
+          "inputs":[{"name":"nfp","type":"number","required":true,"description":"频点数"}]},
+  "missing":{"files":["Model/source_em.json"],"confirmed":true,"inputs":["nfp"]}}}
+```
+
+`missing` 字段：`files` = 尚缺的 waitForFiles；`confirmed` = `true` 表示仍需确认
+（闸门未开 confirm 或已确认时为 `false`）；`inputs` = 尚缺的 required 输入名。
+
+```json
+{"jsonrpc":"2.0","id":8,"method":"task.provideInput","params":{
+  "taskId":"t-...","stageId":"extract",
+  "values":{"nfp":41}
+}}
+```
+```json
+{"jsonrpc":"2.0","id":8,"result":{"taskId":"t-...","stageId":"extract","accepted":true}}
+```
+
+- 任务必须活动且该阶段处于 `waiting` → 否则 `QS-TL-INPUT-NOTWAITING`（任务已结束/阶段已启动/未声明闸门）；
+- `values` 校验：已提供的键按 `gate.inputs` 类型校验（number/string/bool），且每个键过 manifest `allowedArgs` 白名单（非法键/类型错整体拒绝，错误信息与 overrides 同语义）；required 输入的**完整性**由闸门满足判定承担（未齐则继续等待并重发 `awaiting`）——因此 `provideInput` 支持增量提供，`values` 可为空对象（文件出现后的唤醒事件 / 纯确认）；
+- 可**增量提供**：值先存任务记录，闸门全满足后阶段才启动。`values` 拼进该阶段 CLI（`--key value`，与 overrides 同机制）；**与 manifest 模板同键时覆盖模板默认**（模板侧出现被移除，不产生重复 flag）；可见于阶段 `[launch]` 日志 / `job.json` `args`（DllWorker 模块）；
+- 留痕：`state.json` 顶层 `providedInputs`（`{stageId: {values, ts, confirmed?}}`，审计）。
+- `selection` 与闸门正交：被 gate 的阶段可在 selection 子集中；resume 一个"因等待被 cancel 的任务"→ 该阶段重新进入等待。
+
 ### 4.6 模块独立执行（module.run）
 
 不走流水线、单独跑一个模块时用这个（例如只重建网格、只跑一次源模型解析）：
@@ -441,13 +487,14 @@ P1 起（仅非全链任务）：顶层多 `selection`（用户原样传入）�
 | `task.stage.started` | `{taskId, stageId, name}` |
 | `task.stage.log` | `{taskId, stageId, line}` | 后端 stdout/stderr 逐行转发（非结构化，见"五（补充）"） |
 | `task.stage.finished` | `{taskId, stageId, status, exitCode, errorCode, errorMessage, outputs[], assumed?}` | 假定完成阶段（P1 执行选择）带 `assumed:true`，在 `task.started` 后即时发出 |
+| `task.stage.awaiting` | `{taskId, stageId, name, module, gate, missing}` | P1.5 用户闸门：阶段进入/保持等待输入（非终态；provideInput 后仍缺会重发） |
 | `task.finished` | `{taskId, status, summary, elapsedMs}` |
 | `task.cancelled` | `{taskId}` |
 
 UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → 日志窗（后端 stdout/stderr 逐行转发，非结构化文本，高频，注意限流）；
 `task.finished` → 收尾，随后调用 `task.result` 拉清单。
 
-阶段 `status`：`pending` / `running` / `done` / `failed` / `skipped` / `notConfigured`。
+阶段 `status`：`pending` / `running` / `done` / `failed` / `skipped` / `notConfigured` / `waiting`（P1.5 用户闸门等待中，非终态）。
 
 ---
 
@@ -499,6 +546,7 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 | `QS-TL-DEP-BLOCKED` | 上游失败导致跳过 |
 | `QS-TL-DEP-SKIPPED` | 上游被跳过导致跳过 |
 | `QS-TL-SKIP-NOINPUT` | 可选阶段自身输入缺失 |
+| `QS-TL-INPUT-NOTWAITING` | 用户闸门（P1.5）：provideInput 时任务非活动、阶段不在等待、或未声明闸门 |
 | `QS-TL-SEL-UNKNOWNSTAGE` | 执行选择/stages 含流水线中不存在的阶段（或续跑的历史阶段不在当前流水线） |
 | `QS-TL-SEL-DEP-MISSING` | 未选中上游产出在盘缺失（创建前预检或阶段内复检；`errorMessage` 含具体路径） |
 | `QS-TL-ASSUMED-DONE` | 假定完成标记（非错误：执行选择下未选中阶段/续跑信任阶段不执行，直接按在盘产出记账） |

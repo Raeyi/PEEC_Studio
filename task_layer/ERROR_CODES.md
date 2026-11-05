@@ -79,6 +79,16 @@
 | `QS-TL-SEL-DEP-MISSING` | 未选中上游产出在盘缺失（`errorMessage` 含具体路径）。两处触发：① 创建前预检（此时不创建任务）；② 阶段 launch 前复检（必需阶段失败） | 是 | 补齐上游产出（跑上游阶段或换完整算例）后重试 |
 | `QS-TL-ASSUMED-DONE` | 假定完成标记：执行选择下未选中的上游阶段、或 resume 信任的历史阶段，不执行，按在盘产出记账（`status=done`、`assumed=true`、`outputs=[]`） | —（非错误） | 无需处置；UI 展示为"假定完成/已跳过" |
 
+### 2.6 用户闸门（P1.5，2026-11-05 起；来源 `TaskOrchestrator.cpp` / `App.cpp`）
+
+流水线阶段声明 `userGate`（`waitForFiles` / `inputs` / `confirm`）后，阶段就绪但闸门未满足 → 置 `WaitingInput`（序列化名 `waiting`，非终态），任务保持活动。等待时间不计入模块超时；UI 写文件/传值/确认后调 `task.provideInput` 唤醒。
+
+| errorCode | 触发条件 | 可恢复 | 处置 |
+| --- | --- | --- | --- |
+| `QS-TL-INPUT-NOTWAITING` | `task.provideInput` 时任务非活动、阶段不在等待、或未声明闸门 | 是（按提示改操作） | 确认阶段状态（`task.status` 的 `waiting`）后重试 |
+| （复用）overrides 白名单错误 | gate `values` 含 manifest `allowedArgs` 之外的键 → 整体拒绝（与 `task.run` overrides 同一校验路径与错误语义） | 是 | 按 `allowedArgs` 修正键名 |
+| `QS-TL-CANCEL`（复用） | 等待中 `task.cancel` / UI 断连 → 该阶段 Skipped，任务收尾 | 是 | 需要时重新运行 |
+
 ## 三、计算层错误码透传规则
 
 任务层**不重新定义**计算层错误码，只做两件事：提取 + 透传。

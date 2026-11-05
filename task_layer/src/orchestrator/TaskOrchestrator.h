@@ -55,6 +55,17 @@ public:
     bool isBusy() const { return m_busy; }
     QString currentTaskId() const { return m_busy ? m_taskId : QString(); }
 
+    // P1.5 用户闸门：UI 为等待中的阶段提供输入（文件出现/CLI 值/确认）。
+    // 返回 false 时 *error 说明原因（任务非活动 / 阶段不在等待 / 值非法）。
+    // 白名单校验在 App 层（与 overrides 同一校验路径）；本处做 gate.inputs 的
+    // required/类型校验、留痕与唤醒。
+    bool provideInput(const QString& taskId, const QString& stageId,
+                      const QJsonObject& values, QString* error);
+    // 活动任务的阶段定义（任务非活动/未知阶段 -> nullptr）；供 App 白名单校验用
+    const PipelineStage* activeStage(const QString& stageId) const;
+    // gate 输入留痕快照（stageId -> {values, ts, confirmed?}）；供 App 落盘 state.json
+    QJsonObject providedInputs() const { return m_providedInputs; }
+
 signals:
     void notify(const QString& method, const QJsonObject& params);  // 转发给 UI 的通知
 
@@ -64,7 +75,8 @@ private slots:
 
 private:
     void pump();                                  // 从就绪队列启动可用阶段
-    void launchStage(const PipelineStage& s);      // 启动单个阶段（先出队）
+    // 启动单个阶段。返回 false = 阶段进入 WaitingInput（P1.5 用户闸门未满足，留在队列等待）
+    bool launchStage(const PipelineStage& s);      // 启动单个阶段（闸门未满足时先出队）
     bool isReady(const PipelineStage& s) const;    // 依赖全部 done
     bool propagateBlocked();                      // 上游失败/跳过 -> 下游标记 blocked
     void finishTask(const QString& status, const QString& summary);
@@ -75,6 +87,12 @@ private:
     // （dataRoot 相对）；返回缺失文件列表（空 = 满足）。optional 跳过与 P1 入口复检共用。
     QStringList missingFileInputs(const ModuleDef* def, const PipelineStage& s) const;
 
+    // P1.5 闸门检查：返回缺失项（"file:<相对路径>" / "confirm" / "input:<name>"；空 = 满足）
+    QStringList gateMissing(const PipelineStage& s) const;
+    // 组装 task.stage.awaiting 通知参数（gate 原样 + 当前缺失明细）
+    QJsonObject buildAwaiting(const PipelineStage& s, const QStringList& missing) const;
+    bool hasWaiting() const { return !m_waiting.isEmpty(); }
+
     QString m_taskId;
     const PipelineDef* m_pipeline = nullptr;
     const ModuleRegistry* m_registry = nullptr;
@@ -83,6 +101,8 @@ private:
     QJsonObject m_overrides;
     Selection m_selection;                // P1 执行选择
     QSet<QString> m_assumed;              // P1 假定完成的阶段 id（合成记录）
+    QSet<QString> m_waiting;              // P1.5 处于 WaitingInput 的阶段 id（留在 m_pending，等待 task.provideInput）
+    QJsonObject m_providedInputs;         // P1.5 gate 输入留痕（stageId -> {values, ts, confirmed?}）
 
     QMap<QString, StageRecord> m_records;      // stageId -> 运行记录
     QMap<QString, ModuleRunner*> m_running;    // stageId -> 正在运行的 runner

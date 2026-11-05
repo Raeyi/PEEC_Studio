@@ -59,6 +59,12 @@ private:
     bool startTaskWith(const QJsonValue& id, const PipelineDef& pipe,
                        const QString& dataRoot, const QJsonObject& params);
     void rpcCancelTask(const QJsonValue& id, const QJsonObject& params);
+    // P1.5 用户闸门：为等待中的阶段提供输入（文件出现 / CLI 值 / 确认）
+    void rpcProvideInput(const QJsonValue& id, const QJsonObject& params);
+    // 参数白名单校验（manifest allowedArgs）：overrides 与 gate 输入共用同一校验路径；
+    // 返回空串 = 通过，否则为完整错误信息（displayKey 形如 "override 'st.k'" / "input 'k'"）
+    QString checkAllowedArgs(const PipelineStage& st, const QJsonObject& vals,
+                             const QString& displayPrefix) const;
     void rpcTaskStatus(const QJsonValue& id, const QJsonObject& params);
     void rpcTaskResult(const QJsonValue& id, const QJsonObject& params);
     void rpcShutdown(const QJsonValue& id);

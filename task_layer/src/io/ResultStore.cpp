@@ -18,6 +18,7 @@ QString stageStatusName(StageStatus s)
     case StageStatus::Done: return "done";
     case StageStatus::Failed: return "failed";
     case StageStatus::Skipped: return "skipped";
+    case StageStatus::WaitingInput: return "waiting";
     case StageStatus::NotConfigured: return "notConfigured";
     }
     return "pending";
@@ -34,6 +35,7 @@ void ResultStore::open(const QString& taskDir, const QString& taskId, const QStr
     m_stages.clear();
     m_inputs = QJsonObject();
     m_selection = QJsonObject();
+    m_providedInputs = QJsonObject();
     m_started = QDateTime::currentDateTime();
     QDir().mkpath(m_dir);
     appendLog(QString("task %1 pipeline=%2 started at %3")
@@ -85,6 +87,7 @@ void ResultStore::persist()
     if (!m_inputs.isEmpty()) root["inputs"] = m_inputs;
     if (!m_providers.isEmpty()) root["providers"] = m_providers;
     if (!m_selection.isEmpty()) root["selection"] = m_selection;
+    if (!m_providedInputs.isEmpty()) root["providedInputs"] = m_providedInputs;
     QJsonArray stages;
     for (const StageRecord& s : m_stages) {
         QJsonObject so;

@@ -333,3 +333,26 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
   验收：`tools\p1_selection_test.py`（T1–T11 共 22 断言）+ `rpc_smoke.py`（8 断言）+
   三流水线基线（peec S_parameter.csv 与参考逐字节一致、thermal 344.1037 K / 9564 数据行 /
   networkNodes 12750 / 4 数值件逐字节一致、gds_full 14 件产物逐字节一致）。
+- 2026-11-05（P1.5 用户闸门 user gate，同分支）：流水线阶段可声明 `userGate`
+  （`pipelines.json` 阶段级可选键：`waitForFiles` 等文件 / `inputs` CLI 值 / `confirm` 确认，
+  缺省 = 无闸门，内置三流水线不变）：
+  ① 新阶段状态 `WaitingInput`（序列化名 `waiting`，非终态）：阶段就绪但闸门未满足时
+  不启动、留在调度队列，发新通知 `task.stage.awaiting`（`gate` 原样 + `missing` 缺失明细：
+  files/confirmed/inputs）；等待时间**不计入**模块超时（超时自 ModuleRunner::launch 起算）；
+  ② 新 RPC `task.provideInput {taskId, stageId, values?}`：阶段必须处于 waiting（否则
+  `QS-TL-INPUT-NOTWAITING`）；values 支持**增量提供**（文件出现 → 传值 → 确认，values 可为
+  空对象的唤醒事件）；required 完整性由闸门满足判定承担（未满足重发 awaiting），单次调用只校验
+  已提供值的类型与 `allowedArgs` 白名单（与 overrides 同一校验路径，`checkAllowedArgs` 复用）；
+  ③ values 拼进该阶段 CLI（`--key value`，与 overrides 同机制；**与 manifest 模板同键时覆盖
+  模板默认**——模板侧出现被移除，不产生重复 flag，防模块解析顺序依赖；可见于 [launch] 日志 / job.json
+  args）；
+  ④ state.json 顶层 `providedInputs`（stageId→{values,ts,confirmed?}）审计留痕；
+  ⑤ **pump() 死锁兜底修复（§4.2.4 陷阱）**：存在等待阶段时 pump 作为合法停等直接返回，
+  不再把等待阶段判死（QS-TL-CFG-DEADLOCK 误杀）；由 provideInput 唤醒后重新 pump；
+  ⑥ 等待中 cancel → 该阶段 Skipped（QS-TL-CANCEL）正常收尾；UI 断连按既有
+  inputClosed→cancel 逻辑覆盖；`selection` 与闸门正交（resume 因等待被 cancel 的任务 →
+  该阶段重新进入等待）。
+  顺带修复：state.json 顶层 `status` 运行期恒为 `queued`（仅 finish 写终态），与 UI_API §4.9
+  文档语义（`running`）不符 → 任务启动且仍 busy 时写 `running`（全假定任务同步收尾不覆写）。
+  验收：`tools\gate_test.py`（T1–T5：三缺法 awaiting / 白名单拒绝 / 等待中 cancel / 断连 cancel /
+  8s 无死锁回归 / job.args CLI 注入 / providedInputs 留痕）；全链基线回归另跑。

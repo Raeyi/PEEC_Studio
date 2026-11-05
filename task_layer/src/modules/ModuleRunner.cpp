@@ -95,6 +95,27 @@ ModuleRunner::~ModuleRunner()
     }
 }
 
+namespace {
+// 注入参数（overrides / P1.5 闸门值）去重：manifest 模板（base 段）已含同一 --key 时，
+// 删除模板侧出现（flag + 其值，空格形式），保留注入值（尾随胜）—— 防止同一 flag 出现
+// 两次使模块解析顺序依赖。--key=value 形式不在 v1 范围（供应商模板均为空格形式）。
+void dedupeInjectedArgs(QStringList* base, const QStringList& injected)
+{
+    for (int gi = 0; gi + 1 < injected.size(); gi += 2) {
+        const QString flag = injected.at(gi);
+        if (!flag.startsWith("--") || flag.contains('=')) continue;
+        const int baseEnd = base->size();
+        for (int bi = 0; bi < baseEnd; ++bi) {
+            if (base->at(bi) != flag) continue;
+            if (bi + 1 < baseEnd && !base->at(bi + 1).startsWith("--"))
+                base->removeAt(bi + 1);
+            base->removeAt(bi);
+            break;   // 模板侧至多处理一处
+        }
+    }
+}
+} // namespace
+
 QString ModuleRunner::writeJobJson(const ModuleDef& def, const QStringList& args,
                                    const PathResolver& resolver, const QString& dataRoot,
                                    const QString& stageId, const QString& taskId)
@@ -240,6 +261,7 @@ void ModuleRunner::launch(const ModuleDef& def, const QStringList& args,
         exe = QDir::toNativeSeparators(QFileInfo(host).absoluteFilePath());
         QStringList dllArgs = def.args;
         dllArgs << args;
+        dedupeInjectedArgs(&dllArgs, args);   // 注入键覆盖模板默认（job.json 与 CLI 一致）
         const QString jobPath = writeJobJson(def, dllArgs, m_resolver, dataRoot, stageId, taskId);
         if (jobPath.isEmpty()) {
             finishFailure("QS-TL-IO-JOB",
@@ -260,7 +282,10 @@ void ModuleRunner::launch(const ModuleDef& def, const QStringList& args,
         }
         for (const QString& a : def.args) realArgs << a;   // rebindDataRoot 已展开为绝对路径
     }
-    for (const QString& a : args) realArgs << m_resolver.resolve(a);
+    QStringList injected;
+    for (const QString& a : args) injected << m_resolver.resolve(a);
+    for (const QString& a : injected) realArgs << a;
+    dedupeInjectedArgs(&realArgs, injected);   // 注入键覆盖模板默认（防 --key 重复）
 
     // 3) 启动
     m_proc = new QProcess(this);

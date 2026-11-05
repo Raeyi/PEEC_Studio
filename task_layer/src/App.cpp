@@ -375,6 +375,20 @@ void App::onNotify(const QString& method, const QJsonObject& params)
         rec.startedAt = QDateTime::currentMSecsSinceEpoch();
         m_store.setStage(rec);
         m_store.appendLog(QString("stage %1 started (%2)").arg(rec.id, rec.name));
+    } else if (method == "task.stage.awaiting") {
+        // P1.5 用户闸门：阶段进入/保持 WaitingInput（非终态；随后 provideInput 唤醒或取消收尾）
+        StageRecord rec;
+        rec.id = params.value("stageId").toString();
+        rec.moduleId = params.value("module").toString();
+        rec.name = params.value("name").toString();
+        rec.status = StageStatus::WaitingInput;
+        rec.startedAt = 0;
+        m_store.setStage(rec);
+        const QByteArray missJson = QJsonDocument(
+                                        params.value("missing").toObject())
+                                        .toJson(QJsonDocument::Compact);
+        m_store.appendLog(QString("stage %1 waiting for input: %2")
+                              .arg(rec.id, QString::fromUtf8(missJson)));
     } else if (method == "task.stage.finished") {
         StageRecord rec;
         rec.id = params.value("stageId").toString();
@@ -437,6 +451,7 @@ void App::handleRequest(const QJsonValue& reqId, const QString& method,
     else if (method == "task.run") rpcRunTask(reqId, params);
     else if (method == "module.run") rpcRunModule(reqId, params);
     else if (method == "task.cancel") rpcCancelTask(reqId, params);
+    else if (method == "task.provideInput") rpcProvideInput(reqId, params);
     else if (method == "task.status") rpcTaskStatus(reqId, params);
     else if (method == "task.result") rpcTaskResult(reqId, params);
     else if (method == "shutdown") rpcShutdown(reqId);
@@ -696,23 +711,18 @@ bool App::startTaskWith(const QJsonValue& id, const PipelineDef& pipe,
     if (!selRecord.isEmpty()) m_store.setSelection(selRecord);
 
     // overrides 白名单校验（manifest allowedArgs）：非法键直接拒绝，不静默透传
+    //（与 P1.5 gate 输入 task.provideInput 共用 checkAllowedArgs 同一校验路径）
     const QJsonObject overrides = params.value("overrides").toObject();
     for (auto oit = overrides.constBegin(); oit != overrides.constEnd(); ++oit) {
         const PipelineStage* st = nullptr;
         for (const PipelineStage& s : pipe.stages)
             if (s.id == oit.key()) { st = &s; break; }
         if (!st) continue;   // 未知 stageId 由编排器按依赖处理
-        const ModuleDef* def = m_registry.module(st->moduleId);
-        if (!def) continue;
-        for (auto kit = oit.value().toObject().constBegin();
-             kit != oit.value().toObject().constEnd(); ++kit) {
-            const QString key = kit.key().startsWith("--") ? kit.key() : "--" + kit.key();
-            if (!def->allowedArgs.contains(key)) {
-                m_transport->sendError(id, rpc::ErrInputInvalid,
-                    QString("override '%1.%2' not in allowedArgs of module %3")
-                        .arg(oit.key(), kit.key(), def->id));
-                return false;
-            }
+        const QJsonObject vals = oit.value().toObject();
+        const QString bad = checkAllowedArgs(*st, vals, QStringLiteral("override '%1.").arg(oit.key()));
+        if (!bad.isEmpty()) {
+            m_transport->sendError(id, rpc::ErrInputInvalid, bad);
+            return false;
         }
     }
 
@@ -723,6 +733,9 @@ bool App::startTaskWith(const QJsonValue& id, const PipelineDef& pipe,
         m_transport->sendError(id, rpc::InternalError, "task failed to start");
         return false;
     }
+    if (m_orchestrator->isBusy())
+        m_store.setStatus("running");   // state.json 顶层状态：运行中（UI_API §4.9 语义）；
+    // 全假定任务已在 startTask 内同步收尾（finish() 写终态），不得覆写
     QJsonObject resp{{"taskId", tid}, {"pipeline", pipe.id}};
     if (!selRecord.isEmpty()) resp["selection"] = selRecord;
     m_transport->sendResponse(id, resp);
@@ -737,6 +750,61 @@ void App::rpcCancelTask(const QJsonValue& id, const QJsonObject& params)
         return;
     }
     m_transport->sendResponse(id, QJsonObject{{"cancelled", true}});
+}
+
+QString App::checkAllowedArgs(const PipelineStage& st, const QJsonObject& vals,
+                              const QString& displayPrefix) const
+{
+    const ModuleDef* def = m_registry.module(st.moduleId);
+    if (!def) return QString();
+    for (auto it = vals.constBegin(); it != vals.constEnd(); ++it) {
+        const QString key = it.key().startsWith("--") ? it.key() : "--" + it.key();
+        if (!def->allowedArgs.contains(key))
+            return QString("%1%2' not in allowedArgs of module %3")
+                .arg(displayPrefix, it.key(), def->id);
+    }
+    return QString();
+}
+
+void App::rpcProvideInput(const QJsonValue& id, const QJsonObject& params)
+{
+    const QString taskId = params.value("taskId").toString();
+    const QString stageId = params.value("stageId").toString();
+    if (taskId.isEmpty() || stageId.isEmpty()) {
+        m_transport->sendError(id, rpc::InvalidParams, "missing taskId/stageId");
+        return;
+    }
+    if (taskId != m_activeTaskId) {
+        m_transport->sendError(id, rpc::ErrTaskNotFound, "task not running: " + taskId);
+        return;
+    }
+    const PipelineStage* st = m_orchestrator->activeStage(stageId);
+    if (!st) {
+        m_transport->sendError(id, rpc::InvalidParams,
+            QStringLiteral("QS-TL-INPUT-NOTWAITING: stage '%1' is not in an active task").arg(stageId));
+        return;
+    }
+    const QJsonObject values = params.value("values").toObject();
+    // 白名单：与 overrides 同一校验路径（manifest allowedArgs），非法键整体拒绝
+    const QString bad = checkAllowedArgs(*st, values, QStringLiteral("input '"));
+    if (!bad.isEmpty()) {
+        m_transport->sendError(id, rpc::ErrInputInvalid, bad);
+        return;
+    }
+    QString err;
+    if (!m_orchestrator->provideInput(taskId, stageId, values, &err)) {
+        if (err.startsWith("stage not waiting")) {
+            m_transport->sendError(id, rpc::InvalidParams,
+                QStringLiteral("QS-TL-INPUT-NOTWAITING: stage '%1' is not waiting for input").arg(stageId));
+            return;
+        }
+        m_transport->sendError(id, rpc::InvalidParams, err);
+        return;
+    }
+    // gate 输入留痕落盘（state.json providedInputs，审计）
+    m_store.setProvidedInputs(m_orchestrator->providedInputs());
+    m_transport->sendResponse(id, QJsonObject{
+        {"taskId", taskId}, {"stageId", stageId}, {"accepted", true}});
 }
 
 QString App::taskDirOf(const QString& taskId) const

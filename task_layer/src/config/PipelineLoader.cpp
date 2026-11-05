@@ -107,6 +107,41 @@ bool PipelineLoader::parsePipeline(const QString& id, const QJsonObject& obj, QS
             s.optionalInputs << rv.toString();
         for (const QJsonValue& d : so.value("dependsOn").toArray())
             s.dependsOn << d.toString();
+        // P1.5 用户闸门（可选键）：F1 等文件 / F2 CLI 值 / F3 确认；结构非法 → 加载期拒绝
+        {
+            const QJsonValue gv = so.value("userGate");
+            if (gv.isUndefined() || gv.isNull()) {
+                // 无闸门（缺省）
+            } else if (!gv.isObject()) {
+                *error = QString("pipeline '%1': stage '%2': userGate must be an object").arg(id, s.id);
+                return false;
+            } else {
+                const QJsonObject gate = gv.toObject();
+                const QJsonArray wf = gate.value("waitForFiles").toArray();
+                for (const QJsonValue& fv : wf) {
+                    if (!fv.isString() || fv.toString().isEmpty()) {
+                        *error = QString("pipeline '%1': stage '%2': userGate.waitForFiles must be non-empty strings").arg(id, s.id);
+                        return false;
+                    }
+                }
+                if (!gate.value("confirm").isUndefined() && !gate.value("confirm").isBool()) {
+                    *error = QString("pipeline '%1': stage '%2': userGate.confirm must be a boolean").arg(id, s.id);
+                    return false;
+                }
+                const QJsonArray ins = gate.value("inputs").toArray();
+                QSet<QString> inames;
+                for (const QJsonValue& iv : ins) {
+                    const QJsonObject io = iv.toObject();
+                    const QString name = io.value("name").toString();
+                    if (name.isEmpty() || inames.contains(name)) {
+                        *error = QString("pipeline '%1': stage '%2': userGate.inputs need unique non-empty 'name'").arg(id, s.id);
+                        return false;
+                    }
+                    inames.insert(name);
+                }
+                s.userGate = gate;
+            }
+        }
         if (s.id.isEmpty() || s.moduleId.isEmpty()) {
             *error = QString("pipeline '%1': stage requires 'id' and 'module'").arg(id);
             return false;

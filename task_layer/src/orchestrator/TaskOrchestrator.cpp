@@ -33,6 +33,8 @@ bool TaskOrchestrator::startTask(const QString& taskId, const PipelineDef& pipel
     m_overrides = overrides;
     m_selection = sel;
     m_assumed.clear();
+    m_waiting.clear();
+    m_providedInputs = QJsonObject();
     m_maxParallel = pipeline.maxParallel < 1 ? 1 : pipeline.maxParallel;
     m_cancelled = false;
     m_startMs = QDateTime::currentMSecsSinceEpoch();
@@ -113,6 +115,7 @@ bool TaskOrchestrator::cancel(const QString& taskId)
             {"errorCode", "QS-TL-CANCEL"}});
     }
     m_pending.clear();
+    m_waiting.clear();   // P1.5 等待中阶段随任务收尾（上面已按 Skipped/QS-TL-CANCEL 记账）
 
     const QList<ModuleRunner*> runners = m_running.values();
     for (ModuleRunner* r : runners) {
@@ -124,6 +127,132 @@ bool TaskOrchestrator::cancel(const QString& taskId)
     // 没有在跑的进程时直接收尾；否则等在跑阶段回落后由 pump() 收尾
     if (m_running.isEmpty()) pump();
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// P1.5 用户闸门（user gate）
+// ---------------------------------------------------------------------------
+
+bool TaskOrchestrator::provideInput(const QString& taskId, const QString& stageId,
+                                    const QJsonObject& values, QString* error)
+{
+    if (!m_busy || taskId != m_taskId) {
+        if (error) *error = "task not active: " + taskId;
+        return false;
+    }
+    if (!m_waiting.contains(stageId)) {
+        if (error) *error = "stage not waiting for input: " + stageId;
+        return false;
+    }
+    const PipelineStage* stg = nullptr;
+    if (m_pipeline) {
+        for (const PipelineStage& s : m_pipeline->stages)
+            if (s.id == stageId) { stg = &s; break; }
+    }
+    if (!stg) {
+        if (error) *error = "unknown stage: " + stageId;
+        return false;
+    }
+
+    // 与已提供值合并（UI 可增量提供：文件出现 -> CLI 值 -> 确认）
+    QJsonObject merged = m_providedInputs.value(stageId).toObject()
+                             .value("values").toObject();
+    for (auto vit = values.constBegin(); vit != values.constEnd(); ++vit)
+        merged[vit.key()] = vit.value();
+
+    // 按 gate.inputs 校验：required 存在性 + 类型（number/string/bool）
+    const QJsonObject gate = stg->userGate;
+    for (const QJsonValue& iv : gate.value("inputs").toArray()) {
+        const QJsonObject io = iv.toObject();
+        const QString name = io.value("name").toString();
+        // required 完整性由闸门满足判定（gateMissing -> awaiting 缺失明细）承担：
+        // provideInput 支持增量提供（values 可为空对象的唤醒事件），此处只校验已提供值的类型
+        if (!merged.contains(name))
+            continue;
+        const QString type = io.value("type").toString();
+        const QJsonValue v = merged.value(name);
+        bool typeOk = true;
+        if (type == "number") typeOk = v.isDouble();
+        else if (type == "string") typeOk = v.isString();
+        else if (type == "bool") typeOk = v.isBool();
+        if (!typeOk) {
+            if (error) *error = QString("input '%1' must be of type %2").arg(name, type);
+            return false;
+        }
+    }
+
+    // 留痕（审计）：{values, ts, confirmed?}
+    QJsonObject entry = m_providedInputs.value(stageId).toObject();
+    entry["values"] = merged;
+    entry["ts"] = QDateTime::currentMSecsSinceEpoch();
+    if (gate.value("confirm").toBool(false))
+        entry["confirmed"] = true;   // 调用 provideInput 即显式确认（F3 纯确认形态）
+    m_providedInputs[stageId] = entry;
+
+    // 闸门全满足 -> 唤醒（阶段就绪且在 m_pending，本轮 pump 即启动，values 进 extraArgs）；
+    // 未满足 -> 继续等待并重发 awaiting（携带最新缺失明细）
+    const QStringList missing = gateMissing(*stg);
+    if (missing.isEmpty()) {
+        m_waiting.remove(stageId);
+        pump();
+        return true;
+    }
+    auto wit = m_records.find(stageId);
+    if (wit != m_records.end()) wit->status = StageStatus::WaitingInput;
+    emit notify("task.stage.awaiting", buildAwaiting(*stg, missing));
+    return true;
+}
+
+const PipelineStage* TaskOrchestrator::activeStage(const QString& stageId) const
+{
+    if (!m_busy || !m_pipeline) return nullptr;
+    for (const PipelineStage& s : m_pipeline->stages)
+        if (s.id == stageId) return &s;
+    return nullptr;
+}
+
+QStringList TaskOrchestrator::gateMissing(const PipelineStage& s) const
+{
+    QStringList missing;
+    const QJsonObject gate = s.userGate;
+    for (const QJsonValue& fv : gate.value("waitForFiles").toArray()) {
+        const QString rel = fv.toString();
+        QString ap = m_dataRoot + "/" + rel;
+        ap.replace('/', QDir::separator());
+        if (!QFileInfo::exists(QDir::cleanPath(ap))) missing << ("file:" + rel);
+    }
+    if (gate.value("confirm").toBool(false) &&
+        !m_providedInputs.value(s.id).toObject().value("confirmed").toBool(false))
+        missing << "confirm";
+    const QJsonObject provVals = m_providedInputs.value(s.id).toObject()
+                                     .value("values").toObject();
+    for (const QJsonValue& iv : gate.value("inputs").toArray()) {
+        const QJsonObject io = iv.toObject();
+        const QString name = io.value("name").toString();
+        if (!io.value("required").toBool(false)) continue;
+        if (!provVals.contains(name)) missing << ("input:" + name);
+    }
+    return missing;
+}
+
+QJsonObject TaskOrchestrator::buildAwaiting(const PipelineStage& s,
+                                            const QStringList& missing) const
+{
+    QJsonArray missFiles, missInputs;
+    bool needConfirm = false;
+    for (const QString& m : missing) {
+        if (m.startsWith("file:")) missFiles.append(m.mid(5));
+        else if (m == "confirm") needConfirm = true;
+        else if (m.startsWith("input:")) missInputs.append(m.mid(6));
+    }
+    return QJsonObject{
+        {"taskId", m_taskId}, {"stageId", s.id}, {"name", s.name},
+        {"module", s.moduleId},
+        {"gate", s.userGate},
+        {"missing", QJsonObject{
+            {"files", missFiles},
+            {"confirmed", needConfirm},
+            {"inputs", missInputs}}}};
 }
 
 bool TaskOrchestrator::isReady(const PipelineStage& s) const
@@ -178,10 +307,11 @@ void TaskOrchestrator::pump()
             while (m_running.size() < m_maxParallel) {
                 int idx = -1;
                 for (int i = 0; i < m_pending.size(); ++i) {
+                    if (m_waiting.contains(m_pending.at(i).id)) continue;  // P1.5 等待阶段：跳过，不重复触发 awaiting
                     if (isReady(m_pending.at(i))) { idx = i; break; }
                 }
                 if (idx < 0) break;
-                launchStage(m_pending.at(idx));      // 内部会 erase 到 m_running
+                launchStage(m_pending.at(idx));      // 启动（erase 到 m_running）或进入等待（留在队列）
             }
         }
 
@@ -193,6 +323,8 @@ void TaskOrchestrator::pump()
         }
 
         if (m_pending.isEmpty()) break;              // 全部处理完，走收尾
+
+        if (hasWaiting()) return;                      // P1.5 等待用户输入是合法停等：不得走死锁兜底
 
         if (!propagateBlocked()) {
             // 依赖无法解析（配置错误 / 环）：强制收尾，绝不让任务悬挂
@@ -234,8 +366,22 @@ void TaskOrchestrator::pump()
     finishTask(status, summary);
 }
 
-void TaskOrchestrator::launchStage(const PipelineStage& s)
+bool TaskOrchestrator::launchStage(const PipelineStage& s)
 {
+    // P1.5 用户闸门（F1 等文件 / F2 CLI 值 / F3 显式确认）：阶段已就绪但闸门未满足
+    // -> WaitingInput，留在 m_pending 不启动、不离开队列；task.provideInput 唤醒后复检。
+    // 等待时间不计入模块 timeoutSec（模块超时自 ModuleRunner::launch 起算，语义不变）。
+    if (!s.userGate.isEmpty()) {
+        const QStringList missing = gateMissing(s);
+        if (!missing.isEmpty()) {
+            auto wit = m_records.find(s.id);
+            if (wit != m_records.end()) wit->status = StageStatus::WaitingInput;
+            m_waiting.insert(s.id);
+            emit notify("task.stage.awaiting", buildAwaiting(s, missing));
+            return false;
+        }
+    }
+
     // 先出队、再启动：launch() 可能同步回调 onStageFinished -> pump()
     for (int i = 0; i < m_pending.size(); ++i) {
         if (m_pending.at(i).id == s.id) { m_pending.remove(i); break; }
@@ -245,7 +391,7 @@ void TaskOrchestrator::launchStage(const PipelineStage& s)
     if (!def) {
         setStageStatus(s, StageStatus::Failed, "QS-TL-CFG-UNKNOWNMODULE",
                        QString("module '%1' not registered").arg(s.moduleId));
-        return;
+        return true;
     }
 
     // P1 防御性复检：selection 子集的入口阶段（依赖里有假定完成的合成记录）
@@ -262,7 +408,7 @@ void TaskOrchestrator::launchStage(const PipelineStage& s)
                                            : "selection entry recheck: inputs missing: %1";
                 setStageStatus(s, s.optional ? StageStatus::Skipped : StageStatus::Failed,
                                msgCode, msgTpl.arg(missing.join("; ")));
-                return;
+                return true;
             }
         }
     }
@@ -276,7 +422,7 @@ void TaskOrchestrator::launchStage(const PipelineStage& s)
             setStageStatus(s, StageStatus::Skipped, "QS-TL-SKIP-NOINPUT",
                            QString("optional stage skipped: inputs missing: %1")
                                .arg(missing.join("; ")));
-            return;
+            return true;
         }
     }
 
@@ -302,11 +448,20 @@ void TaskOrchestrator::launchStage(const PipelineStage& s)
                   << oit.value().toVariant().toString();
     }
 
+    // P1.5 闸门输入（F2 CLI 值）：与 overrides 同机制拼 --key value（白名单已由 App 校验）
+    const QJsonObject gateVals = m_providedInputs.value(s.id).toObject()
+                                     .value("values").toObject();
+    for (auto git = gateVals.constBegin(); git != gateVals.constEnd(); ++git) {
+        extraArgs << (git.key().startsWith("--") ? git.key() : QString("--") + git.key())
+                  << git.value().toVariant().toString();
+    }
+
     emit notify("task.stage.started", QJsonObject{
         {"taskId", m_taskId}, {"stageId", s.id}, {"name", s.name},
         {"module", s.moduleId}});
     runner->launch(*def, extraArgs, m_resolver, m_dataRoot, s.id, m_taskId,
                    def->timeoutSec);
+    return true;
 }
 
 QStringList TaskOrchestrator::missingFileInputs(const ModuleDef* def, const PipelineStage& s) const
@@ -412,6 +567,7 @@ void TaskOrchestrator::finishTask(const QString& status, const QString& summary)
     const qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - m_startMs;
     m_busy = false;
     m_pending.clear();
+    m_waiting.clear();
 
     emit notify("task.finished", QJsonObject{
         {"taskId", m_taskId}, {"status", status}, {"summary", summary},

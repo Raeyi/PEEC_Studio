@@ -10,7 +10,7 @@
 namespace task {
 
 enum class StageStatus {
-    Pending, Ready, Running, Done, Failed, Skipped, NotConfigured
+    Pending, Ready, Running, Done, Failed, Skipped, WaitingInput, NotConfigured
 };
 
 QString stageStatusName(StageStatus s);
@@ -40,10 +40,14 @@ public:
     void finish(const QString& status, const QString& summary, qint64 elapsedMs);
     // UI 动态输入（如 source_em.json 路径），落盘便于任务追溯
     void setInputs(const QJsonObject& inputs) { m_inputs = inputs; persist(); }
+    // 顶层任务状态（queued -> running -> 终态；finish() 写终态）
+    void setStatus(const QString& st) { m_status = st; persist(); }
     // providers version snapshot: which module versions produced this task (traceability)
     void setProviders(const QJsonObject& providers) { m_providers = providers; persist(); }
     // 执行选择留痕（P1）：task.run 的 selection 原样落盘（未传 selection 时不写，保持旧 state.json 形状）
     void setSelection(const QJsonObject& sel) { m_selection = sel; persist(); }
+    // gate 输入留痕（P1.5）：stageId -> {values, ts, confirmed?}（task.provideInput 落盘，审计）
+    void setProvidedInputs(const QJsonObject& p) { m_providedInputs = p; persist(); }
 
     QString taskDir() const { return m_dir; }
     QString taskId() const { return m_taskId; }
@@ -60,6 +64,7 @@ private:
     QJsonObject m_inputs;
     QJsonObject m_providers;   // providerId -> {version, apiVersion}
     QJsonObject m_selection;   // selection 留痕（P1）
+    QJsonObject m_providedInputs;  // gate 输入留痕（P1.5，stageId -> {values, ts, confirmed?}）
     QString m_status = "queued";
     QString m_summary;
     QDateTime m_started;
