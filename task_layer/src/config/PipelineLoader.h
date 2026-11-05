@@ -29,6 +29,7 @@ struct PipelineDef {
     QString description;
     QVector<PipelineStage> stages;
     int maxParallel = 1;     // 最大并行阶段数
+    QString source = "builtin";   // P3：来源标记（builtin / local，pipelines.local.json 覆盖）
 };
 
 // 路径变量解析器：
@@ -78,8 +79,10 @@ private:
 class PipelineLoader
 {
 public:
-    // schemaVersion 1（全内联）与 2（阶段库 + ref 混合）均可；>=3 拒绝
-    bool loadFromFile(const QString& jsonPath, QString* error);
+    // schemaVersion 1（全内联）与 2（阶段库 + ref 混合）均可；>=3 拒绝。
+    // P3：localPath（pipelines.local.json，可选）= 部署级覆盖——同名 pipeline id / 阶段库
+    // ref 均为 local 赢（启动日志留痕）；local 文件任何错误整文件拒载（fail-fast）。
+    bool loadFromFile(const QString& mainPath, const QString& localPath, QString* error);
     const PipelineDef* pipeline(const QString& id) const
     {
         const auto it = m_pipelines.find(id);
@@ -95,7 +98,8 @@ public:
 
 private:
     bool parseStageLib(const QString& ref, const QJsonObject& obj, QString* error);
-    bool parsePipeline(const QString& id, const QJsonObject& obj, QString* error);
+    bool parsePipeline(const QString& id, const QJsonObject& obj, QString* error,
+                         const QString& source = "builtin");
     int m_schemaVersion = 1;
     QMap<QString, StageLibDef> m_stageLib;
     QMap<QString, PipelineDef> m_pipelines;

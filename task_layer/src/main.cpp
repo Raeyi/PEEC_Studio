@@ -145,7 +145,8 @@ int main(int argc, char* argv[])
             QTextStream(stdout) << "config error: " << err << "\n";
             return 2;
         }
-        if (!loader.loadFromFile(configDir + "/pipelines.json", &err)) {
+        if (!loader.loadFromFile(configDir + "/pipelines.json",
+                                configDir + "/pipelines.local.json", &err)) {
             QTextStream(stdout) << "config error: " << err << "\n";
             return 2;
         }
@@ -157,7 +158,8 @@ int main(int argc, char* argv[])
             }
         } else {
             for (const PipelineDef& p : loader.allPipelines()) {
-                out << p.id << "\t" << p.displayName << "\tmaxParallel=" << p.maxParallel << "\n";
+                out << p.id << "\t" << p.displayName << "\tmaxParallel=" << p.maxParallel
+                    << (p.source == "local" ? "\t(local)" : "") << "\n";
                 for (const PipelineStage& s : p.stages)
                     out << "  - " << s.id << "\t" << s.moduleId << (s.optional ? "\t(optional)" : "") << "\n";
             }

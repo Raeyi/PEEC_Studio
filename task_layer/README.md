@@ -40,7 +40,7 @@ UI 用 `QProcess::start("task_layer.exe", {"serve", ...})` 启动任务层，
 | `inputs.validate` | `{dataRoot, pipeline?, module?, inputs?}` | `{valid, checked, issues:[{path,reason,detail}], warnings, inputs?}` |
 | `task.run` | `{pipeline, dataRoot, taskId?, inputs?, selection?, overrides?}` | `{taskId, pipeline}` |
 | `task.provideInput` | `{taskId, stageId, values?}` | `{taskId, stageId, accepted}`（用户闸门等待中的阶段提供输入；`QS-TL-INPUT-NOTWAITING` 非等待时拒绝） |
-| `module.run` | `{moduleId, dataRoot, taskId?, inputs?}` | `{taskId, pipeline}` |
+| `module.run` | `{moduleId, dataRoot, taskId?, inputs?, stageRef?}` | `{taskId, pipeline}`（P3：接线自动路由；多候选需 stageRef 消歧） |
 | `task.cancel` | `{taskId}` | `{cancelled}` |
 | `task.status` | `{taskId}` | state.json 内容（各阶段状态） |
 | `task.result` | `{taskId}` | state + `resultFiles` |
@@ -376,4 +376,27 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
   验收：`tools\p2_stage_lib_test.py`（18 断言：v1/v2 物化等价 / 未知 ref 拒载 / 合并规则 /
   同 ref 双链独立覆盖 / params 白名单拒载 / ref 溯源）；回归四套件（rpc_smoke、
   p1_selection_test、baseline_e2e 三流水线字节红线、gate_test）均按 v2 配置重跑通过。
+  未改动任何模块 manifest（计划五不碰清单保持）。
+- 2026-11-05（P3 部署级覆盖 + module.run 路由修复，同分支）：
+  ① **L1 层 `config/pipelines.local.json`（可选文件）**：集成商/客户 IT 用阶段库组合自定义流水线；
+  格式与主文件相同（schemaVersion 1/2），同名 pipeline id / 同名阶段库 ref 均 **local 赢**
+  （启动日志留痕，`pipelines.list` 该条目标 `source:"local"`，其余 `"builtin"`）；
+  local pipeline 的 ref 可跨主/local 两个库解析；与主文件同一套加载期校验，任何错误
+  **整文件拒载**（fail-fast：serve 启动即 ErrConfig 退出 2，错误带 `pipelines.local.json` 前缀）。
+  算例级（dataRoot）不允许定义流水线（L2 收紧，计划 §4.4.1）。
+  ② **module.run 路由修复（H2）**：单模块任务的阶段接线（artifacts 路由 / requires / params /
+  userGate）从该模块在所有流水线（含 local）物化阶段条目中自动采用——恰好 1 处直接用其
+  库级默认（回归：`module.run thermal.extract` 单跑时 `user/thermal.mesh` 正确路由到
+  `Result/gds2geo/thermal/model_thermal.msh`，而非 manifest 默认 `Model/model_thermal.msh`）；
+  0 处 = 现行为（manifest 默认位置）；>=2 处报错并列候选，新可选参数 `stageRef`
+  （`"pipelineId/stageId"`，取候选之一）消歧。
+  ③ **module.run 生命周期修复（验收期发现的既有隐患）**：编排器原以指针持有流水线
+  （`const PipelineDef* m_pipeline`），而 `module.run` 的合成单阶段流水线是调用方栈上临时对象——
+  任务收尾时 pump 解引用已析构对象，ACCESS_VIOLATION 崩溃（serve 进程死在 `task.stage.finished`
+  之后、`task.finished` 之前，state.json 永久停留 `running`）。P3 验收 ③ 首次跑通单模块到
+  完成时暴露；改为值拷贝持有 + 存在标志（`m_hasPipeline`），行为其余不变。
+  **计划偏离（留档）**：计划 §7.3 的 stage 记录 `upstreamFingerprints`（size/mtime）字段本期
+  顺延（P3 验收 ①-⑤ 不依赖；按 §5.2"指纹先软后硬"，待 state.json 数据积累后再定）。
+  验收：`tools\p3_local_test.py`（local 覆盖/标记/日志留痕、非法 local 整文件拒载、H2 路由
+  [launch] 断言、多候选报错 + stageRef 消歧）；回归四套件 + p2 测试均按最终构建重跑通过。
   未改动任何模块 manifest（计划五不碰清单保持）。

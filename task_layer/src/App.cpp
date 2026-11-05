@@ -111,7 +111,8 @@ bool App::loadConfig(QString* detail)
 //     for (const QString& w : warnings + missing)
 //         qWarning("[config] %s", qPrintable(w));
 //     m_refRoutes = routes;
-    if (!m_loader.loadFromFile(m_configDir + "/pipelines.json", &err)) {
+    if (!m_loader.loadFromFile(m_configDir + "/pipelines.json",
+                                    m_configDir + "/pipelines.local.json", &err)) {
         if (detail) *detail = err;
         return false;
     }
@@ -520,6 +521,7 @@ void App::rpcListPipelines(const QJsonValue& id)
     for (const PipelineDef& p : m_loader.allPipelines()) {
         QJsonObject o;
         o["id"] = p.id;
+        o["source"] = p.source;   // P3：builtin / local（pipelines.local.json 覆盖）
         o["displayName"] = p.displayName;
         o["description"] = p.description;
         o["maxParallel"] = p.maxParallel;
@@ -589,6 +591,37 @@ void App::rpcRunModule(const QJsonValue& id, const QJsonObject& params)
 
     // 单模块执行 = 只含该模块的"单阶段流水线"：
     // 进度通知、状态持久化、task.status / task.result / task.cancel 全部复用流水线那套。
+    // P3（H2 路由修复）：在所有 pipeline（含 local）的物化阶段条目中找该模块的接线——
+    //   恰好 1 个 -> 采用其 artifacts/requires/params/userGate 库级默认接线；
+    //   0 个     -> 现行为（无路由，manifest 默认位置）；
+    //   >=2 个   -> 要求 stageRef = "<pipelineId>/<stageId>" 消歧（候选列表可直接复制）。
+    struct Candidate { QString pipelineId; const PipelineStage* st; };
+    QVector<Candidate> cands;
+    for (const PipelineDef& pd : m_loader.allPipelines())
+        for (const PipelineStage& ps : pd.stages)
+            if (ps.moduleId == moduleId)
+                cands.append({pd.id, &ps});
+    const QString stageRef = params.value("stageRef").toString();
+    const PipelineStage* routed = nullptr;
+    if (cands.size() == 1) {
+        routed = cands.first().st;
+    } else if (cands.size() >= 2) {
+        for (const Candidate& c : cands) {
+            if (c.pipelineId + "/" + c.st->id == stageRef) {
+                routed = c.st;
+                break;
+            }
+        }
+        if (!routed) {
+            QStringList listed;
+            for (const Candidate& c : cands)
+                listed << c.pipelineId + "/" + c.st->id;
+            m_transport->sendError(id, rpc::InvalidParams,
+                QString("module '%1' is wired into %2 pipeline stages; pass stageRef as one of: %3")
+                    .arg(moduleId, QString::number(cands.size()), listed.join(", ")));
+            return;
+        }
+    }
     PipelineDef single;
     single.id = QStringLiteral("single:%1").arg(moduleId);
     single.displayName = def->displayName;
@@ -598,6 +631,12 @@ void App::rpcRunModule(const QJsonValue& id, const QJsonObject& params)
     st.id = def->id;
     st.moduleId = def->id;
     st.name = def->displayName;
+    if (routed) {   // H2：唯一/消歧后的接线默认（物化后的库级 + 本地覆盖结果）
+        st.artifacts = routed->artifacts;
+        st.optionalInputs = routed->optionalInputs;
+        st.params = routed->params;
+        st.userGate = routed->userGate;
+    }
     single.stages.append(st);
 
     startTaskWith(id, single, params.value("dataRoot").toString(), params);

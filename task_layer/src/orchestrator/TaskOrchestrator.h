@@ -94,7 +94,10 @@ private:
     bool hasWaiting() const { return !m_waiting.isEmpty(); }
 
     QString m_taskId;
-    const PipelineDef* m_pipeline = nullptr;
+    // P3 修复：值拷贝持有流水线——module.run 的合成单阶段流水线是调用方栈上临时对象，
+    // 存指针会在调用返回后悬垂（任务收尾时 pump 解引用崩溃，ACCESS_VIOLATION）
+    PipelineDef m_pipeline;
+    bool m_hasPipeline = false;
     const ModuleRegistry* m_registry = nullptr;
     PathResolver m_resolver;
     QString m_dataRoot;

@@ -26,7 +26,8 @@ bool TaskOrchestrator::startTask(const QString& taskId, const PipelineDef& pipel
     if (m_busy) return false;   // 单任务实例：同一时刻只跑一条流水线
 
     m_taskId = taskId;
-    m_pipeline = &pipeline;
+    m_pipeline = pipeline;   // 值拷贝（调用方可能传临时对象，见 m_pipeline 注释）
+    m_hasPipeline = true;
     m_registry = &registry;
     m_resolver = resolver;
     m_dataRoot = dataRoot;
@@ -145,8 +146,8 @@ bool TaskOrchestrator::provideInput(const QString& taskId, const QString& stageI
         return false;
     }
     const PipelineStage* stg = nullptr;
-    if (m_pipeline) {
-        for (const PipelineStage& s : m_pipeline->stages)
+    if (m_hasPipeline) {
+        for (const PipelineStage& s : m_pipeline.stages)
             if (s.id == stageId) { stg = &s; break; }
     }
     if (!stg) {
@@ -205,8 +206,8 @@ bool TaskOrchestrator::provideInput(const QString& taskId, const QString& stageI
 
 const PipelineStage* TaskOrchestrator::activeStage(const QString& stageId) const
 {
-    if (!m_busy || !m_pipeline) return nullptr;
-    for (const PipelineStage& s : m_pipeline->stages)
+    if (!m_busy || !m_hasPipeline) return nullptr;
+    for (const PipelineStage& s : m_pipeline.stages)
         if (s.id == stageId) return &s;
     return nullptr;
 }
@@ -340,8 +341,8 @@ void TaskOrchestrator::pump()
 
     QStringList failedStages;
     QStringList blockedStages;
-    if (m_pipeline) {
-        for (const PipelineStage& s : m_pipeline->stages) {
+    if (m_hasPipeline) {
+        for (const PipelineStage& s : m_pipeline.stages) {
             const auto it = m_records.constFind(s.id);
             if (it == m_records.constEnd()) continue;
             if (it->assumed) continue;   // P1：合成假定完成记录不参与失败/阻塞统计
@@ -581,7 +582,7 @@ void TaskOrchestrator::finishTask(const QString& status, const QString& summary)
         {"elapsedMs", elapsed}});
 
     clearRunners();
-    m_pipeline = nullptr;
+    m_hasPipeline = false;
 }
 
 void TaskOrchestrator::clearRunners()

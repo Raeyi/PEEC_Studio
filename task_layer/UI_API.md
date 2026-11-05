@@ -110,11 +110,11 @@ task_layer.exe serve [--config <目录>] [--bin <目录>] [--module-root <目录
 |---|---|---|
 | `ping` | — | `{pong, app, schemaVersion}` |
 | `modules.list` | — | `{modules:[{id,displayName,kind,command,available,resolvedPath}]}` |
-| `pipelines.list` | — | `{pipelines:[{id,displayName,stages:[...]}]}` |
+| `pipelines.list` | — | `{pipelines:[{id,source,displayName,maxParallel,stages:[...]}]}`（`source`：builtin / local，P3） |
 | `inputs.validate` | `{dataRoot, pipeline?, module?, inputs?, selection?}` | `{valid, checked, issues, warnings}` |
 | `task.run` | `{pipeline, dataRoot, taskId?, inputs?, selection?, overrides?}` | `{taskId, pipeline, selection?}` |
 | `task.provideInput`（P1.5） | `{taskId, stageId, values?}` | `{taskId, stageId, accepted}` |
-| `module.run` | `{moduleId, dataRoot, taskId?, inputs?}` | `{taskId, pipeline}` ← **单独启动一个模块** |
+| `module.run` | `{moduleId, dataRoot, taskId?, inputs?, stageRef?}` | `{taskId, pipeline}` ← **单独启动一个模块**（P3：接线自动路由 + 多候选 stageRef 消歧） |
 | `task.cancel` | `{taskId}` | `{cancelled}` |
 | `task.status` | `{taskId}` | `state.json` 内容 |
 | `task.result` | `{taskId}` | `state` + `resultFiles` |
@@ -207,6 +207,16 @@ pipeline 的阶段条目此时写 `{id, ref, dependsOn, [本地覆盖]}`；`ref`
 - `params` CLI 化：按 `--key value` 追加，与 overrides / 闸门值同一机制；同键时最具体者赢（顺序：闸门值 > 任务级 overrides > 阶段 params，ModuleRunner 去重保留尾随出现，模块 CLI 与 job.json 中只出现一次）。
 - 同一 ref 可被多条链引用，各自本地覆盖互不串扰（物化在引用处完成）。
 - `schemaVersion >= 3` → 加载期拒绝。内置三流水线已迁移 v2 形态（接线全部上收阶段库，本地仅留 DAG），物化结果与 v1 逐字段等价（见 task_layer/README.md 变更记录 P2 条）。
+- `pipelines.list` 每个 pipeline 带 `source` 字段（`"builtin"` / `"local"`，见下）。
+
+#### 部署级覆盖 `pipelines.local.json`（P3 起，L1 层）
+
+`config/pipelines.local.json`（**可选文件**，与 `pipelines.json` 同目录）供集成商/客户 IT 用阶段库组合自定义流水线：
+
+- 格式与主文件相同（schemaVersion 1/2；自带 `stages` 库条目与 `pipelines`）；
+- **同名 pipeline id → local 赢**（覆盖整条内置流水线；启动日志留痕，`pipelines.list` 该条目标 `source:"local"`）；同名阶段库 ref 亦 local 赢；local pipeline 的 ref 可跨主/local 两个库解析；
+- 与主文件同一套**加载期校验**（ref/module 互斥、未知 ref、DAG、userGate 结构、params 白名单），任何错误**整文件拒载**（fail-fast：serve 启动即 `ErrConfig` 退出 2，错误带 `pipelines.local.json` 前缀）——部署级配置错误要响，不静默忽略；
+- 算例级（dataRoot）**不允许**定义流水线（用户区可写性考量）：要"自己的流程"用本文件（L1），要"这次少跑两步"用 `selection`（L2，P1）。
 
 **当前可用状态**（重要）：
 
@@ -407,7 +417,16 @@ UI 断连按既有 inputClosed→cancel 逻辑收尾。
   同样能用 `task.status` / `task.result` / `task.cancel`；
 - 返回的 `pipeline` 字段形如 `single:<moduleId>`，便于 UI 区分"流水线任务"与"单模块任务"；
 - 同一进程仍然一次只能跑一个任务（`-32002`）；
-- 模块自身的输入契约照常生效，缺输入时报 `QS-TL-INPUT-MISSING`。
+- 模块自身的输入契约照常生效，缺输入时报 `QS-TL-INPUT-MISSING`；
+- **接线路由（P3 起）**：单模块任务的阶段接线（`artifacts` 工件路由 / `requires` / `params` / `userGate`）从该模块在**所有流水线（含 local）中的物化阶段条目**自动采用——恰好 1 处接线时直接用其库级默认（例如 `thermal.extract` 单跑时 `user/thermal.mesh` 自动路由到 `Result/gds2geo/thermal/model_thermal.msh`，而非 manifest 默认的 `Model/model_thermal.msh`）；0 处 = 无路由（manifest 默认位置）；**>=2 处**时报错并列出候选（形如 `peec_basic/extract, dup_chain/x`），调用方传 `stageRef`（值 = 候选之一，`"pipelineId/stageId"` 格式）消歧后放行：
+
+```json
+{"jsonrpc":"2.0","id":5,"method":"module.run","params":{
+  "moduleId":"peec.model_extract",
+  "dataRoot":"D:/cases/demo/DATA",
+  "stageRef":"peec_basic/extract"
+}}
+```
 
 同一个模块既可以用 `module.run` 单独启动，也可以作为 `task.run` 流水线里的一个阶段，
 两种方式走的是同一套执行与状态逻辑，UI 不需要写两套处理。

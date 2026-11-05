@@ -1,3 +1,4 @@
+#include <QtGlobal>
 #include "config/PipelineLoader.h"
 
 #include <functional>
@@ -160,9 +161,11 @@ bool PipelineLoader::parseStageLib(const QString& ref, const QJsonObject& obj, Q
     return true;
 }
 
-bool PipelineLoader::parsePipeline(const QString& id, const QJsonObject& obj, QString* error)
+bool PipelineLoader::parsePipeline(const QString& id, const QJsonObject& obj, QString* error,
+                                         const QString& source)
 {
     PipelineDef def;
+    def.source = source;
     def.id = id;
     def.displayName = obj.value("displayName").toString(id);
     def.description = obj.value("description").toString();
@@ -319,11 +322,11 @@ bool PipelineLoader::parsePipeline(const QString& id, const QJsonObject& obj, QS
     return true;
 }
 
-bool PipelineLoader::loadFromFile(const QString& jsonPath, QString* error)
+bool PipelineLoader::loadFromFile(const QString& mainPath, const QString& localPath, QString* error)
 {
-    QFile f(jsonPath);
+    QFile f(mainPath);
     if (!f.open(QIODevice::ReadOnly)) {
-        *error = QString("cannot open %1").arg(jsonPath);
+        *error = QString("cannot open %1").arg(mainPath);
         return false;
     }
     QJsonParseError perr;
@@ -349,6 +352,55 @@ bool PipelineLoader::loadFromFile(const QString& jsonPath, QString* error)
     const QJsonObject pipes = root.value("pipelines").toObject();
     for (auto it = pipes.begin(); it != pipes.end(); ++it) {
         if (!parsePipeline(it.key(), it.value().toObject(), error)) return false;
+    }
+
+    // P3 L1 部署级覆盖：pipelines.local.json（可选文件）
+    //   - 同名 pipeline id -> local 赢；同名阶段库 ref -> local 赢（均启动日志留痕）
+    //   - 与主文件同一套加载期校验；任何错误整文件拒载（fail-fast，不静默忽略）
+    if (!localPath.isEmpty() && QFile::exists(localPath)) {
+        QFile lf(localPath);
+        if (!lf.open(QIODevice::ReadOnly)) {
+            *error = QString("pipelines.local.json: cannot open %1").arg(localPath);
+            return false;
+        }
+        QJsonParseError lperr;
+        const QJsonDocument ldoc = QJsonDocument::fromJson(lf.readAll(), &lperr);
+        if (lperr.error != QJsonParseError::NoError || !ldoc.isObject()) {
+            *error = QString("pipelines.local.json parse error: %1").arg(lperr.errorString());
+            return false;
+        }
+        const QJsonObject lroot = ldoc.object();
+        const int lschema = lroot.value("schemaVersion").toInt(2);
+        if (lschema < 1 || lschema > 2) {
+            *error = QString("pipelines.local.json: unsupported schemaVersion %1").arg(lschema);
+            return false;
+        }
+        // local 阶段库先行并入（同名 ref local 赢），其 pipeline 的 ref 才能跨主/local 库解析
+        if (lschema == 2) {
+            const QJsonObject llibs = lroot.value("stages").toObject();
+            for (auto it = llibs.begin(); it != llibs.end(); ++it) {
+                const bool shadow = m_stageLib.contains(it.key());
+                QString sub;
+                if (!parseStageLib(it.key(), it.value().toObject(), &sub)) {
+                    *error = "pipelines.local.json: " + sub;
+                    return false;
+                }
+                if (shadow)
+                    qWarning("[config] pipelines.local.json: stage library ref '%s' overrides builtin",
+                             qPrintable(it.key()));
+            }
+        }
+        const QJsonObject lpipes = lroot.value("pipelines").toObject();
+        for (auto it = lpipes.begin(); it != lpipes.end(); ++it) {
+            if (m_pipelines.contains(it.key()))
+                qWarning("[config] pipelines.local.json: pipeline '%s' overrides builtin",
+                         qPrintable(it.key()));
+            QString sub;
+            if (!parsePipeline(it.key(), it.value().toObject(), &sub, "local")) {
+                *error = "pipelines.local.json: " + sub;
+                return false;
+            }
+        }
     }
     return true;
 }
