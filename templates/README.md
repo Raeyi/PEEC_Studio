@@ -14,6 +14,15 @@
 导入脚本放入，不属于本目录模板件）；thermal_extract_control.json 独立文件取消（提取控制内嵌
 于 source_thermal.json，schemaVersion 2）；OP0 与 SPICE 网表暂不做校验。
 
+热链 1.0.7 布局（2026-11-06 集成，DATA_LAYOUT v1.5 修订 3）：source_thermal.json 新增**简化
+schemaVersion 3**（仅 `sources`：volume_ids 上 total_power，允许空数组；体材料按 mesh Physical
+标签 + matdb 自动装配，无需 thermal 提取对象）与原 schemaVersion 2 并存；boundary_thermal.json
+新增 **schemaVersion 2**（default adiabatic + boundaries：fixed_temperature（任意面，含内部面）/
+convection）与原 schemaVersion 1 并存；程序按成对版本解析（2+1 或 3+2，错配 → 模块 exit 2）。
+最简单算例（无热源、两个固定温度面）= `dev/cases/thermal/heater`（schema 3 空 sources +
+schema 2 边界；验收 6089 节点 / 608 @500 K / 1961 @293.15 K / 0 W；post 6089/6089、max 500 K、
+min 293.145 K）。OP0 后处理仍严格校验映射节点温度齐备（不自动补全，1.0.7 不变）。
+
 ## 文件清单
 
 | 文件 | 时代 | 写者 | 说明 |
@@ -23,10 +32,10 @@
 | ~~Result/thermal/thermal_extract_control.json~~ | ~~thermal 1.0.5 时代~~ | — | **已取消（thermal 1.0.6，2026-11-04 集成）**：提取控制（thermal 对象）改内嵌于 Model/source_thermal.json（schemaVersion 2），本目录不再提供该初值 |
 | ~~Setting/set.json~~ | ~~v1.2 时代~~ | — | **已废止（2026-11-05，compact_em v1.3 集成）**：EM 链只读 set_em.json，合并件不再被任何模块读取；初值件已从本目录删除 |
 | Model/source_em.json | 全时代 | UI | EM 源定义（meshFile/meshSha256 + 端口 triangleIds） |
-| Model/source_thermal.json | 全时代（**thermal 1.0.6 起 schemaVersion 2**） | UI | 热源定义（meshFile 指向落位路径 + SHA + sources + **thermal 提取对象**（体域/薄层/材料关联））；不含边界条件 |
-| Model/boundary_thermal.json | thermal 1.0.5 起 | UI | 热边界条件（default_external_boundary + fixed_temperature），**必需输入**（经 --boundary 传入，SHA 入内部绑定）；1.0.1 时代内嵌于 source_thermal.json |
+| Model/source_thermal.json | 全时代（**thermal 1.0.7 起 schemaVersion 3（简化）/ 2（原）**） | UI | 3 = 仅 sources（volume_ids 上 total_power，允许空数组；体材料按 mesh Physical 标签 + matdb 自动装配，无 thermal 提取对象、无 meshFile 绑定）；2 = 热源定义（meshFile 指向落位路径 + SHA + sources + **thermal 提取对象**（体域/薄层/材料关联））；不含边界条件 |
+| Model/boundary_thermal.json | thermal 1.0.5 起（**1.0.7 起 schemaVersion 2 / 原 1**） | UI | 热边界条件（default_external_boundary + fixed_temperature），**必需输入**（经 --boundary 传入，SHA 入内部绑定）；1.0.7 schemaVersion 2 = default adiabatic + boundaries（fixed_temperature（任意面，含内部面）/ convection（h_W_m2K + ambient_temperature_K））；1.0.1 时代内嵌于 source_thermal.json |
 
-（1.0.1 时代：boundary 字段内嵌于 source_thermal.json、无独立仿真设置文件；1.0.5 起按上表；1.0.6 起提取控制内嵌 source_thermal.json（schemaVersion 2），上表控制件行取消。1.0.5 的划分按用户最新指示实施，优先于 DATA_LAYOUT v1.3 上午的拆分文案。）
+（1.0.1 时代：boundary 字段内嵌于 source_thermal.json、无独立仿真设置文件；1.0.5 起按上表；1.0.6 起提取控制内嵌 source_thermal.json（schemaVersion 2），上表控制件行取消。1.0.5 的划分按用户最新指示实施，优先于 DATA_LAYOUT v1.3 上午的拆分文案。1.0.7 起 source 新增简化 schemaVersion 3（无 thermal 提取对象）、boundary 新增 schemaVersion 2（default adiabatic + boundaries，含内部面/对流）；程序按成对版本解析（2+1 或 3+2，错配 → 模块 exit 2）；最简单算例 = dev/cases/thermal/heater。）
 
 ## 使用流程
 
@@ -37,12 +46,16 @@
    - source_em.json：meshSha256 = 落位主网格 SHA-256；ports 的 triangleIds 在新网格上选取；
    - source_thermal.json：meshFile = Result/gds2geo/thermal/model_thermal.msh（落位路径），
      meshSha256 = 该文件 SHA-256；sources 的实体 ID 为新网格的 Elementary ID；
+     （1.0.7 起简化 schemaVersion 3：仅需 sources（无热源 = 空数组），无 meshFile/meshSha256/
+     thermal 提取对象（体材料按 mesh Physical 标签 + matdb.json 自动装配）——最简单算例
+     dev/cases/thermal/heater 即此格式）；
    - source_thermal.json 的 thermal 提取对象（schemaVersion 2）：四面体域/薄层的 elementary ID /
      reference_surfaces 按新网格选取（薄层参考面必须完整铺满，material_footprints 必须完整覆盖
      reference_surfaces）；
      set_thermal.json 为仿真设置，默认 {"analysis":"op","probe":["V(*)"]}
      即可（完整温度可视化需保留 V(*)）；
-   - boundary_thermal.json：固定温度面 surface_entities 为新网格 Elementary ID；
+   - boundary_thermal.json：固定温度面 surface_entities 为新网格 Elementary ID（原 schemaVersion 1；
+     1.0.7 起 schemaVersion 2：boundaries[].surface_ids 可为任意现有面（含内部面），另有对流边界）；
 4. 跑 peec_basic / thermal_basic（OP0 就绪后 post 才可跑）。
 
 ## 注意

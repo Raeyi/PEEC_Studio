@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "default": "adiabatic",
+  "boundaries": [
+    {
+      "name": "boundary1",
+      "type": "fixed_temperature",
+      "surface_ids": [3],
+      "temperature_K": 500.0
+    },
+    {
+      "name": "boundary2",
+      "type": "fixed_temperature",
+      "surface_ids": [14],
+      "temperature_K": 293.15
+    }
+  ]
+}

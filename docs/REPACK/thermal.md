@@ -3,6 +3,61 @@
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
 > 关联活契约：`DATA_LAYOUT.md`（v1.5 修订 1）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.0.6（2026.11.04-native-1.0.6，apiVersion 7）**。
 
+## 第 3 轮（2026-11-06 请求 → 回执同日）
+
+状态：**已收口（2026-11-06 同日）** —— 1.0.7 已收到并集成（模块目录替换 + 文档/配置值级同步 + 直跑/平台 E2E 三通道复测通过；DATA_LAYOUT v1.5 修订 3 记录 1.0.7 输入格式接受；v2.1 交付包重切）。
+
+### 请求正文（2026-11-06，用户与 thermal 侧）
+
+致 thermal 模块团队。本轮请求为**能力扩展**：为支持 UI 侧**最简单算例**跑通，输入契约简化如下（新旧格式并存）：
+- `Model/source_thermal.json` 新增 **schemaVersion 3（简化）**：仅 `sources`（`{name, type:"total_power", volume_ids, power_W}`，空数组 = 无热源允许）；体材料按 mesh Physical 标签 + matdb.json 自动装配（带材料标签的表面按 matdb 厚度装配面内导热 + 热容 film）；mesh 坐标默认 mm，`mesh_length_unit`（m/mm/um）可选；无需 `thermal` 提取对象；
+- `Model/boundary_thermal.json` 新增 **schemaVersion 2**：`default:"adiabatic"` + `boundaries`（fixed_temperature：surface_ids 为任意现有 Elementary Surface（含内部面）；convection：h_W_m2K>0 + ambient_temperature_K）；
+- 成对版本解析：source 2 ↔ boundary 1、source 3 ↔ boundary 2，错配 → exit 2；
+- OP0 后处理仍严格校验映射节点温度齐备（不自动补全）。
+
+随包材料：**heater 最简单算例**（`dev/cases/thermal/heater`）：零热源样例（schema 3 空 sources + schema 2 两个固定温度面 500 K / 293.15 K，面 3 含内部 HEATER 薄膜面）；OP0 为 vendor 独立稀疏求解合成补齐（原用户 OP0 缺 T65/T68/T2681/T3806 四节点温度，最大温差 0.00005 K）。
+
+### 交付要求
+
+1. 1.0.7 模块包（双 exe + manifest + README/ERROR_CODES）；
+2. demo1_4.1（1.0.6 既有算例）在 1.0.7 下的字节级兼容承诺（vendor 回归：五项主要提取产物 + 节点温度 CSV 与 1.0.6 逐字节一致；**未执行平台 task_layer 全链 E2E，需集成方复测**）;
+3. heater 算例 vendor 回归数据（extract / post 验收数）。
+
+### 回执（2026-11-06，集成侧）
+
+**契约变化确认（值级；task_layer 零代码改动、零模块 manifest 改动）：**
+- apiVersion 7 不变；errorContract `qs-json-stderr`；exit 码 0/2/3/4/5/6（新增 6 = `QS-TH-RUN-LOCKED` 流水线锁，**活跃句柄检查**——空闲残留锁文件不阻断运行：heater 案例 0 B `.locks/thermal.pipeline.lock` 残留不影响跑通，已实测）;
+- 1.0.7 README 新增参数默认（`--mesh`/`--materials`/`--source`/`--boundary`/`--op0` 标准位置）——平台不传这些参，走 manifest 默认，路由不变；
+- `extraction_report.json` 新增 3 字段（`surfaceFilmTriangles`/`convectionResistors`/`ambientTemperatureSources`）；
+
+**E2E 复测（三通道，1.0.7 双 exe）：**
+1. **demo1_4.1 直跑**（vendor CLI）：extract/post exit 0；五项主要物理产物 + 节点温度 CSV 与 1.0.6 **逐字节一致**（10/11；唯一差异 = 报告新增 3 个零值字段，数值字段无变化）；基线 344.1037 K / 9564 行 / 12750 节点 ✓ —— **vendor 字节兼容承诺成立**；
+2. **heater 直跑**（vendor CLI，`--data-root` 单参）：extract/post exit 0；11/11 物理产物与 vendor 预烘焙参考**逐字节一致**；6089 节点 / 0 W / 608 @500 K / 1961 @293.15 K（fixed 2569）；post 6089/6089 映射、max 500 K、min 293.145 K ✓ —— **vendor 验收数成立**；
+3. **平台全链**（task.run thermal_basic × 2 + 回归套件）：demo1_4.1 平台跑基线不变（344.1037 K / 9564 行 / 12750 节点、参考字节一致）；heater 平台跑（网格落标准路由 `Result/gds2geo/thermal/`、schema 3 空 sources，无需 meshFile 同步）6089 / 0 W / 6089 行 / max 500 K / min 293.145 K、物理产物与直跑逐字节一致；回归套件（rpc_smoke / p1_selection / gate / baseline_e2e）全绿——**回归套件明细见本段末尾复测记录**。
+
+**集成动作：**
+- 模块替换：`thermal/` + `task_layer/dist/thermal/`（ThermalExtract 468,480→488,960 B、TemperatureProcess 459,264→460,800 B、manifest 8,008 B，SHA 校验）;
+- 案例归档：`dev/cases/thermal/heater/`（含预烘焙 Result + 0 B `.locks` 残留）;
+- 文档/配置值级：pipelines.json thermal_basic 描述（config/build/dist 三份）、UI_API.md（thermal_basic 行 + 热链流程）、ERROR_CODES.md（`3.3 thermal 段）、templates/README（1.0.7 布局 + 成对表格 + 使用流程）、dev/cases/thermal/README（heater 段）、DATA_LAYOUT v1.5 修订 3;
+- 交付：PEEC_Studio_20261106_v2.1.zip **重切**（同版本号重发先例：含 thermal 1.0.7 + heater 算例 + 更新交付说明）。
+
+**留档 flags：**
+- heater 算例 README 引用的 `validation/` 目录（原用户 OP0 + 补齐对照报告）未随分发包提供（**vendor 遗漏**）——预烘焙 Result 与 Model OP0 已经直跑与平台复测接受，不影响算例可用性;
+- heater 算例 `.locks/thermal.pipeline.lock` 为 vendor 运行残留（0 B）——模块锁检查活跃句柄、不阻断运行，保留并加注;
+- 双 exe 均有变更：直跑字节兼容已验证（见上），无漂移。
+
+### 复测记录（2026-11-06，回归套件）
+
+2026-11-06（build\task_layer.exe，同 P3 验收构建）回归套件 + heater 平台全链复测：
+- rpc_smoke 8/8 PASS（ping / modules.list 12 模块 / pipelines.list 三条 / inputs.validate 0 问题 / task.run done / task.result 2 文件）；
+- p1_selection_test 22/22 PASS（T11 S_parameter.csv 与参考逐字节一致 22,118 B——compact_em v1.3 红线不变）；
+- gate_test 25/25 PASS（P1.5 用户闸门全场景：暂停/白名单拒绝/取消/断连/NOTWAITING/CLI 拼参）；
+- baseline_e2e：A. thermal_basic@demo1_4.1（1.0.7 exe）done——MaximumTemperature 344.1037 K、NodeTemperature 9564 数据行、ThermalNetList.sp、ThermalTemperatureMap.csv 均与 1.0.6 参考**逐字节一致**，networkNodes=12750；
+  B. gds_full——14/14 产物与 final3 参考逐字节一致（gmsh 共享化后行为不变）；
+- heater_plat_test（新增）：task.run thermal_basic@heater（网格落标准路由 Result/gds2geo/thermal/、schema 3 空 sources，无需 meshFile 同步）done——extract/post 均成功，
+  6089 节点 / 0 W / fixed 2569，post 6089 数据行、max 500.0 K / min 293.145 K，11/11 物理产物与 1.0.7 直跑参考**逐字节一致**。
+结论：1.0.7 集成对既有三流水线基线**零回归**；heater 平台全链验收通过（与 vendor 直跑数一致）。
+
 ## 第 2 轮（2026-11-04 请求 → 待回执）
 
 状态：**已收口（2026-11-04 同日）** —— 1.0.6 重发版已收到并集成（模块目录替换 + 平台预检切换 + E2E 双通道实测通过；DATA_LAYOUT 升 v1.5 修订 1 定形提取控制载体）。

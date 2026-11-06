@@ -1,0 +1,14 @@
+status SUCCESS
+model volume-and-surface-film-mapped
+op0 C:\Users\18444\Desktop\AEDA\united_group\ThermalDelivery_1.0.7_20261106\thermal_cases_20261106\heater\Model\thermal.op0
+mesh C:\Users\18444\Desktop\AEDA\united_group\ThermalDelivery_1.0.7_20261106\thermal_cases_20261106\heater\Model\model_thermal.msh
+map C:\Users\18444\Desktop\AEDA\united_group\ThermalDelivery_1.0.7_20261106\thermal_cases_20261106\heater\Result/thermal\extract/ThermalTemperatureMap.csv
+op0_temperature_count 6089
+mapped_temperature_count 6089
+mapping_weight_count 6089
+max_partition_of_unity_error 0
+minimum_mapped_temperature_K 293.14499999999998
+maximum_mapped_temperature_K 500
+new_temperature_solve_performed false
+values_clamped false
+note Original mesh temperatures map directly from thermal nodes.

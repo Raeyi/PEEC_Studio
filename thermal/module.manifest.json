@@ -1,8 +1,8 @@
 {
   "manifestVersion": 1,
   "id": "thermal",
-  "name": "薄层与四面体混合热路提取及温度后处理",
-  "version": "2026.11.04-native-1.0.6",
+  "name": "热路提取及温度后处理",
+  "version": "2026.11.06-native-1.0.7",
   "apiVersion": 7,
   "minApiVersion": 1,
   "cli": {
@@ -176,13 +176,10 @@
         "accept": {
           "schemaVersion": {
             "min": 2,
-            "max": 2
+            "max": 3
           },
           "fields": [
-            "meshFile",
-            "meshSha256",
-            "sources",
-            "thermal"
+            "sources"
           ]
         }
       },
@@ -195,11 +192,8 @@
         "accept": {
           "schemaVersion": {
             "min": 1,
-            "max": 1
-          },
-          "fields": [
-            "default_external_boundary"
-          ]
+            "max": 2
+          }
         }
       },
       {
@@ -253,6 +247,10 @@
       {
         "version": "2026.11.04-native-1.0.6",
         "note": "DATA_LAYOUT 1.5: source_thermal.json schemaVersion 2 embeds required thermal extraction data; independent control file and --settings removed. OP0 binary default follows the actual source directory; standard manifest passes Model/thermal.op0. Post no longer reads or checks netlists; OP0 values required by the temperature map remain validated. Simulation settings schema/defaults unchanged; platform owns defaults."
+      },
+      {
+        "version": "2026.11.06-native-1.0.7",
+        "note": "Accept simplified source schema 3 and boundary schema 2 in addition to legacy 2/1; volume total power, arbitrary surface Dirichlet and convection; post accepts matching new source and preserves strict mapped-node checks."
       }
     ],
     "dataLayoutRevision": "1.5"

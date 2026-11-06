@@ -1,6 +1,6 @@
 # PEEC Studio 数据布局规范（DATA_LAYOUT）
 
-v1.5 修订 2 · 2026-11-05 · 适用：所有计算层模块与 UI、task_layer。路径与目录的唯一事实源；manifest 中所有 path 以本文件为基准；冲突时以本文件为准。
+v1.5 修订 3 · 2026-11-06 · 适用：所有计算层模块与 UI、task_layer。路径与目录的唯一事实源；manifest 中所有 path 以本文件为基准；冲突时以本文件为准。
 变更（v1.2）：`port_em.json` → `source_em.json`、`port_thermal.json` → `source_thermal.json`；新增预留件 `boundary_em.json`、`boundary_thermal.json`（均 UI 输入）；模块包不再携带 examples//templates/（案例改为包外单独交付，见 ONBOARDING §1.1）。
 变更（v1.3）：求解设置拆分为 `Setting/set_em.json`（EM 字段，compact_em 消费）与 `Setting/set_thermal.json`（热对象，热模块消费）；原合并件 `set.json` 为 v1.2 时代格式（见 §八）。生效条件：thermal ≥1.0.2 与 compact_em ≥v1.3 重发版集成起（模块按各自 manifest consumed 声明读取，平台代码不改）。
 变更（v1.4）：热侧设置定形按 thermal 1.0.5 重发版（2026-11-02，按用户最新指示实施，优先于 v1.3 热侧稿）：`Setting/set_thermal.json` 为 SPICE 仿真设置（analysis/probe，§八.1）；`thermal` 对象移入 `Result/thermal/thermal_extract_control.json`（提取控制，暂存于此、拆分位置待定）；`Model/boundary_thermal.json` 为必需输入（§八.2）；OP0 默认路径 `Result/thermal/post/thermal.op0`。EM 侧 `set_em.json` 改名不变（compact_em ≥v1.3 重发版待到位）。
@@ -8,6 +8,8 @@ v1.5 修订 2 · 2026-11-05 · 适用：所有计算层模块与 UI、task_layer
 变更（v1.5，2026-11-04，thermal 下一版布局定形，用户与 thermal 侧确认）：① OP0 默认路径 = `Model/thermal.op0`（程序去 `source_thermal.json` 所在目录（Model/）读取）；② 移除 `Result/thermal/thermal_extract_control.json` 独立文件（程序不再消费；提取控制数据（四面体域/薄层/材料关联）的载体以 vendor 下一版 manifest/README 声明为准，若移入 source_thermal.json 须发版说明明确格式）；③ OP0 与 SPICE 网表暂不做校验（1.0.1 时代绑定校验不恢复）。自 thermal 下一版重发版集成起生效（**已集成：thermal 1.0.6，2026-11-04**）。
 变更（v1.5 修订 1，2026-11-04，thermal 1.0.6 集成立项）：① 提取控制数据载体定形 = 内嵌于 `Model/source_thermal.json`（schemaVersion 2，新增必需顶层 `thermal` 对象，按 v1.5 ② 由 vendor 声明并 1.0.6 实施；独立控制文件与 `--settings` 参数取消，传入报 exit=2）；② OP0 标准位置 `Model/thermal.op0` 落地（1.0.6 默认随 source 目录，显式 `--op0` 优先，无旧路径回退；1.0.5 时代 `Result/thermal/post/` 路径废止）；③ thermal 1.0.6（apiVersion 7）集成：模块目录替换、平台 post 预检 → `Model/thermal.op0`、templates 清理、E2E 双通道实测通过（见 REPACK/thermal.md 第 2 轮回执）。
 变更（v1.5 修订 2，2026-11-05，EM 侧设置定形，compact_em v1.3 集成）：① EM 链唯一 JSON 设置 = `Setting/set_em.json`（平铺 schemaVersion=1；旧平铺 `set.json` 不再读取，v1.2 时代合并件废止，templates/ 的 set.json 初值件删除）；② 绘图程序与全部 Touchstone sNp 导出（含 legacy 隐式导出）取消，S 参数由前端自 `S_parameter.csv` 计算（平台 peec.plotter 路由同步移除）；③ 新增设置字段 `GROUND_PLANE_ENABLED`/`GROUND_PLANE_Z_METERS`（无限 PEC 参考地，默认关闭，约束见 compact_em README）与设置指纹规则（设置文件整体纳入 artifacts/receipt 指纹，内容变化不可复用旧上游结果），见 §八。
+变更（v1.5 修订 3，2026-11-06，thermal 1.0.7 集成，布局不变、输入格式接受）：① source_thermal.json 新增**简化 schemaVersion 3**（仅 sources：volume_ids 上 total_power，空数组 = 无热源允许；体材料按 mesh Physical 标签 + matdb 自动装配，无 thermal 提取对象、无 meshFile/meshSha256 绑定）与原 schemaVersion 2 并存；② boundary_thermal.json 新增 **schemaVersion 2**（default adiabatic + boundaries：fixed_temperature（surface_ids 为任意现有 Elementary Surface，含内部面）/ convection（h_W_m2K>0 + ambient_temperature_K））与原 schemaVersion 1 并存；③ 程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2 QS-TH-FMT-INPUT）；④ 最简单算例（零热源 + 两个固定温度面）= dev/cases/thermal/heater（schema 3 空 sources + schema 2 边界；验收 6089 节点 / 0 W / post 6089 行、max 500 K、min 293.145 K）；⑤ OP0 后处理严格校验映射节点温度齐备（不自动补全，1.0.7 起不变）；⑥ 目录布局与 §四 所有权表不变（模块输入接受能力扩展，task_layer 零代码改动）。
+
 ## 一、总则
 
 1. **dataRoot 单根**：一个算例的全部输入/配置/产物/日志/锁在同一数据根下。位置与目录名由 UI/用户定（约定：目录名=项目名，禁空格特殊字符）。

@@ -129,7 +129,7 @@
     },
     "thermal_basic": {
       "displayName": "热基本链路（thermal 两段）",
-      "description": "热路提取 → 温度后处理（可选）。热网格经 stage artifacts 路由到 gds2geo 热链产物（Result/gds2geo/thermal/），材料用 publisher 落位的 Model/matdb.json；UI 提供 Model/source_thermal.json（schemaVersion 2，含 thermal 提取对象：体域/薄层/材料关联）+ Model/boundary_thermal.json（必需）+ Setting/set_thermal.json（SPICE 仿真设置：analysis/probe）；post 依赖 Model/thermal.op0（ALPS 结果，1.0.6 起标准位置，1.0.5 时代的 Result/thermal/ 独立控制件已取消）",
+      "description": "热路提取 → 温度后处理（可选）。热网格经 stage artifacts 路由到 gds2geo 热链产物（Result/gds2geo/thermal/），材料用 publisher 落位的 Model/matdb.json；UI 提供 Model/source_thermal.json（thermal 1.0.7 起支持简化 schemaVersion 3（仅 sources：volume_ids 上 total_power，允许空数组，体材料按 mesh Physical 标签 + matdb 自动装配，无需 thermal 提取对象）与原 schemaVersion 2（含 thermal 提取对象：体域/薄层/材料关联）；1.0.5 时代独立控制件已取消）+ Model/boundary_thermal.json（必需；1.0.7 起支持 schemaVersion 2（default adiabatic + boundaries：fixed_temperature（任意面，含内部面）/ convection）与原 schemaVersion 1）+ Setting/set_thermal.json（SPICE 仿真设置：analysis/probe）；程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2）；最简单算例（无热源、两个固定温度面）= dev/cases/thermal/heater（schema 3 空 sources + schema 2 边界）；post 依赖 Model/thermal.op0（ALPS 结果，1.0.6 起标准位置，1.0.5 时代的 Result/thermal/ 独立控制件已取消）",
       "maxParallel": 1,
       "stages": [
         {

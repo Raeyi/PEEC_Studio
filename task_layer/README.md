@@ -410,3 +410,28 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
   ③ 交付布局：dist 同步 modules.json；gds2geo/README 与 docs/REPACK/gds2geo.md（第 2 轮）同步。
   验证：`baseline_e2e` 重跑（gds_full 14 工件 vs final3 零差异 + thermal 数值不变）——
   同一 gmsh 二进制经 env 解析，行为等价。回退兼容：旧部署包内 gmsh.exe 仍在时同目录优先照旧。
+- 2026-11-06（thermal 1.0.7 集成：task_layer 零代码改动、零模块 manifest 改动、未重编译）：
+  ① **模块替换**：`thermal/` + `task_layer/dist/thermal/`（2026.11.06-native-1.0.7，apiVersion 7 不变：
+  ThermalExtract 468,480→488,960 B / TemperatureProcess 459,264→460,800 B，manifest 8,008 B，SHA 校验）。
+  ② **契约增量（模块侧输入接受能力；平台零适配）**：source_thermal.json 新增**简化 schemaVersion 3**
+  （仅 sources：volume_ids 上 total_power，空数组 = 无热源允许；体材料按 mesh Physical 标签 + matdb 自动装配，
+  无 thermal 提取对象、无 meshFile 绑定）与原 schemaVersion 2 并存；boundary_thermal.json 新增 **schemaVersion 2**
+  （default adiabatic + boundaries：fixed_temperature（任意现有面，含内部面）/ convection）与原 schemaVersion 1 并存；
+  程序按成对版本解析（2+1 或 3+2，错配 → 模块 exit 2 QS-TH-FMT-INPUT）；extraction_report.json 新增 3 个零值字段
+  （surfaceFilmTriangles/convectionResistors/ambientTemperatureSources）；exit 6 = 流水线锁 QS-TH-RUN-LOCKED
+  （活跃句柄检查，空闲残留锁文件不阻断运行）。
+  ③ **最简单算例**：`dev/cases/thermal/heater`（vendor 20261106 案例包归档，归档件与 vendor zip **33/33 逐字节一致**）：
+  零热源（schema 3 空 sources）+ 两个固定温度面（500 K / 293.15 K，面 3 含内部 HEATER 薄膜面）；
+  OP0 = vendor 独立稀疏求解合成补齐件（原用户 OP0 缺 4 节点温度）。
+  ④ **验证（1.0.7 双 exe，三通道）**：demo1_4.1 直跑——五项主要产物 + 节点温度 CSV 与 1.0.6 **逐字节一致**
+  （10/11；唯一差异 = 报告新增 3 零值字段，数值字段无变化），基线 344.1037 K / 9564 行 / 12750 节点不变；
+  heater 直跑 11/11 与 vendor 预烘焙参考逐字节一致（6089 节点 / 0 W / fixed 2569 / post 6089 行 / max 500 K /
+  min 293.145 K）；平台全链——回归四套件全绿（rpc_smoke 8/8；p1_selection 22/22，S_parameter.csv 22,118 B
+  字节红线不变；gate 25/25；baseline_e2e：thermal 基线 344.1037 K / 9564 行 / 12750 节点、参考字节一致，
+  gds_full 14/14 产物与 final3 参考字节一致），heater 平台跑（网格落标准路由 Result/gds2geo/thermal/、
+  schema 3 空 sources、无需 meshFile 同步）12/12 验收通过、物理产物与直跑逐字节一致。
+  ⑤ **值级同步**：pipelines.json thermal_basic 描述（config/build/dist 三份）、UI_API / ERROR_CODES / 本 README
+  （dist 同步）、templates/README（1.0.7 布局 + 成对表格 + 使用流程）、dev/cases/thermal/README（heater 段）、
+  docs/REPACK/thermal.md（第 3 轮）、docs/DATA_LAYOUT.md（v1.5 修订 3）。
+  ⑥ **交付**：PEEC_Studio_20261106_v2.1.zip 重切（同版本号重发先例；含 thermal 1.0.7 + heater 算例 + 更新交付说明）。
+  未改动任何模块 manifest（计划五不碰清单保持）。

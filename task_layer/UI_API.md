@@ -224,7 +224,7 @@ pipeline 的阶段条目此时写 `{id, ref, dependsOn, [本地覆盖]}`；`ref`
 |---|---|
 | `gds_full` | **建模**：源模型 → 几何准备 → 电磁网格 → 热网格（1102 版起四段全必需）；EM 主网格 + 材料由任务层 **publisher 自动落位到 `Model/`**，热网格保留在 `Result/gds2geo/thermal/`（v1.1 布局，无 handoff）。gds2geo 1102 版需要的 gmsh 4.11.1 由 task_layer 经子进程环境变量 `GDS2GEO_GMSH_EXECUTABLE` 自动注入，UI 无需处理 |
 | `peec_basic` | **电磁**：PEEC 提取 → 频域求解 → 源/场后处理（post 段可选）；S 参数绘图由前端完成（plot 阶段自 2026-11-04 / v1.1 起移除；绘图程序与 Touchstone 导出随 compact_em v1.3 一并取消，2026-11-05 起生效） |
-| `thermal_basic` | **热**：热路提取（thermal.extract，必需）→ 温度后处理（thermal.post，可选，无 OP0 时自动跳过）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），热链三件由 UI 写入：`Model/source_thermal.json`（热源 + thermal 提取对象（体域/薄层/材料关联），**thermal 1.0.6 起必需 schemaVersion 2**；1.0.5 时代提取控制为独立文件 `Result/thermal/thermal_extract_control.json`，已取消）+ `Model/boundary_thermal.json`（边界条件，必需，thermal 1.0.5 起；1.0.1 时代内嵌于 source_thermal.json）+ `Setting/set_thermal.json`（SPICE 仿真设置 analysis/probe，thermal 1.0.5 起）；post 依赖 `Model/thermal.op0`（ALPS 结果，1.0.6 起标准位置；1.0.5 时代为 Result/thermal/post/，已废止） |
+| `thermal_basic` | **热**：热路提取（thermal.extract，必需）→ 温度后处理（thermal.post，可选，无 OP0 时自动跳过）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），热链三件由 UI 写入：`Model/source_thermal.json`（**thermal 1.0.7 起支持简化 schemaVersion 3**（仅 sources：volume_ids 上 total_power，允许空数组，体材料按 mesh Physical 标签 + matdb 自动装配，无需 thermal 提取对象）**与原 schemaVersion 2**（热源 + thermal 提取对象（体域/薄层/材料关联），1.0.6 起引入；1.0.5 时代提取控制为独立文件 `Result/thermal/thermal_extract_control.json`，已取消））+ `Model/boundary_thermal.json`（必需；**1.0.7 起支持 schemaVersion 2**（default adiabatic + boundaries：fixed_temperature（任意面，含内部面）/ convection（h_W_m2K + ambient_temperature_K））**与原 schemaVersion 1**（1.0.5 起独立文件；1.0.1 时代内嵌于 source_thermal.json））+ `Setting/set_thermal.json`（SPICE 仿真设置 analysis/probe，thermal 1.0.5 起）；程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2 QS-TH-FMT-INPUT）；最简单算例（无热源、两个固定温度面）= `dev/cases/thermal/heater`（schema 3 空 sources + schema 2 边界；验收 6089 节点 / 608 @500 K / 1961 @293.15 K / 0 W；post 6089/6089，max 500 K，min 293.145 K）；post 依赖 `Model/thermal.op0`（ALPS 结果，1.0.6 起标准位置；1.0.5 时代为 Result/thermal/post/，已废止；1.0.7 仍严格校验映射节点温度完整性，不自动补全） |
 
 进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。
 模块能否真正运行（程序是否找得到）用 `modules.list` 的 `available` 字段判断（见 4.2）。
@@ -247,7 +247,7 @@ pipeline 的阶段条目此时写 `{id, ref, dependsOn, [本地覆盖]}`；`ref`
 
 ```text
 ① UI: task.run gds_full              → 热网格产出在 Result/gds2geo/thermal/（matdb 含热物性）
-② UI: 写求解设置            → v1.2 时代：set.json 增加 "thermal" 对象；thermal 1.0.6 起：写 Setting/set_thermal.json（SPICE 仿真设置）；提取控制（thermal 对象）内嵌于 Model/source_thermal.json（schemaVersion 2）
+② UI: 写求解设置            → v1.2 时代：set.json 增加 "thermal" 对象；thermal 1.0.6 起：写 Setting/set_thermal.json（SPICE 仿真设置）；提取控制（thermal 对象）内嵌于 Model/source_thermal.json（schemaVersion 2；1.0.7 起亦可用简化 schemaVersion 3——无 thermal 对象，见 heater 算例）
                                         （tetrahedral_domains / thin_layers，elementary 实体 ID；
                                         薄层 material_footprints 必须完整铺满 reference_surfaces）
                                         写 Model/source_thermal.json        → meshFile 指向
