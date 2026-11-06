@@ -20,7 +20,7 @@ schemaVersion 3**（仅 `sources`：volume_ids 上 total_power，允许空数组
 convection）与原 schemaVersion 1 并存；程序按成对版本解析（2+1 或 3+2，错配 → 模块 exit 2）。
 **本目录 Model/ 初值 = 最简单算例标准（vendor 案例包 thermal_cases_20261106.zip 的 heater 案例，
 2026-11-06 起）**：source_thermal.json 简化 schemaVersion 3（空 sources = 无热源）/ boundary_thermal.json
-schemaVersion 2 / matdb.json / thermal.op0（OP0 初值，vendor 独立稀疏求解合成补齐件）——
+schemaVersion 2 / thermal.op0（OP0 初值，vendor 独立稀疏求解合成补齐件）；**matdb.json 不在本目录初值内——案例专属材料库：全流量算例由 gds_full 自动落位、最简单算例由案例自带（heater 案例包内含）**——
 对应算例 dev/cases/thermal/heater（验收 6089 节点 / 608 @500 K / 1961 @293.15 K / 0 W；post 6089/6089、
 max 500 K、min 293.145 K）。OP0 后处理仍严格校验映射节点温度齐备（不自动补全）；全流量/新案例
 仍须经案例导入脚本导入**自己的** OP0（导入目标 Model/thermal.op0，覆写本目录初值）。
@@ -36,7 +36,6 @@ max 500 K、min 293.145 K）。OP0 后处理仍严格校验映射节点温度齐
 | Model/source_em.json | 全时代 | UI | EM 源定义（meshFile/meshSha256 + 端口 triangleIds） |
 | Model/source_thermal.json | 全时代（**初值 = 简化 schemaVersion 3，2026-11-06 vendor 标准**） | UI | 3 = 仅 sources（volume_ids 上 total_power，允许空数组 = 无热源；体材料按 mesh Physical 标签 + matdb.json 自动装配；无 thermal 提取对象、无 meshFile 绑定）；2 = 热源定义 + **thermal 提取对象**（四面体域/薄层/材料关联）+ meshFile（指向落位路径）+ SHA——全流量算例用，初值件已不再随包（格式见仓库 dev/cases/thermal/demo1_4.1 与 git 历史）；不含边界条件 |
 | Model/boundary_thermal.json | thermal 1.0.5 起（**初值 = schemaVersion 2，2026-11-06 vendor 标准**） | UI | 热边界条件，**必需输入**（经 --boundary 传入，SHA 入内部绑定）；schemaVersion 2 = default adiabatic + boundaries（fixed_temperature（任意面，含内部面；初值为 heater 面 3=500 K / 14=293.15 K）/ convection（h_W_m2K + ambient_temperature_K））；原 schemaVersion 1（default_external_boundary）仍可用；1.0.1 时代内嵌于 source_thermal.json |
-| Model/matdb.json | **初值新设（2026-11-06，vendor 标准）** | UI（最简单算例）/ task_layer（全流量） | 材料数据库（体材料装配依赖：mesh Physical 标签 + matdb）；初值 = heater 标准；全流量算例由 gds_full 自动落位（落位件 task_layer 写，UI 不创建、不改写），最简单算例用本初值 |
 | Model/thermal.op0 | **初值新设（2026-11-06，vendor 标准）** | UI / 案例导入脚本 | OP0 初值（vendor 独立稀疏求解合成补齐的完整件，heater 标准；post 严格校验映射节点温度齐备，不自动补全）；全流量/新案例必须导入自己的 OP0（导入目标 = 本文件，覆写初值）；1.0.6 时代 OP0 为纯算例产物、本目录不提供初值，2026-11-06 起重切包起提供 |
 
 （1.0.1 时代：boundary 字段内嵌于 source_thermal.json、无独立仿真设置文件；1.0.5 起按上表；1.0.6 起提取控制内嵌 source_thermal.json（schemaVersion 2），上表控制件行取消。1.0.5 的划分按用户最新指示实施，优先于 DATA_LAYOUT v1.3 上午的拆分文案。1.0.7 起 source 新增简化 schemaVersion 3（无 thermal 提取对象）、boundary 新增 schemaVersion 2（default adiabatic + boundaries，含内部面/对流）；程序按成对版本解析（2+1 或 3+2，错配 → 模块 exit 2）；最简单算例 = dev/cases/thermal/heater，**本目录 Model/ 初值即该标准（2026-11-06 起，vendor 案例包为准）**。）
@@ -44,12 +43,12 @@ max 500 K、min 293.145 K）。OP0 后处理仍严格校验映射节点温度齐
 ## 使用流程
 
 **最简单算例（thermal 1.0.7 标准，无 GDS 流程）——初值即本目录 Model/（heater 标准）**：
-1. UI 建算例：拷本目录 Model/ 4 件（source_thermal.json / boundary_thermal.json / matdb.json /
-   thermal.op0）+ Setting/set_thermal.json 到 <dataRoot>/；
+1. UI 建算例：拷本目录 Model/ 3 件（source_thermal.json / boundary_thermal.json /
+   thermal.op0）+ Setting/set_thermal.json + 案例自带 matdb.json（案例专属件，如 heater 案例包）到 <dataRoot>/；
 2. 将算例的热网格（model_thermal.msh）放到 `Result/gds2geo/thermal/model_thermal.msh`（标准路由；
    schema 3 无 meshFile 绑定，无需回填 meshFile/meshSha256）；
 3. 若边界面 ID（初值 = heater 面 3/14）或材料与算例网格不一致，改 boundary_thermal.json 的
-   surface_ids / matdb.json（初值仅示范格式，新模型须换实际值）；
+   surface_ids / 案例 matdb.json（初值仅示范格式，新模型须换实际值）；
 4. 跑 thermal_basic（2 阶段 extract → post；OP0 已随初值就绪，post 直接可跑）。
    验收（heater 标准）：6089 节点 / 0 W / post 6089 数据行、max 500 K、min 293.145 K、
    MaximumTemperature.txt = 500。
