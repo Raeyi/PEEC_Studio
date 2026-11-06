@@ -24,4 +24,5 @@ task_layer/dist/
 # ===== 工作/诊断文件（不入仓） =====
 .dht_analysis/
 .dsh-acl-reports/
+__pycache__/
 task_layer/config/*.v1.bak
