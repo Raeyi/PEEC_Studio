@@ -427,7 +427,7 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
   （10/11；唯一差异 = 报告新增 3 零值字段，数值字段无变化），基线 344.1037 K / 9564 行 / 12750 节点不变；
   heater 直跑 11/11 与 vendor 预烘焙参考逐字节一致（6089 节点 / 0 W / fixed 2569 / post 6089 行 / max 500 K /
   min 293.145 K）；平台全链——回归四套件全绿（rpc_smoke 8/8；p1_selection 22/22，S_parameter.csv 22,118 B
-  字节红线不变；gate 25/25；baseline_e2e：thermal 基线 344.1037 K / 9564 行 / 12750 节点、参考字节一致，
+  字节红线不变；gate 24/24；baseline_e2e：thermal 基线 344.1037 K / 9564 行 / 12750 节点、参考字节一致，
   gds_full 14/14 产物与 final3 参考字节一致），heater 平台跑（网格落标准路由 Result/gds2geo/thermal/、
   schema 3 空 sources、无需 meshFile 同步）12/12 验收通过、物理产物与直跑逐字节一致。
   ⑤ **值级同步**：pipelines.json thermal_basic 描述（config/build/dist 三份）、UI_API / ERROR_CODES / 本 README

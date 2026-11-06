@@ -1,14 +1,17 @@
 {
-  "schemaVersion": 1,
-  "default_external_boundary": "adiabatic",
-  "fixed_temperature": [
+  "schemaVersion": 2,
+  "default": "adiabatic",
+  "boundaries": [
     {
-      "name": "bottom_293p15K",
-      "location": "global_bottom_plane",
-      "surface_entities": [
-        18,
-        22
-      ],
+      "name": "boundary1",
+      "type": "fixed_temperature",
+      "surface_ids": [3],
+      "temperature_K": 500.0
+    },
+    {
+      "name": "boundary2",
+      "type": "fixed_temperature",
+      "surface_ids": [14],
       "temperature_K": 293.15
     }
   ]

@@ -51,7 +51,7 @@
 2026-11-06（build\task_layer.exe，同 P3 验收构建）回归套件 + heater 平台全链复测：
 - rpc_smoke 8/8 PASS（ping / modules.list 12 模块 / pipelines.list 三条 / inputs.validate 0 问题 / task.run done / task.result 2 文件）；
 - p1_selection_test 22/22 PASS（T11 S_parameter.csv 与参考逐字节一致 22,118 B——compact_em v1.3 红线不变）；
-- gate_test 25/25 PASS（P1.5 用户闸门全场景：暂停/白名单拒绝/取消/断连/NOTWAITING/CLI 拼参）；
+- gate_test 24/24 PASS（P1.5 用户闸门全场景：暂停/白名单拒绝/取消/断连/NOTWAITING/CLI 拼参）；
 - baseline_e2e：A. thermal_basic@demo1_4.1（1.0.7 exe）done——MaximumTemperature 344.1037 K、NodeTemperature 9564 数据行、ThermalNetList.sp、ThermalTemperatureMap.csv 均与 1.0.6 参考**逐字节一致**，networkNodes=12750；
   B. gds_full——14/14 产物与 final3 参考逐字节一致（gmsh 共享化后行为不变）；
 - heater_plat_test（新增）：task.run thermal_basic@heater（网格落标准路由 Result/gds2geo/thermal/、schema 3 空 sources，无需 meshFile 同步）done——extract/post 均成功，
