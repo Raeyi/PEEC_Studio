@@ -10,6 +10,7 @@
 | MODULE_MANIFEST_SPEC.md | 文档头部 |
 | MODULE_ONBOARDING.md | 文档头部 |
 | module.manifest.schema.json | schemaVersion 字段 |
+| DELIVERY_PACKAGE_SPEC.md | 文档头部（打包白名单 / staging 规则 / 验证 gate / 变更记录口径） |
 
 规则：
 - 文件名永不变；变更 = 改正文（只保留当前真，旧表述被覆盖不堆叠）+ 文档内版本/变更记录加 1 行 + git 提交（git log 即完整审计轨迹）；
@@ -34,7 +35,7 @@
 ## 四、对外发布（zip 命名）
 
 - **契约包** `docs_<DATA_LAYOUT 版本>.zip`（如 docs_1.4.zip）：内容 = 活契约文档 + docs/README.md + REPACK/*.md；版本跟契约走，**契约升版才重打**，不带日期；
-- **主交付包** `PEEC_Studio_YYYYMMDD_vX.Y.zip`：交付快照 + 交付包版本号（2026-11-03 起启用；当前最新 **v2.0** = 2026-11-05 构建：compact_em v1.3（set_em.json 唯一设置、绘图/Touchstone 取消、P0 修复平台验证通过）+ thermal 1.0.6（OP0 → Model/、独立控制件取消、apiVersion 7）+ templates/ + DATA_LAYOUT v1.5 修订 1）；
+- **主交付包** `PEEC_Studio_YYYYMMDD_vX.Y.zip`：交付快照 + 交付包版本号（2026-11-03 起启用；当前最新 **v2.1** = 2026-11-06 构建：task_layer P1→P3 运行模型（pipelines schemaVersion 2 / UI_API 0.9 / worker_host 独立进程）+ thermal 1.0.7 + templates 标准（vendor heater 基线）+ DATA_LAYOUT v1.5 修订 3；打包按 DELIVERY_PACKAGE_SPEC.md 执行）；
   升版规则：交付包每次重打小版本 +0.1（内容集成/修正，如换模块目录、配置、文档）；引入平台大能力或契约跨大版本（如 compact_em v1.3 + DATA_LAYOUT v1.5 集成）大版本 +1.0；
   **日期 = 该版本的构建日期（此版本最终重打包的日期）**，版本变化则日期与版本号同时更新；版本对应内容记在 git 提交与《给UI负责人的交付说明.md》修订行；
 - 案例包 / 模块包：按 vendor 交付命名；平台归档到 dev/cases/<模块>/，不作为契约件。
