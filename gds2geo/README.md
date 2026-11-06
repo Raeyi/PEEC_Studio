@@ -1,8 +1,9 @@
 # GDS2GEO
 
-交付版本：**V1.1**（2026-11-02，按平台 `docs_1.2` 重打包）。
+交付版本：**V1.2**（2026-11-06，gmsh 移出本包至平台 `tools/gmsh/` 区；四个主 EXE 与 V1.1 逐字节相同）。
 
-本包用于 task_layer 集成，按程序、README、错误码、manifest 四类交付，共八个文件：
+本包用于 task_layer 集成，按程序、README、错误码、manifest 四类交付，共七个文件（V1.2 起 gmsh 不随包，
+由平台部署根 `tools/gmsh/` 区提供，见下节）：
 
 ```text
 gds2geo/
@@ -10,7 +11,6 @@ gds2geo/
   geo_prepare.exe
   geo2em.exe
   geo2thermal.exe
-  gmsh.exe
   README.md
   ERROR_CODES.md
   module.manifest.json
@@ -22,9 +22,11 @@ gds2geo/
 
 ## 平台运行依赖
 
-随包提供 Gmsh **4.11.1**，只有 EM 和 thermal 网格阶段调用它。主程序优先使用同目录的
-`gmsh.exe`；保留完整八文件即可运行，不需要另行安装 Gmsh。历史外置模式还支持
-`GDS2GEO_GMSH_EXECUTABLE` 绝对路径或 `PATH`；同目录随附程序优先，版本不匹配明确失败。
+Gmsh **4.11.1** 由平台提供（V1.2 起不再随包），只有 EM 和 thermal 网格阶段调用它。
+主程序解析链不变：优先同目录 `gmsh.exe`（遗留兜底，V1.2 标准部署下不存在）→
+`GDS2GEO_GMSH_EXECUTABLE` 绝对路径（平台在 modules.json 路由表按阶段注入，标准部署值为
+`{MODULE_ROOT}/tools/gmsh/gmsh.exe`）→ `PATH`。版本不匹配明确失败。本地自测若把
+`gmsh.exe` 放进模块目录，同目录优先规则照旧生效。
 四主程序本身不依赖 PowerShell；下方 PowerShell 代码仅供平台参考。
 
 内部版本：GDS2GEO/MATDB 0.1.0、CLI11 2.6.2、nlohmann/json 3.12.0、Clipper2 2.0.1、
@@ -66,7 +68,7 @@ manifest 中两个网格工件沿用平台示例的 `schemaVersion: "4"`；本�
 
 ## 可复制的串行调用参考
 
-替换开头两个绝对路径后，可在 PowerShell 5.1 或 7 中执行。Gmsh 从模块目录取用。
+替换开头两个绝对路径后，可在 PowerShell 5.1 或 7 中执行。Gmsh 从平台 tools/ 区取用（标准部署位）。
 此代码写在说明中供平台参考，
 平台也可直接以进程 API 顺序启动四个 EXE，并检查真实退出码。
 
@@ -74,7 +76,8 @@ manifest 中两个网格工件沿用平台示例的 `schemaVersion: "4"`；本�
 ```powershell
 $ModuleDir = 'C:/Modules/gds2geo'
 $DataRoot = 'D:/Cases/demo'
-$GmshExe = Join-Path $ModuleDir 'gmsh.exe'
+# 平台 tools/ 区（部署根与模块包平级）；遗留兜底：把 gmsh.exe 放进 $ModuleDir 亦可
+$GmshExe = 'C:/Modules/tools/gmsh/gmsh.exe'
 $env:GDS2GEO_GMSH_EXECUTABLE = $GmshExe
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false

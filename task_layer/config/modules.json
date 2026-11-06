@@ -35,7 +35,7 @@
       "provider": "gds2geo",
       "stage": "source",
       "env": {
-        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe"
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
       },
       "searchDirs": [
         "{MODULE_ROOT}/gds2geo"
@@ -47,7 +47,7 @@
       "provider": "gds2geo",
       "stage": "prepared",
       "env": {
-        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe"
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
       },
       "searchDirs": [
         "{MODULE_ROOT}/gds2geo"
@@ -59,7 +59,7 @@
       "provider": "gds2geo",
       "stage": "em",
       "env": {
-        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe"
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
       },
       "searchDirs": [
         "{MODULE_ROOT}/gds2geo"
@@ -71,7 +71,7 @@
       "provider": "gds2geo",
       "stage": "thermal",
       "env": {
-        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/gds2geo/gmsh.exe"
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
       },
       "searchDirs": [
         "{MODULE_ROOT}/gds2geo"

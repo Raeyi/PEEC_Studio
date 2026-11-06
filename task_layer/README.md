@@ -400,3 +400,13 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
   验收：`tools\p3_local_test.py`（local 覆盖/标记/日志留痕、非法 local 整文件拒载、H2 路由
   [launch] 断言、多候选报错 + stageRef 消歧）；回归四套件 + p2 测试均按最终构建重跑通过。
   未改动任何模块 manifest（计划五不碰清单保持）。
+- 2026-11-06（gmsh 共享化：部署配置级变更，task_layer 无代码改动、未重编译）：
+  gmsh 4.11.1 由 gds2geo 包内移至部署根共享工具区 `tools/gmsh/gmsh.exe`（git mv；
+  平台所有，后续模块如 emopt 经同一 tools/ 区取用各自 gmsh 工件）。
+  ① `config/modules.json`：gds2geo 四阶段路由的 `GDS2GEO_GMSH_EXECUTABLE` env 注入值改为
+  `{MODULE_ROOT}/tools/gmsh/gmsh.exe`（路径变量机制，ModuleRunner 注入）；
+  ② gds2geo manifest 值级 **V1.2**：`bundled: false`、`deliveryFiles` 8→7、`configuration`
+  注明平台注入位（解析链代码行为不变：同目录遗留兜底 → env → PATH；模块 exe 零改动）；
+  ③ 交付布局：dist 同步 modules.json；gds2geo/README 与 docs/REPACK/gds2geo.md（第 2 轮）同步。
+  验证：`baseline_e2e` 重跑（gds_full 14 工件 vs final3 零差异 + thermal 数值不变）——
+  同一 gmsh 二进制经 env 解析，行为等价。回退兼容：旧部署包内 gmsh.exe 仍在时同目录优先照旧。

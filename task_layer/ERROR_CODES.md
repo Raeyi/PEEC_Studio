@@ -105,7 +105,7 @@
 
 - gds2geo 没有 QS 编码、统一 JSON stderr 或 trace_id 合同；诊断为带程序名的文本 + 进程退出码。1102 版为**严格串行** source→prepared→em→thermal 四阶段，em/thermal 两份网格均为必需；热网格保留在 `Result/gds2geo/thermal/`（不进 `Model/`，保持 I1 单主网格不变式）。
 - 因此任务层对 gds2geo 固定上报 `QS-TL-MOD-EXEC` + `exitCode`：`0` = 成功，`2` = CLI/输入/配置类，`5` = 执行类，`6` = 内部错误（仅 source 阶段）。语义以 `gds2geo/README.md` 的退出码表为准（1102 起交付不再单独提供 ERROR_CODES.md）。
-- **gmsh 依赖**：1102 版不随包分发 gmsh，要求 **4.11.1 精确匹配**（版本不符硬失败）。平台须在子进程环境注入绝对路径 `GDS2GEO_GMSH_EXECUTABLE`；task_layer 经 modules.json 的 `env` 字段完成注入（当前指向 `{MODULE_ROOT}/gds2geo/gmsh.exe`，后续 gmsh 上移到项目根目录时只改这一处配置）。
+- **gmsh 依赖**：要求 **4.11.1 精确匹配**（版本不符硬失败）。平台在子进程环境注入绝对路径 `GDS2GEO_GMSH_EXECUTABLE`；task_layer 经 modules.json 的 `env` 字段完成注入（2026-11-06 起 gmsh 上移至平台共享工具区，注入值 `{MODULE_ROOT}/tools/gmsh/gmsh.exe`；gds2geo V1.2 起不随包分发 gmsh，解析链同目录规则仅作遗留兜底——旧部署包内仍有 `gmsh.exe` 时优先于 env 生效）。
 - **锁机制**：1102 版改用 Windows 命名互斥量，**不再产生 `.lock` 文件**；不得与旧版文件锁程序混用同一算例（同一 dataRoot 上 1102 与旧版 gds2geo 不得共用）。
 - 详细诊断由各程序经 `--runtime-dir` 写到 `Result/logs/gds2geo/`（每程序一份 `.log` + source 的 attempts 记录）；任务层的 `task.log`/`state.json` 在 `Result/tasks/<taskId>/`。
 - 《物理模块错误码清单.xlsx》中的 G2G-001~166 建议码**尚未接入 gds2geo 程序**，属规划项；接入前任务层不会看到这些码。
