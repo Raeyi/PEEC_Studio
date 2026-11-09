@@ -44,6 +44,7 @@ struct ModuleDef {
     QMap<QString, QString> env;          // 子进程环境变量（modules.json，值支持路径变量）
     QStringList allowedArgs;      // UI overrides 白名单（--key 形式）
     ModuleContract contract;
+    QVector<ModuleContract::PublishRule> basePublishes;  // manifest publishTo 基底（rebind 先重置再叠加宿主 publishes）
     QString errorType = "none";   // none | qs-json-stderr
     QString traceLog;
 };
@@ -71,8 +72,12 @@ public:
     // 用给定 dataRoot 重新展开所有模块的 args / contract 路径（每个任务开始时调用）。
     // artifactOverrides：moduleId -> (ref -> dataRoot 相对路径)，流水线 stage 的
     // artifacts 字段在此注入，覆盖 manifest consumed 的默认位置（跨模块工件路由）。
+    // publishOverrides：moduleId -> (produced ref -> Model/|Setting/ 正式件落点)，流水线 stage 的
+    // publishes 字段在此注入（宿主侧发布声明：manifest 未带 publishTo 时由平台声明落位，
+    // 如 gds2geo r2 的 Model/ 网格+MATDB 配对发布）；先重置为 manifest 基底再叠加，逐次 rebind 幂等。
     void rebindDataRoot(const QString& dataRoot,
-                        const QMap<QString, QMap<QString, QString>>* artifactOverrides = nullptr);
+                        const QMap<QString, QMap<QString, QString>>* artifactOverrides = nullptr,
+                        const QMap<QString, QMap<QString, QString>>* publishOverrides = nullptr);
 
 private:
     struct RoutingEntry {

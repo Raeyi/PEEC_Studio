@@ -33,6 +33,20 @@ QMap<QString, QMap<QString, QString>> artifactOverridesOf(const PipelineDef& pip
     return ov;
 }
 
+// 流水线 stage 的 publishes 声明 → 按 moduleId 归组（宿主侧发布声明注入 rebind，
+// 覆盖 manifest 未带 publishTo 的模块：平台声明 Model/|Setting/ 正式件落位）
+QMap<QString, QMap<QString, QString>> publishOverridesOf(const PipelineDef& pipe,
+                                                         const QSet<QString>* effectiveStages = nullptr)
+{
+    QMap<QString, QMap<QString, QString>> ov;
+    for (const PipelineStage& s : pipe.stages) {
+        if (effectiveStages && !effectiveStages->contains(s.id)) continue;
+        for (auto it = s.publishes.constBegin(); it != s.publishes.constEnd(); ++it)
+            ov[s.moduleId][it.key()] = it.value();
+    }
+    return ov;
+}
+
 // P1 resume 归一：读上次任务 state.json → pipeline 一致性校验 + Done 阶段产出在盘核验
 // → stagesToRun（未完成重进）+ assumed（假定完成）。失败写 *error 并返回 false。
 bool normalizeResumeSelection(const PipelineDef& pipe, const QString& root,
@@ -185,7 +199,8 @@ int App::runOnce(const QString& pipelineId, const QString& dataRoot,
     m_resolver.setBase(root, m_moduleRoot, m_binRoot, m_activeTaskDir);
     m_resolver.setInputs(inputs);
     const QMap<QString, QMap<QString, QString>> ov = artifactOverridesOf(*pipe);
-    m_registry.rebindDataRoot(root, &ov);   // 展开 args/契约路径（含 stage artifacts 路由）
+    const QMap<QString, QMap<QString, QString>> pov = publishOverridesOf(*pipe);
+    m_registry.rebindDataRoot(root, &ov, &pov);   // 展开 args/契约路径（含 stage artifacts 路由 + 宿主 publishes）
     m_store.open(m_activeTaskDir, taskId, pipelineId);
     m_store.setInputs(m_resolver.resolvedInputs());
 
@@ -250,12 +265,10 @@ QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineI
     }
     // 校验用临时 rebind：把契约路径展开到本 dataRoot（不改活动任务状态）；
     // P1 带 selection 时按有效阶段集合（选中 + 上游闭包）计算路由，与 task.run 一致
-    QMap<QString, QMap<QString, QString>> vov;
+    QMap<QString, QMap<QString, QString>> vov, vpov;
     if (!pipelineId.isEmpty() && m_loader.pipeline(pipelineId)) {
-        if (validateSelSet.isEmpty())
-            vov = artifactOverridesOf(*m_loader.pipeline(pipelineId));
-        else {
-            QSet<QString> effective;
+        QSet<QString> effective;
+        if (!validateSelSet.isEmpty()) {
             QMap<QString, QStringList> depMap;
             for (const PipelineStage& s2 : m_loader.pipeline(pipelineId)->stages)
                 depMap.insert(s2.id, s2.dependsOn);
@@ -270,10 +283,14 @@ QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineI
                     if (!closure.contains(d)) stack.append(d);
             }
             effective = closure;
-            vov = artifactOverridesOf(*m_loader.pipeline(pipelineId), &effective);
         }
+        vov = artifactOverridesOf(*m_loader.pipeline(pipelineId),
+                                  effective.isEmpty() ? nullptr : &effective);
+        vpov = publishOverridesOf(*m_loader.pipeline(pipelineId),
+                                  effective.isEmpty() ? nullptr : &effective);
     }
-    m_registry.rebindDataRoot(root, vov.isEmpty() ? nullptr : &vov);
+    m_registry.rebindDataRoot(root, vov.isEmpty() ? nullptr : &vov,
+                              vpov.isEmpty() ? nullptr : &vpov);
 
     // 只校验"入口阶段"的输入契约：这是"这条流水线能否启动"的判据。
     // P1 带 selection 时：入口 = 选中且"依赖不都在选中集"的阶段（resume 已归一）；
@@ -713,25 +730,24 @@ bool App::startTaskWith(const QJsonValue& id, const PipelineDef& pipe,
     m_resolver.setBase(root, m_moduleRoot, m_binRoot, m_activeTaskDir);
     m_resolver.setInputs(m_activeInputs);
     // P1：工件路由按有效阶段集合计算（选中 + 上游闭包；全链保持现行为）
-    const QMap<QString, QMap<QString, QString>> ov = [&]() {
-        if (sel.isFull()) return artifactOverridesOf(pipe);
-        QSet<QString> effective;
+    QSet<QString> effSet;
+    if (!sel.isFull()) {
         QMap<QString, QStringList> depMap;
         for (const PipelineStage& s : pipe.stages) depMap.insert(s.id, s.dependsOn);
-        QSet<QString> closure;
         QStringList stack = sel.stages;
         while (!stack.isEmpty()) {
             const QString cur = stack.takeLast();
-            if (closure.contains(cur)) continue;
-            closure.insert(cur);
-            const QStringList deps = depMap.value(cur);
-            for (const QString& d : deps)
-                if (!closure.contains(d)) stack.append(d);
+            if (effSet.contains(cur)) continue;
+            effSet.insert(cur);
+            for (const QString& d : depMap.value(cur))
+                if (!effSet.contains(d)) stack.append(d);
         }
-        effective = closure;
-        return artifactOverridesOf(pipe, &effective);
-    }();
-    m_registry.rebindDataRoot(root, &ov);
+    }
+    const QMap<QString, QMap<QString, QString>> ov =
+        artifactOverridesOf(pipe, sel.isFull() ? nullptr : &effSet);
+    const QMap<QString, QMap<QString, QString>> pov =
+        publishOverridesOf(pipe, sel.isFull() ? nullptr : &effSet);
+    m_registry.rebindDataRoot(root, &ov, &pov);
     // P1 子集入口依赖预检：选中阶段若依赖未选中上游，其产出契约必须已在盘上满足
     //（复用 optional 阶段的 requiredInputs + optionalInputs 存在性检查）→ 缺失拒绝启动。
     if (!sel.isFull()) {

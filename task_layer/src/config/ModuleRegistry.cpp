@@ -195,6 +195,7 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
                 if (!a.publishTo.isEmpty())
                     def.contract.publishes.append({a.path, a.publishTo});
             }
+            def.basePublishes = def.contract.publishes;   // manifest 基底；rebind 先重置再叠加宿主 publishes
         }
         m_modules.insert(moduleId, def);
     }
@@ -205,7 +206,8 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
 }
 
 void ModuleRegistry::rebindDataRoot(const QString& dataRoot,
-                                    const QMap<QString, QMap<QString, QString>>* artifactOverrides)
+                                    const QMap<QString, QMap<QString, QString>>* artifactOverrides,
+                                    const QMap<QString, QMap<QString, QString>>* publishOverrides)
 {
     m_dataRoot = dataRoot;
     for (auto mit = m_modules.begin(); mit != m_modules.end(); ++mit) {
@@ -274,6 +276,37 @@ void ModuleRegistry::rebindDataRoot(const QString& dataRoot,
         }
         def.contract.requiredInputs = req;
         def.contract.outputChecks = chk;
+        // 宿主侧发布声明（流水线 stage publishes）：重置为 manifest 基底后叠加
+        // （ref -> Model/|Setting/ 正式件落点）；ref 解析于 manifest produced，
+        // 与 manifest publishTo 保持同形（POSIX 相对路径），下方统一展开为绝对路径。
+        def.contract.publishes = def.basePublishes;
+        if (publishOverrides) {
+            const QMap<QString, QString> pv = publishOverrides->value(def.id);
+            for (auto pjit = pv.constBegin(); pjit != pv.constEnd(); ++pjit) {
+                const QString dest = pjit.value();
+                if (!dest.startsWith("Model/") && !dest.startsWith("Setting/")) {
+                    qWarning("[config] module %s: publishes dest '%s' rejected (Model/|Setting/ only)",
+                             qPrintable(def.id), qPrintable(dest));
+                    continue;
+                }
+                QString raw;
+                if (mm && mm->artifact(pjit.key()))
+                    raw = mm->artifact(pjit.key())->path;
+                if (raw.isEmpty()) {
+                    for (const ModuleManifest& m2 : m_manifests)
+                        if (const ManifestArtifact* pa = m2.artifact(pjit.key())) {
+                            raw = pa->path;
+                            break;
+                        }
+                }
+                if (raw.isEmpty()) {
+                    qWarning("[config] module %s: publishes ref '%s' not in manifest produced, skipped",
+                             qPrintable(def.id), qPrintable(pjit.key()));
+                    continue;
+                }
+                def.contract.publishes.append({raw, dest});
+            }
+        }
         for (ModuleContract::PublishRule& pr : def.contract.publishes) {
             if (!QFileInfo(pr.src).isAbsolute()) pr.src = toNative(pr.src, dataRoot);
             if (!QFileInfo(pr.dst).isAbsolute()) pr.dst = toNative(pr.dst, dataRoot);

@@ -137,6 +137,13 @@ bool PipelineLoader::parseStageLib(const QString& ref, const QJsonObject& obj, Q
     const QJsonObject arts = obj.value("artifacts").toObject();
     for (auto ait = arts.constBegin(); ait != arts.constEnd(); ++ait)
         lib.artifacts.insert(ait.key(), ait.value().toString());
+    if (obj.contains("publishes") && !obj.value("publishes").isObject()) {
+        if (error) *error = ctx + ": 'publishes' must be an object";
+        return false;
+    }
+    const QJsonObject pubs = obj.value("publishes").toObject();
+    for (auto pit = pubs.constBegin(); pit != pubs.constEnd(); ++pit)
+        lib.publishes.insert(pit.key(), pit.value().toString());
     if (obj.contains("requires") && !obj.value("requires").isArray()) {
         if (error) *error = ctx + ": 'requires' must be an array";
         return false;
@@ -210,7 +217,7 @@ bool PipelineLoader::parsePipeline(const QString& id, const QJsonObject& obj, QS
             } else {
                 s.optionalInputs = lib->requires;
             }
-            // params / artifacts：对象按键合并，本地键赢
+            // params / artifacts / publishes：对象按键合并，本地键赢
             for (auto pit = lib->params.constBegin(); pit != lib->params.constEnd(); ++pit)
                 s.params[pit.key()] = pit.value();
             const QJsonObject lparams = so.value("params").toObject();
@@ -221,6 +228,11 @@ bool PipelineLoader::parsePipeline(const QString& id, const QJsonObject& obj, QS
             const QJsonObject larts = so.value("artifacts").toObject();
             for (auto ait = larts.constBegin(); ait != larts.constEnd(); ++ait)
                 s.artifacts.insert(ait.key(), ait.value().toString());
+            for (auto kvit = lib->publishes.constBegin(); kvit != lib->publishes.constEnd(); ++kvit)
+                s.publishes.insert(kvit.key(), kvit.value());
+            const QJsonObject lpubs = so.value("publishes").toObject();
+            for (auto pit = lpubs.constBegin(); pit != lpubs.constEnd(); ++pit)
+                s.publishes.insert(pit.key(), pit.value().toString());
             // userGate：库定义为默认，本地可 extends（新增键）；库级闸门键不可被本地覆盖/取消
             s.userGate = lib->userGate;
             const QJsonValue lg = so.value("userGate");
@@ -246,6 +258,9 @@ bool PipelineLoader::parsePipeline(const QString& id, const QJsonObject& obj, QS
             const QJsonObject arts = so.value("artifacts").toObject();
             for (auto ait = arts.constBegin(); ait != arts.constEnd(); ++ait)
                 s.artifacts.insert(ait.key(), ait.value().toString());
+            const QJsonObject pubs = so.value("publishes").toObject();
+            for (auto pit = pubs.constBegin(); pit != pubs.constEnd(); ++pit)
+                s.publishes.insert(pit.key(), pit.value().toString());
             for (const QJsonValue& rv : so.value("requires").toArray())
                 s.optionalInputs << rv.toString();
             // P1.5 用户闸门（可选键）：结构非法 → 加载期拒绝

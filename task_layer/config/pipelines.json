@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "_comment": "handoff 阶段已移除（v1.1 布局规范：正式件由 publisher 按 manifest publishTo 落位，见 docs/DATA_LAYOUT.md D3）。v2（P2）：顶层 stages = 阶段库（同一模块接线的库级默认：模块/参数/工件路由/前置/可选/闸门），pipeline 阶段经 ref 引用 + 本地覆盖（params/artifacts 键级合并本地赢；requires/optional 本地有则本地赢；userGate 本地只能 extends 新增键）。物化规则与 v1 等价性见 task_layer/README.md 变更记录（P2）",
+  "_comment": "handoff 阶段已移除（v1.1 布局规范：正式件由 publisher 落位，见 docs/DATA_LAYOUT.md D3）。v2（P2）：顶层 stages = 阶段库（同一模块接线的库级默认：模块/参数/工件路由/前置/可选/闸门），pipeline 阶段经 ref 引用 + 本地覆盖（params/artifacts/publishes 键级合并本地赢；requires/optional 本地有则本地赢；userGate 本地只能 extends 新增键）。正式件落位两种声明：① 模块 manifest produced[].publishTo；② 阶段库/pipeline 阶段 publishes（<produced ref> -> Model/|Setting/ 落点，r2 gds2geo 起使用，manifest 未带 publishTo 时由平台侧声明配对发布，见 docs/DATA_LAYOUT.md D7）。物化规则与 v1 等价性见 task_layer/README.md 变更记录（P2）",
   "stages": {
     "em.model_extract": {
       "module": "peec.model_extract",
@@ -22,36 +22,37 @@
         "Result/compact_em/solve/S_parameter.csv"
       ]
     },
-    "em.source": {
-      "module": "phys.model_parse",
-      "name": "源模型解析（gds2geo）"
+    "gds.geo_em": {
+      "module": "gds.geo_em",
+      "name": "电磁几何生成（GDS→EM 几何包）"
     },
-    "em.prepare": {
-      "module": "gds.prepare",
-      "name": "几何准备",
-      "requires": [
-        "Result/gds2geo/source/model.geo"
-      ]
+    "gds.geo_thermal": {
+      "module": "gds.geo_thermal",
+      "name": "热学几何生成（GDS→热几何包）"
     },
     "em.mesh": {
       "module": "gds.mesh_em",
-      "name": "电磁网格",
+      "name": "电磁网格（GEO→MSH+MATDB）",
       "requires": [
-        "Result/gds2geo/prepared/em.geo"
-      ]
+        "Result/gds2geo/em_geo/model_em.geo"
+      ],
+      "publishes": {
+        "gds2geo/mesh.em": "Model/model_em.msh",
+        "gds2geo/matdb.model": "Model/matdb.json"
+      }
     },
     "em.mesh_thermal": {
       "module": "gds.mesh_thermal",
-      "name": "热网格（1102 起必需）",
+      "name": "热网格（GEO→MSH+MATDB，1102 起必需）",
       "requires": [
-        "Result/gds2geo/prepared/thermal.geo"
+        "Result/gds2geo/thermal_geo/model_thermal.geo"
       ]
     },
     "thermal.extract": {
       "module": "thermal.extract",
       "name": "热路提取",
       "artifacts": {
-        "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh"
+        "user/thermal.mesh": "Result/gds2geo/thermal_msh/model_thermal.msh"
       }
     },
     "thermal.post": {
@@ -59,7 +60,7 @@
       "name": "温度后处理（OP0 映射）",
       "optional": true,
       "artifacts": {
-        "user/thermal.mesh": "Result/gds2geo/thermal/model_thermal.msh"
+        "user/thermal.mesh": "Result/gds2geo/thermal_msh/model_thermal.msh"
       },
       "requires": [
         "Model/thermal.op0",
@@ -96,40 +97,38 @@
     },
     "gds_full": {
       "displayName": "建模与网格（GDS2GEO 四阶段）",
-      "description": "源模型生成 → 几何准备 → 电磁网格（热网格可选）；正式件（Model/ 主网格+matdb）由 publisher 按 manifest 落位",
+      "description": "电磁/热几何生成（互不依赖）→ 电磁网格 → 热网格（gds2geo r2：4 EXE 收敛为 2 EXE，几何阶段内部合并旧 source/prepared）；正式件（Model/ 主网格 + matdb.json 配对）由 publisher 按阶段库 publishes 声明落位（r2 manifest 不再携带 publishTo，README §4 将该发布委托平台）",
       "maxParallel": 1,
       "stages": [
         {
-          "id": "source",
-          "ref": "em.source",
+          "id": "geo_em",
+          "ref": "gds.geo_em",
           "dependsOn": []
         },
         {
-          "id": "prepared",
-          "ref": "em.prepare",
-          "dependsOn": [
-            "source"
-          ]
+          "id": "geo_thermal",
+          "ref": "gds.geo_thermal",
+          "dependsOn": []
         },
         {
-          "id": "em",
+          "id": "mesh_em",
           "ref": "em.mesh",
           "dependsOn": [
-            "prepared"
+            "geo_em"
           ]
         },
         {
-          "id": "thermal",
+          "id": "mesh_thermal",
           "ref": "em.mesh_thermal",
           "dependsOn": [
-            "prepared"
+            "geo_thermal"
           ]
         }
       ]
     },
     "thermal_basic": {
       "displayName": "热基本链路（thermal 两段）",
-      "description": "热路提取 → 温度后处理（可选）。热网格经 stage artifacts 路由到 gds2geo 热链产物（Result/gds2geo/thermal/），材料用 publisher 落位的 Model/matdb.json；UI 提供 Model/source_thermal.json（thermal 1.0.7 起支持简化 schemaVersion 3（仅 sources：volume_ids 上 total_power，允许空数组，体材料按 mesh Physical 标签 + matdb 自动装配，无需 thermal 提取对象）与原 schemaVersion 2（含 thermal 提取对象：体域/薄层/材料关联）；1.0.5 时代独立控制件已取消）+ Model/boundary_thermal.json（必需；1.0.7 起支持 schemaVersion 2（default adiabatic + boundaries：fixed_temperature（任意面，含内部面）/ convection）与原 schemaVersion 1）+ Setting/set_thermal.json（SPICE 仿真设置：analysis/probe）；程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2）；最简单算例（无热源、两个固定温度面）= dev/cases/thermal/heater（schema 3 空 sources + schema 2 边界）；post 依赖 Model/thermal.op0（ALPS 结果，1.0.6 起标准位置，1.0.5 时代的 Result/thermal/ 独立控制件已取消）",
+      "description": "热路提取 → 温度后处理（可选）。热网格经 stage artifacts 路由到 gds2geo 热链产物（Result/gds2geo/thermal_msh/，r2 起按目标分目录），材料用 publisher 落位的 Model/matdb.json；UI 提供 Model/source_thermal.json（thermal 1.0.7 起支持简化 schemaVersion 3（仅 sources：volume_ids 上 total_power，允许空数组，体材料按 mesh Physical 标签 + matdb 自动装配，无需 thermal 提取对象）与原 schemaVersion 2（含 thermal 提取对象：体域/薄层/材料关联）；1.0.5 时代独立控制件已取消）+ Model/boundary_thermal.json（必需；1.0.7 起支持 schemaVersion 2（default adiabatic + boundaries：fixed_temperature（任意面，含内部面）/ convection）与原 schemaVersion 1）+ Setting/set_thermal.json（SPICE 仿真设置：analysis/probe）；程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2）；最简单算例（无热源、两个固定温度面）= dev/cases/thermal/heater（schema 3 空 sources + schema 2 边界）；post 依赖 Model/thermal.op0（ALPS 结果，1.0.6 起标准位置，1.0.5 时代的 Result/thermal/ 独立控制件已取消）",
       "maxParallel": 1,
       "stages": [
         {

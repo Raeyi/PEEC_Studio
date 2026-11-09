@@ -8,7 +8,7 @@
   ① local 文件加载 + 同名 pipeline 覆盖（local 赢）+ source 标记 + local 阶段库条目
   ② local 文件非法 -> 整文件拒载（serve ErrConfig，退出码 2，错误带 pipelines.local.json 前缀）
   ③ module.run thermal.extract 单独跑：user/thermal.mesh 按库级 artifacts 路由
-     （[launch] --mesh 指向 Result/gds2geo/thermal/ 而非 manifest 默认 Model/ 位置，H2 回归）
+     （[launch] --mesh 指向 Result/gds2geo/thermal_msh/ 而非 manifest 默认 Model/ 位置，H2 回归）
   ④ 同模块多接线 -> 报错列候选；stageRef "pipelineId/stageId" 消歧后放行
 """
 import argparse, json, os, shutil, subprocess, sys, time
@@ -250,17 +250,17 @@ def main():
           "unsupported schemaVersion" in line and rc == 2, line[:200])
 
     # ── ③ module.run thermal.extract H2 路由 ──
-    # 造 gds_full 型根：热网格只在 Result/gds2geo/thermal/（manifest 默认 Model/ 位不存在）
+    # 造 gds_full 型根：热网格只在 Result/gds2geo/thermal_msh/（manifest 默认 Model/ 位不存在）
     th = os.path.join(work, "th")
     if os.path.exists(th):
         shutil.rmtree(th)
     shutil.copytree(os.path.join(args.cases, "thermal", "demo1_4.1"), th)
-    os.makedirs(os.path.join(th, "Result", "gds2geo", "thermal"), exist_ok=True)
+    os.makedirs(os.path.join(th, "Result", "gds2geo", "thermal_msh"), exist_ok=True)
     shutil.copy2(os.path.join(th, "Model", "model_thermal.msh"),
-                 os.path.join(th, "Result", "gds2geo", "thermal", "model_thermal.msh"))
+                 os.path.join(th, "Result", "gds2geo", "thermal_msh", "model_thermal.msh"))
     os.remove(os.path.join(th, "Model", "model_thermal.msh"))   # 默认位撤除
     sj = json.load(open(os.path.join(th, "Model", "source_thermal.json"), encoding="utf-8"))
-    sj["meshFile"] = "Result/gds2geo/thermal/model_thermal.msh"
+    sj["meshFile"] = "Result/gds2geo/thermal_msh/model_thermal.msh"
     json.dump(sj, open(os.path.join(th, "Model", "source_thermal.json"), "w",
                        encoding="utf-8"), ensure_ascii=False, indent=2)
     # 清掉算例自带结果（避免旧件干扰"新生成"断言）
@@ -294,7 +294,7 @@ def main():
         mesharg = mm.group(1) if mm else ""
         tail = mesharg.replace("/", os.sep).lstrip(os.sep)
         check("③ [launch] --mesh 指向库级路由位（非 manifest 默认 Model/）",
-              tail.endswith(os.path.join("Result", "gds2geo", "thermal", "model_thermal.msh"))
+              tail.endswith(os.path.join("Result", "gds2geo", "thermal_msh", "model_thermal.msh"))
               and not tail.startswith("Model"),
               launch.strip()[:250])
         sp = os.path.join(th, "Result", "thermal", "extract", "ThermalNetList.sp")

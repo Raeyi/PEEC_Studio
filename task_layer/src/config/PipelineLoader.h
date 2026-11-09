@@ -18,6 +18,7 @@ struct PipelineStage {
     bool optional = false;   // 可选阶段：输入缺失或失败时不阻断主链
     QJsonObject params;      // 传给模块的参数（覆盖模块 args 中的变量）
     QMap<QString, QString> artifacts;  // <ref> -> dataRoot 相对路径（跨模块工件路由）
+    QMap<QString, QString> publishes;  // <produced ref> -> 正式件落点（Model/|Setting/，宿主侧发布声明）
     QStringList optionalInputs;        // 可选阶段的存在性前置（dataRoot 相对路径）：缺失则跳过
     QJsonObject userGate;                // P1.5 用户闸门（可选）：{waitForFiles:[dataRoot 相对路径], confirm:bool,
                                           // inputs:[{name,type,required,description}]}；缺省 = 无闸门
@@ -37,14 +38,15 @@ struct PipelineDef {
 //   动态变量 {PORT_JSON} 等，由 UI 通过 task.run/inputs.validate 的 inputs 传入
 //   （键名驼峰转大写下划线：portJson -> {PORT_JSON}）
 // P2 阶段库定义（pipelines.json schemaVersion 2 顶层 stages 对象）：
-// 同一模块接线的"库级默认"（模块/参数/工件路由/前置/可选/闸门），pipeline 阶段经 ref 引用
-// 并做本地覆盖（params/artifacts 键级合并本地赢；requires/optional 本地有则本地赢；
+// 同一模块接线的"库级默认"（模块/参数/工件路由/发布声明/前置/可选/闸门），pipeline 阶段经 ref 引用
+// 并做本地覆盖（params/artifacts/publishes 键级合并本地赢；requires/optional 本地有则本地赢；
 // userGate 本地只能 extends 新增键，不能取消库级闸门）。
 struct StageLibDef {
     QString moduleId;
     QString name;
     QJsonObject params;
     QMap<QString, QString> artifacts;
+    QMap<QString, QString> publishes;   // <produced ref> -> 正式件落点（Model/|Setting/，宿主侧发布声明）
     QStringList requires;         // 存在性前置（dataRoot 相对路径）
     bool optional = false;
     QJsonObject userGate;

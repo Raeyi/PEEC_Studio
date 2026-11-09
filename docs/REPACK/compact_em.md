@@ -1,7 +1,25 @@
 # compact_em 模块重打包请求日志（REPACK/compact_em）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.5 修订 2）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**v1.3（2026-11-04，API 3，2026-11-05 集成）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.6）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**v1.3（2026.11.04，API 3，2026-11-05 集成）**。
+
+## 第 2 轮（2026-11-09 请求，进行中）
+
+状态：**进行中 —— 待 vendor 回执**（平台 2026-11-09 集成 gds2geo V1.2 r2 时 API-4 探针发现；联动 REPACK/gds2geo.md 第 3 轮）。
+
+**问题清单（2026-11-09 探针证据，E:/code/_integ/peec_api4b）**：
+- compact_em v1.3（2026.11.04）对 r2 em MSH（vendor 多行记录方言，Delivery API 4：dimensions 0–3 含 Point1/Line2/Tri3/Tet4）**解析正常**（608 点 / 1277 元素 / 2 材料 / vacuum id 4 全部解析成功），但标准 MATDB/source 输入契约拒绝网格中的**激励线元素**：`QS-FMT-MSH-INVALID` "Standard MATDB/source_em.json input must not contain excitation line elements"（exit 1）。
+- r2 MSH 的 manifest 已声明（capabilities.mesh）：CAD Point1/Line2 **不是激励定义**（ungroupedEntities："CAD Point1/Line2 are not excitation definitions"；consumerRequirement："do not treat CAD Line2 as ports"）——即网格线元素为原生 CAD 几何，与现契约"禁止激励线元素"冲突 ⇒ 契约需 compact_em 侧对齐（或 r2 提供无线 MSH 选项，两者取一即可）。
+- 影响面：**GDS→PEEC 生成网格全流阻塞**（peec_basic 的标准输入必须消费 Model/model_em.msh 正式件，该正式件现为 r2 全维 MSH）；预烘焙网格算例（红线算例 standard，经典 gmsh 4.1 单记录行格式）不受影响（S_parameter.csv 22,118 B 字节一致 PASS）。
+
+**交付要求**：
+1. （阻塞项）标准 MATDB/source 输入接受 r2 全维 MSH（Delivery API 4）：将 CAD Line2 视为几何（端口/激励仅由 source_em.json 的 ports 定义，不扫描网格线元素），或提供无线 MSH 输入模式；二选一。
+2. （与 gds2geo 第 3 轮联动）mesh 侧选项或消费端适配二选一，由 vendor 单方定口径，避免双 vendor 互相等待。
+3. 若改输入契约：发版说明注明 apiVersion / breakingChanges（现 apiVersion 3）。
+
+**回执**：待 vendor 回执。回执后平台复测（standard × r2 生成网格全流 + 红线算例回归），本轮回执写回即关闭。
+
+---
 
 ## 第 1 轮（2026-11-02 请求 → 2026-11-05 回执，已收口）
 

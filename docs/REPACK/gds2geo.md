@@ -1,7 +1,23 @@
 # gds2geo 模块重打包请求日志（REPACK/gds2geo）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.4）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**V1.2（2026-11-06，gmsh 移出包至平台 tools/ 区）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.6）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**V1.2 r2（GDS2GEO-V1.2-20261107-r2，2026-11-09 集成；2 EXE / 5 文件 / manifest apiVersion 4；gmsh 在平台 tools/ 区）**。
+
+## 第 3 轮（2026-11-09 请求，进行中）
+
+状态：**进行中 —— 待 vendor 回执**。V1.2 r2（GDS2GEO-V1.2-20261107-r2）已于 2026-11-09 集成（2 EXE / 5 文件 / apiVersion 4；Result/gds2geo 布局重构为 em_geo/thermal_geo/em_msh/thermal_msh；EM 正式件落位改为平台 `publishes` 声明，见 task_layer README 2026-11-09 条目）。
+
+**问题清单（平台 2026-11-09 API-4 探针发现）**：
+- r2 em MSH（Delivery API 4）保留全部原生 CAD 实体（dimensions 0–3，含 Line2），而 compact_em v1.3 的标准 MATDB/source 输入契约**拒绝激励线元素**（QS-FMT-MSH-INVALID "Standard MATDB/source_em.json input must not contain excitation line elements"）；网格文件本身解析正常（608 点 / 1277 元素 / 2 材料 + vacuum id 4 全部解析成功，端口 triangleIds 有效）。平台 r2 manifest 的 executionProfiles **无线元素排除选项**，vendor 程序无相应开关 ⇒ **GDS→PEEC 生成网格全流目前阻塞**（预烘焙网格算例不受影响，红线算例字节一致 PASS）。
+- r2 MSH 为 vendor 多行记录方言（manifest 自述 "Gmsh 4.1 ASCII"），两求解器（compact_em v1.3 / thermal 1.0.7）均可正常解析，非格式不兼容；thermal 解析 r2 热网格正常（mesh loaded: 8095 nodes），失败源于旧算例 boundary_thermal.json 的 surface_ids 绑定旧网格编号（算例制备绑定问题，非求解器缺陷）。
+
+**交付要求**：
+1. （阻塞项）二选一：a) r2 MSH 提供**无线元素导出选项**（如 `--no-1d` / profile 开关）；b) r2 README/manifest 明确消费端适配方法（如何区分 CAD Line2 与激励线、以何实体为端口定义）。r2 manifest capabilities.mesh 已声明 "do not treat CAD Line2 as ports"，消费端适配口径需 vendor 确认。
+2. 案例包 `gds2geo_cases_20261107.zip`（r2 manifest externalCasePackage 声明）随下一轮交付；`validation/` 目录交付（r2 与 V1.2 1106 轮均缺）。
+
+**回执**：待 vendor 回执。回执后平台复测（compact_em 标准输入 × r2 生成网格），本轮回执写回即关闭。
+
+---
 
 ## 第 2 轮（2026-11-06 gmsh 共享化 → 已收口）
 
@@ -43,3 +59,4 @@
 ## 未决项（非重打包）
 
 - **案例包 gds2geo_cases_20261102.zip 未交付**（README 引用）：仅影响平台侧 dev_case 回归自测，不阻塞 UI 发布；经用户催收。交付后归档 dev/cases/gds2geo/。
+- **r2 案例包 gds2geo_cases_20261107.zip 亦未交付**（r2 manifest externalCasePackage 声明；2026-11-09 集成时核对包内无此件）：仅影响 dev_case 回归自测，不阻塞主包交付；已列入第 3 轮交付要求。`validation/` 目录仍缺（r2 交付 = 2 EXE + README + ERROR_CODES.md + module.manifest.json 共 5 文件）。

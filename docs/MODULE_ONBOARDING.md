@@ -119,7 +119,7 @@ compact_em 具体项：
 
 **Q：想新增 dataRoot 下的全局共享目录？** 走 DATA_LAYOUT 版本变更流程；模块私有需求放 `Result/<providerId>/` 自由区。
 **Q：产物 schema 小改要升 apiVersion 吗？** 加可选字段不升（C2）；删字段/改语义升（B4）。拿不准就升。
-**Q：热链输入文件现在要写哪些？** 两个：① `Model/source_thermal.json`——只含源定义（meshFile 指向热网格实际落位路径，gds_full 链路下为 `Result/gds2geo/thermal/model_thermal.msh`，+ 该文件 SHA-256；total_power_W / sources 等），**不含边界条件**；② `Model/boundary_thermal.json`——热边界条件（default_external_boundary + fixed_temperature，格式见 DATA_LAYOUT §八.2），热模块经 CLI `--boundary` 读取（重发版起）。`boundary_em.json` 仍是预留槽位（格式 TBD、暂无消费方），UI 可不写。另注意求解设置拆分（DATA_LAYOUT §八，v1.3 起 set_em.json/set_thermal.json；v1.2 过渡期纯热算例 set.json 不复制 EM 字段）。
+**Q：热链输入文件现在要写哪些？** 两个：① `Model/source_thermal.json`——只含源定义（meshFile 指向热网格实际落位路径，gds_full 链路下为 `Result/gds2geo/thermal_msh/model_thermal.msh`（gds2geo V1.2 r2 起），+ 该文件 SHA-256；total_power_W / sources 等），**不含边界条件**；② `Model/boundary_thermal.json`——热边界条件（default_external_boundary + fixed_temperature，格式见 DATA_LAYOUT §八.2），热模块经 CLI `--boundary` 读取（重发版起）。`boundary_em.json` 仍是预留槽位（格式 TBD、暂无消费方），UI 可不写。另注意求解设置拆分（DATA_LAYOUT §八，v1.3 起 set_em.json/set_thermal.json；v1.2 过渡期纯热算例 set.json 不复制 EM 字段）。
 **Q：案例（自测样品）能放进模块包吗？** 不能。包内只含四件套；案例按 §1.1 单独交付（`<module>_cases_YYYYMMDD/`），平台归档 `dev/cases/<module>/`。
 **Q：设置默认件（set_em.json / set_thermal.json）怎么放？** 模块包**不携带**（2026-11-04 定）：设置默认件归**平台管理**——初值在平台交付包 `templates/` 目录，平台负责最终内容并传给 UI 作默认值；模块发版若改动设置格式/默认值，在发版说明中注明即可，平台据此更新 templates/ 文件并传给 UI（DATA_LAYOUT v1.4 修订 1 ①）。
 **Q：set.txt 什么时候彻底废弃？** compact_em 下一版 CLI 同时接受 JSON 求解设置 + set.txt（过渡）；v1.3 起 JSON 设置文件名为 set_em.json。过渡期两个文件同时存在时 JSON 优先 + warning。

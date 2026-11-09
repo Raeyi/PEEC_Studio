@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "_comment": "v2 = 路由表：契约来自各包 module.manifest.json（docs/MODULE_MANIFEST_SPEC.md）。kind: external/dll；provider = manifest id = 模块包目录名；stage = manifest stages[].id。",
+  "_comment": "v2 = 路由表：契约来自各包 module.manifest.json（docs/MODULE_MANIFEST_SPEC.md）。kind: external/dll；provider = manifest id = 模块包目录名；stage = manifest stages[].id。gds2geo r2（V1.2-20261107-r2，2026-11-09 集成）：4 EXE → 2 EXE（gds2geo.exe / geo2msh.exe），stage 集 = em_geo / thermal_geo / em_msh / thermal_msh；gmsh 仅 em_msh/thermal_msh 需要（requiredBy）。",
   "modules": {
     "peec.model_extract": {
       "displayName": "等效电路模型 · PEEC 提取",
@@ -29,35 +29,29 @@
         "{MODULE_ROOT}/compact_em"
       ]
     },
-    "phys.model_parse": {
-      "displayName": "物理模型解析（GDS2GEO 源模型）",
+    "gds.geo_em": {
+      "displayName": "电磁几何生成（GDS2GEO r2）",
       "kind": "external",
       "provider": "gds2geo",
-      "stage": "source",
-      "env": {
-        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
-      },
+      "stage": "em_geo",
       "searchDirs": [
         "{MODULE_ROOT}/gds2geo"
       ]
     },
-    "gds.prepare": {
-      "displayName": "几何准备（热/电磁目标派生）",
+    "gds.geo_thermal": {
+      "displayName": "热学几何生成（GDS2GEO r2）",
       "kind": "external",
       "provider": "gds2geo",
-      "stage": "prepared",
-      "env": {
-        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
-      },
+      "stage": "thermal_geo",
       "searchDirs": [
         "{MODULE_ROOT}/gds2geo"
       ]
     },
     "gds.mesh_em": {
-      "displayName": "电磁网格生成",
+      "displayName": "电磁网格生成（GDS2GEO r2）",
       "kind": "external",
       "provider": "gds2geo",
-      "stage": "em",
+      "stage": "em_msh",
       "env": {
         "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
       },
@@ -69,7 +63,7 @@
       "displayName": "热网格生成（1102 起必需）",
       "kind": "external",
       "provider": "gds2geo",
-      "stage": "thermal",
+      "stage": "thermal_msh",
       "env": {
         "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
       },

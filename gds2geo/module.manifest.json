@@ -3,43 +3,37 @@
   "id": "gds2geo",
   "name": "GDS2GEO",
   "version": "V1.2",
-  "apiVersion": 1,
+  "apiVersion": 4,
   "cli": {
     "executables": [
       "gds2geo.exe",
-      "geo_prepare.exe",
-      "geo2em.exe",
-      "geo2thermal.exe"
+      "geo2msh.exe"
     ],
     "deprecatedModes": [
-      "no-arg-default",
-      "exe-relative-fallback",
-      "exe-relative-settings"
+      "no-argument mode using executable-relative settings/input/output",
+      "gds2geo without --target (exact source only)",
+      "geo2msh without --target (legacy dual bundle)"
     ]
   },
   "stages": [
     {
-      "id": "source",
+      "id": "em_geo",
       "executable": "gds2geo.exe",
       "argsTemplate": [
-        "--runtime-dir",
-        "{runtimeDir}",
-        "source",
         "--gds",
         "{dataRoot}/Model/model.gds",
         "--tech",
         "{dataRoot}/Model/model_info.csv",
+        "--target",
+        "em",
         "--output-dir",
-        "{dataRoot}/Result/gds2geo/source"
+        "{dataRoot}/Result/gds2geo/em_geo"
       ],
-      "allowedArgs": [
-        "--top-cell"
-      ],
-      "optional": false,
+      "allowedArgs": [],
       "exitCodes": {
         "0": "ok",
-        "2": "input_or_config",
-        "5": "execution",
+        "2": "input_or_configuration",
+        "5": "execution_or_publication",
         "6": "internal"
       },
       "errorContract": {
@@ -47,62 +41,59 @@
       },
       "consumesInternal": [],
       "producesInternal": [
-        "gds2geo/source.geo",
-        "gds2geo/source.json",
-        "gds2geo/source.matdb"
+        "gds2geo/prepared.em.geo",
+        "gds2geo/prepared.em.json",
+        "gds2geo/prepared.em.matdb"
       ]
     },
     {
-      "id": "prepared",
-      "executable": "geo_prepare.exe",
+      "id": "thermal_geo",
+      "executable": "gds2geo.exe",
       "argsTemplate": [
-        "--runtime-dir",
-        "{runtimeDir}",
-        "--input-dir",
-        "{dataRoot}/Result/gds2geo/source",
+        "--gds",
+        "{dataRoot}/Model/model.gds",
+        "--tech",
+        "{dataRoot}/Model/model_info.csv",
+        "--target",
+        "thermal",
         "--output-dir",
-        "{dataRoot}/Result/gds2geo/prepared"
+        "{dataRoot}/Result/gds2geo/thermal_geo"
       ],
       "allowedArgs": [],
-      "optional": false,
       "exitCodes": {
         "0": "ok",
-        "2": "input_or_config",
-        "5": "execution"
+        "2": "input_or_configuration",
+        "5": "execution_or_publication",
+        "6": "internal"
       },
       "errorContract": {
         "type": "none"
       },
-      "consumesInternal": [
-        "gds2geo/source.geo",
-        "gds2geo/source.json",
-        "gds2geo/source.matdb"
-      ],
+      "consumesInternal": [],
       "producesInternal": [
-        "gds2geo/prepared.em.geo",
-        "gds2geo/prepared.em.json",
         "gds2geo/prepared.thermal.geo",
         "gds2geo/prepared.thermal.json",
-        "gds2geo/prepared.matdb"
+        "gds2geo/prepared.thermal.matdb"
       ]
     },
     {
-      "id": "em",
-      "executable": "geo2em.exe",
+      "id": "em_msh",
+      "executable": "geo2msh.exe",
       "argsTemplate": [
         "--runtime-dir",
         "{runtimeDir}",
+        "--target",
+        "em",
         "--input-dir",
-        "{dataRoot}/Result/gds2geo/prepared",
+        "{dataRoot}/Result/gds2geo/em_geo",
         "--output-dir",
-        "{dataRoot}/Result/gds2geo/em"
+        "{dataRoot}/Result/gds2geo/em_msh"
       ],
       "allowedArgs": [],
-      "optional": false,
       "exitCodes": {
         "0": "ok",
-        "2": "input_or_config",
-        "5": "execution"
+        "2": "input_or_configuration",
+        "5": "execution_or_publication"
       },
       "errorContract": {
         "type": "none"
@@ -110,31 +101,31 @@
       "consumesInternal": [
         "gds2geo/prepared.em.geo",
         "gds2geo/prepared.em.json",
-        "gds2geo/prepared.matdb"
+        "gds2geo/prepared.em.matdb"
       ],
       "producesInternal": [
-        "gds2geo/em.mesh",
-        "gds2geo/em.receipt",
-        "gds2geo/em.matdb"
+        "gds2geo/mesh.em",
+        "gds2geo/matdb.model"
       ]
     },
     {
-      "id": "thermal",
-      "executable": "geo2thermal.exe",
+      "id": "thermal_msh",
+      "executable": "geo2msh.exe",
       "argsTemplate": [
         "--runtime-dir",
         "{runtimeDir}",
+        "--target",
+        "thermal",
         "--input-dir",
-        "{dataRoot}/Result/gds2geo/prepared",
+        "{dataRoot}/Result/gds2geo/thermal_geo",
         "--output-dir",
-        "{dataRoot}/Result/gds2geo/thermal"
+        "{dataRoot}/Result/gds2geo/thermal_msh"
       ],
       "allowedArgs": [],
-      "optional": false,
       "exitCodes": {
         "0": "ok",
-        "2": "input_or_config",
-        "5": "execution"
+        "2": "input_or_configuration",
+        "5": "execution_or_publication"
       },
       "errorContract": {
         "type": "none"
@@ -142,40 +133,93 @@
       "consumesInternal": [
         "gds2geo/prepared.thermal.geo",
         "gds2geo/prepared.thermal.json",
-        "gds2geo/prepared.matdb"
+        "gds2geo/prepared.thermal.matdb"
       ],
       "producesInternal": [
-        "gds2geo/thermal.mesh",
-        "gds2geo/thermal.receipt",
-        "gds2geo/thermal.matdb"
+        "gds2geo/mesh.thermal",
+        "gds2geo/matdb.thermal"
       ]
     }
   ],
   "artifacts": {
     "produced": [
       {
+        "ref": "gds2geo/prepared.em.geo",
+        "stage": "em_geo",
+        "path": "Result/gds2geo/em_geo/model_em.geo",
+        "schemaVersion": "3",
+        "units": {
+          "length": "GDS layout user unit",
+          "metersPerUnitField": "coordinates.dim",
+          "source": "same-stem JSON"
+        }
+      },
+      {
+        "ref": "gds2geo/prepared.em.json",
+        "stage": "em_geo",
+        "path": "Result/gds2geo/em_geo/model_em.json",
+        "schemaVersion": "3",
+        "units": {
+          "formalGeoLengthUnitField": "coordinates.outputUnit",
+          "metersPerGeoUnitField": "coordinates.dim",
+          "modelLength": "mm",
+          "privateMeshLength": "um"
+        }
+      },
+      {
+        "ref": "gds2geo/prepared.em.matdb",
+        "stage": "em_geo",
+        "path": "Result/gds2geo/em_geo/matdb.json",
+        "schemaVersion": "3"
+      },
+      {
+        "ref": "gds2geo/prepared.thermal.geo",
+        "stage": "thermal_geo",
+        "path": "Result/gds2geo/thermal_geo/model_thermal.geo",
+        "schemaVersion": "3",
+        "units": {
+          "length": "GDS layout user unit",
+          "metersPerUnitField": "coordinates.dim",
+          "source": "same-stem JSON"
+        }
+      },
+      {
+        "ref": "gds2geo/prepared.thermal.json",
+        "stage": "thermal_geo",
+        "path": "Result/gds2geo/thermal_geo/model_thermal.json",
+        "schemaVersion": "3",
+        "units": {
+          "formalGeoLengthUnitField": "coordinates.outputUnit",
+          "metersPerGeoUnitField": "coordinates.dim",
+          "modelLength": "mm",
+          "privateMeshLength": "um"
+        }
+      },
+      {
+        "ref": "gds2geo/prepared.thermal.matdb",
+        "stage": "thermal_geo",
+        "path": "Result/gds2geo/thermal_geo/matdb.json",
+        "schemaVersion": "3"
+      },
+      {
         "ref": "gds2geo/mesh.em",
-        "path": "Result/gds2geo/em/model_em.msh",
+        "stage": "em_msh",
+        "path": "Result/gds2geo/em_msh/model_em.msh",
         "schemaVersion": "4",
         "units": {
           "length": "mm"
-        },
-        "publishTo": "Model/model_em.msh"
+        }
       },
       {
         "ref": "gds2geo/matdb.model",
-        "path": "Result/gds2geo/em/matdb.json",
-        "schemaVersion": "3",
-        "publishTo": "Model/matdb.json"
-      },
-      {
-        "ref": "gds2geo/receipt.em",
-        "path": "Result/gds2geo/em/model_em.msh.json",
-        "schemaVersion": "6"
+        "stage": "em_msh",
+        "path": "Result/gds2geo/em_msh/matdb.json",
+        "schemaVersion": "3"
       },
       {
         "ref": "gds2geo/mesh.thermal",
-        "path": "Result/gds2geo/thermal/model_thermal.msh",
+        "stage": "thermal_msh",
+        "path": "Result/gds2geo/thermal_msh/model_thermal.msh",
         "schemaVersion": "4",
         "units": {
           "length": "mm"
@@ -183,13 +227,9 @@
       },
       {
         "ref": "gds2geo/matdb.thermal",
-        "path": "Result/gds2geo/thermal/matdb.json",
+        "stage": "thermal_msh",
+        "path": "Result/gds2geo/thermal_msh/matdb.json",
         "schemaVersion": "3"
-      },
-      {
-        "ref": "gds2geo/receipt.thermal",
-        "path": "Result/gds2geo/thermal/model_thermal.msh.json",
-        "schemaVersion": "6"
       }
     ],
     "consumed": [
@@ -222,53 +262,294 @@
     "environment": {
       "gmsh": {
         "version": "4.11.1",
+        "bundled": false,
         "requiredBy": [
-          "em",
-          "thermal"
-        ]
+          "em_msh",
+          "thermal_msh"
+        ],
+        "environmentVariable": "GDS2GEO_GMSH_EXECUTABLE",
+        "platformTool": "tools/gmsh/gmsh.exe",
+        "resolutionOrder": [
+          "gmsh.exe beside geo2msh.exe",
+          "absolute path in GDS2GEO_GMSH_EXECUTABLE",
+          "PATH"
+        ],
+        "configuration": "The platform sets GDS2GEO_GMSH_EXECUTABLE to the absolute path of its external Gmsh 4.11.1 executable."
       }
     }
   },
   "capabilities": {
     "dataLayout": "peec-data/v1",
-    "breakingChanges": [],
-    "technologyFormats": [
-      "csv"
-    ],
-    "requiredStages": [
-      "source",
-      "prepared",
-      "em",
-      "thermal"
-    ],
-    "meshFormat": "4.1 ASCII",
-    "meshSchemaVersionMeaning": "MSH major format version; not the mesh receipt schemaVersion",
-    "materialSchemaVersion": 3,
-    "meshReceiptSchemaVersion": 6,
-    "lockMechanism": "Windows named mutex; no lock files",
-    "externalDependencies": {
-      "gmsh": {
-        "version": "4.11.1",
-        "bundled": false,
-        "configuration": [
-          "gmsh.exe beside the four stage executables (legacy fallback; V1.2 起不随包)",
-          "GDS2GEO_GMSH_EXECUTABLE absolute path (platform-injected; standard deploy: {MODULE_ROOT}/tools/gmsh/gmsh.exe)",
-          "PATH"
-        ],
-        "requiredBy": [
-          "em",
-          "thermal"
-        ]
+    "breakingChanges": [
+      {
+        "version": "V1.2",
+        "note": "This V1.2 two-executable release uses delivery API 3 and prepared target schema 3. Direct GDS2GEO replaces the former source/geo_prepare delivery stages. Each formal GEO uses the input GDS layout user unit and declares dim in meters per GEO coordinate unit. The matching GEO2MSH reads this contract and outputs MSH in mm. Each target keeps its own MATDB. EM mesh and material refs are gds2geo/mesh.em and gds2geo/matdb.model. Gmsh is provided by the platform."
+      },
+      {
+        "version": "V1.2",
+        "note": "Delivery API 4: MSH preserves all native CAD entities in dimensions 0/1/2/3, signed direct boundaries, native node classification and Point1/Line2/Tri3/Tet4 elements. Native unreferenced nodes are allowed. Consumers restricted to face/body entities or element types 2/4 must be adapted. CLI, artifact paths, GEO schema 3, MATDB schema 3, MSH 4.1 ASCII and mm coordinates are unchanged. Product/executable versions remain V1.2/1.2.0."
       }
-    },
+    ],
     "deliveryFiles": [
       "gds2geo.exe",
-      "geo_prepare.exe",
-      "geo2em.exe",
-      "geo2thermal.exe",
+      "geo2msh.exe",
       "README.md",
       "ERROR_CODES.md",
       "module.manifest.json"
-    ]
+    ],
+    "executables": {
+      "gds2geo.exe": {
+        "version": "1.2.0",
+        "sha256": "e982a45b52e86ce6ca38cff1a7c399bc3e28a6192113bd8afecbd7dca5f60b67"
+      },
+      "geo2msh.exe": {
+        "version": "1.2.0",
+        "sha256": "c40a788930f51f42b94f6e6ad0b4d81de500572e76e160be7490623df1f87c25"
+      }
+    },
+    "geometry": {
+      "kind": "gds2geo_prepared_target",
+      "schemaVersion": 3,
+      "policyVersion": "independent-target-1",
+      "lengthUnit": "GDS layout user unit",
+      "contourToleranceMm": 5e-05,
+      "nativeTechnologyFormats": [
+        "csv",
+        "xtf"
+      ],
+      "profileTechnologyFormat": "csv",
+      "metersPerGeoUnit": "coordinates.dim",
+      "dimDefinition": "For GDS UNITS (a, b), dim = b/a. a is user units per DBU; b is meters per DBU. The GEO header and its same-stem JSON declare this scale.",
+      "modelLengthUnit": "mm",
+      "privateMeshLengthUnit": "um",
+      "materialSchemaVersion": 3
+    },
+    "mesh": {
+      "format": "Gmsh 4.1 ASCII",
+      "lengthUnit": "mm",
+      "artifactSchemaVersionMeaning": "MSH major format version",
+      "materialSchemaVersion": 3,
+      "materialPairing": {
+        "em": [
+          "gds2geo/mesh.em",
+          "gds2geo/matdb.model"
+        ],
+        "thermal": [
+          "gds2geo/mesh.thermal",
+          "gds2geo/matdb.thermal"
+        ]
+      },
+      "entityDimensions": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "elementTypes": {
+        "15": "Point1",
+        "1": "Line2",
+        "2": "Tri3",
+        "4": "Tet4"
+      },
+      "entityIdentity": "Same (dimension, tag) as the corresponding target GEO loaded by Gmsh 4.11.1; not guaranteed across different targets or geometry edits.",
+      "directBoundaries": "Native immediate boundary entities, with orientation where applicable.",
+      "nodeClassification": "Native CAD entity dimension and tag; unreferenced native nodes may be present. Every element node reference must be valid.",
+      "ungroupedEntities": "Allowed; no synthetic Physical 0 or fake material. CAD Point1/Line2 are not excitation definitions.",
+      "coordinateScaleFromGeo": "coordinates.dim * 1000",
+      "consumerRequirement": "Read all entity dimensions and supported element types. Select solver elements by dimension and Physical/material membership; do not treat CAD Line2 as ports.",
+      "stableMeshIds": false
+    },
+    "requestContract": {
+      "required": [
+        "target",
+        "endpoint"
+      ],
+      "targets": [
+        "em",
+        "thermal",
+        "both"
+      ],
+      "endpoints": [
+        "prepared",
+        "mesh"
+      ],
+      "policy": "Select exactly one execution profile. In order, invoke each calls entry once with the indicated executable and argsTemplate. Calls refer to stages or nativeBothCalls. A native both call replaces both listed stages. Require exit code zero and every required artifact for this request before reporting success. Native mesh commands also accept standalone validated pre-existing geometry packages."
+    },
+    "executionProfiles": [
+      {
+        "id": "em_prepared",
+        "request": {
+          "target": "em",
+          "endpoint": "prepared"
+        },
+        "calls": [
+          "em_geo"
+        ],
+        "requiredArtifacts": [
+          "gds2geo/prepared.em.geo",
+          "gds2geo/prepared.em.json",
+          "gds2geo/prepared.em.matdb"
+        ]
+      },
+      {
+        "id": "em_mesh",
+        "request": {
+          "target": "em",
+          "endpoint": "mesh"
+        },
+        "calls": [
+          "em_geo",
+          "em_msh"
+        ],
+        "requiredArtifacts": [
+          "gds2geo/prepared.em.geo",
+          "gds2geo/prepared.em.json",
+          "gds2geo/prepared.em.matdb",
+          "gds2geo/mesh.em",
+          "gds2geo/matdb.model"
+        ]
+      },
+      {
+        "id": "thermal_prepared",
+        "request": {
+          "target": "thermal",
+          "endpoint": "prepared"
+        },
+        "calls": [
+          "thermal_geo"
+        ],
+        "requiredArtifacts": [
+          "gds2geo/prepared.thermal.geo",
+          "gds2geo/prepared.thermal.json",
+          "gds2geo/prepared.thermal.matdb"
+        ]
+      },
+      {
+        "id": "thermal_mesh",
+        "request": {
+          "target": "thermal",
+          "endpoint": "mesh"
+        },
+        "calls": [
+          "thermal_geo",
+          "thermal_msh"
+        ],
+        "requiredArtifacts": [
+          "gds2geo/prepared.thermal.geo",
+          "gds2geo/prepared.thermal.json",
+          "gds2geo/prepared.thermal.matdb",
+          "gds2geo/mesh.thermal",
+          "gds2geo/matdb.thermal"
+        ]
+      },
+      {
+        "id": "both_prepared",
+        "request": {
+          "target": "both",
+          "endpoint": "prepared"
+        },
+        "calls": [
+          "both_geo"
+        ],
+        "requiredArtifacts": [
+          "gds2geo/prepared.em.geo",
+          "gds2geo/prepared.em.json",
+          "gds2geo/prepared.em.matdb",
+          "gds2geo/prepared.thermal.geo",
+          "gds2geo/prepared.thermal.json",
+          "gds2geo/prepared.thermal.matdb"
+        ]
+      },
+      {
+        "id": "both_mesh",
+        "request": {
+          "target": "both",
+          "endpoint": "mesh"
+        },
+        "calls": [
+          "both_geo",
+          "both_msh"
+        ],
+        "requiredArtifacts": [
+          "gds2geo/prepared.em.geo",
+          "gds2geo/prepared.em.json",
+          "gds2geo/prepared.em.matdb",
+          "gds2geo/prepared.thermal.geo",
+          "gds2geo/prepared.thermal.json",
+          "gds2geo/prepared.thermal.matdb",
+          "gds2geo/mesh.em",
+          "gds2geo/matdb.model",
+          "gds2geo/mesh.thermal",
+          "gds2geo/matdb.thermal"
+        ]
+      }
+    ],
+    "nativeBothCalls": [
+      {
+        "id": "both_geo",
+        "satisfiesStages": [
+          "em_geo",
+          "thermal_geo"
+        ],
+        "executable": "gds2geo.exe",
+        "argsTemplate": [
+          "--gds",
+          "{dataRoot}/Model/model.gds",
+          "--tech",
+          "{dataRoot}/Model/model_info.csv",
+          "--target",
+          "both",
+          "--em-output-dir",
+          "{dataRoot}/Result/gds2geo/em_geo",
+          "--thermal-output-dir",
+          "{dataRoot}/Result/gds2geo/thermal_geo"
+        ],
+        "allowedArgs": [],
+        "exitCodes": {
+          "0": "ok",
+          "2": "input_or_configuration",
+          "5": "execution_or_publication",
+          "6": "internal"
+        },
+        "errorContract": {
+          "type": "none"
+        }
+      },
+      {
+        "id": "both_msh",
+        "satisfiesStages": [
+          "em_msh",
+          "thermal_msh"
+        ],
+        "executable": "geo2msh.exe",
+        "argsTemplate": [
+          "--runtime-dir",
+          "{runtimeDir}",
+          "--target",
+          "both",
+          "--em-input-dir",
+          "{dataRoot}/Result/gds2geo/em_geo",
+          "--thermal-input-dir",
+          "{dataRoot}/Result/gds2geo/thermal_geo",
+          "--em-output-dir",
+          "{dataRoot}/Result/gds2geo/em_msh",
+          "--thermal-output-dir",
+          "{dataRoot}/Result/gds2geo/thermal_msh"
+        ],
+        "allowedArgs": [],
+        "exitCodes": {
+          "0": "ok",
+          "2": "input_or_configuration",
+          "5": "execution_or_publication"
+        },
+        "errorContract": {
+          "type": "none"
+        }
+      }
+    ],
+    "publicationPolicy": "Stage outputs stay in Result/gds2geo. If publication is configured by the host, use the mesh and MATDB from the same target and successful generation.",
+    "platformIntegration": "The host selects and dispatches the requested profile and native both calls. Platform registration and downstream artifact routing require separate integration.",
+    "deliveryBatch": "GDS2GEO-V1.2-20261107-r2",
+    "externalCasePackage": "gds2geo_cases_20261107.zip"
   }
 }

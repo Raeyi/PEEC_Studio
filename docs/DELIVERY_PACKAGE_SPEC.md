@@ -1,7 +1,7 @@
 # 打包交付规范（DELIVERY_PACKAGE_SPEC）
 
-版本：v1.0（2026-11-06）｜维护方：平台集成侧｜UI 模块组可对照 §二/§四 审查交付包
-基线：PEEC_Studio_20261106_v2.1（2026-11-06 16:14 重切，39 条目）+ docs_1.5.zip（9 条目）
+版本：v1.1（2026-11-09）｜维护方：平台集成侧｜UI 模块组可对照 §二/§四 审查交付包
+基线：PEEC_Studio_20261109_v2.2（2026-11-09，37 条目）+ docs_1.6.zip（9 条目）
 
 ## 一、目的与范围
 
@@ -11,7 +11,7 @@
 
 **核心原则——白名单制：包内只允许出现 §二 所列文件；不在表内 = 不打包。**
 
-## 二、包内结构白名单（当前 39 条目）
+## 二、包内结构白名单（当前 37 条目）
 
 包根 = MODULE_ROOT。
 
@@ -19,12 +19,12 @@
 |---|---|---|
 | 包根 | 给UI负责人的交付说明.md（唯一根文档；变更说明权威件，见 §五） | 1 |
 | compact_em/ | module.manifest.json / README.md / ERROR_CODES.md / PEEC_Model_Extractor.exe / PEEC_Solver.exe / PEEC_Post_Processing.exe | 6 |
-| gds2geo/ | module.manifest.json / README.md / ERROR_CODES.md / gds2geo.exe / geo_prepare.exe / geo2em.exe / geo2thermal.exe | 7 |
+| gds2geo/ | module.manifest.json / README.md / ERROR_CODES.md / gds2geo.exe / geo2msh.exe（V1.2 r2，2026-11-09 起） | 5 |
 | thermal/ | module.manifest.json / README.md / ERROR_CODES.md / ThermalExtract.exe / TemperatureProcess.exe | 5 |
 | tools/gmsh/ | gmsh.exe（平台共享工具区；模块包不含 gmsh） | 1 |
 | task_layer/dist/ | task_layer.exe / README.md / UI_API.md / ERROR_CODES.md / Qt6Core.dll / libgcc_s_seh-1.dll / libstdc++-6.dll / libwinpthread-1.dll / bin/Qt6Core.dll / bin/worker_host.exe / config/modules.json / config/pipelines.json | 12 |
 | templates/ | README.md / Model/source_thermal.json / Model/boundary_thermal.json / Model/thermal.op0 / Model/source_em.json / Setting/set_thermal.json / Setting/set_em.json | 7 |
-| **合计** | | **39** |
+| **合计** | | **37** |
 
 注：
 - 模块 EXE 清单以该模块当前版 module.manifest.json 为准（如 compact_em v1.3 起不含绘图 EXE）；构成变化时同步更新本表与 §六 验证计数；
@@ -67,9 +67,9 @@ Staging 目录 `E:\code\PEEC_Studio_YYYYMMDD`（日期 = 交付批次日），�
 
 Python `zipfile`（in-memory 读取 + SHA256；pwsh Compress-Archive 仅用于切包，验证必须走 Python）：
 
-1. 条目数 = §二 白名单计数（当前 **39**）；
+1. 条目数 = §二 白名单计数（当前 **37**）；
 2. §四 负面清单零命中（*.bak / __pycache__ / .git / Result / cases / .locks 等逐一检查）；
-3. 关键件 SHA256 与源文件（repo 或 staging）一致——至少含：各模块双 EXE + manifest、templates 7 件、config 2 件、UI_API.md、task_layer/dist/README.md、PEEC_Solver.exe、geo2em.exe、交付说明（≥13 件）；
+3. 关键件 SHA256 与源文件（repo 或 staging）一致——至少含：各模块双 EXE + manifest、templates 7 件、config 2 件、UI_API.md、task_layer/dist/README.md、PEEC_Solver.exe、geo2msh.exe、交付说明（≥13 件）；
 4. in-zip 交付说明 == staging 文件（逐字节一致）；
 5. 改动文档 EOL 完好（LF 文档：CRLF = 0）。
 
@@ -84,6 +84,6 @@ Python `zipfile`（in-memory 读取 + SHA256；pwsh Compress-Archive 仅用于�
 
 ## 八、交付清单（给 UI 模块组的完整集合）
 
-1. `PEEC_Studio_YYYYMMDD_vX.Y.zip`——主包（39 条目，§二）；
-2. `docs_X.Y.zip`——平台文档包（当前 docs_1.5.zip，9 条目）：DATA_LAYOUT.md（**UI 必读**）/ MODULE_MANIFEST_SPEC.md / MODULE_ONBOARDING.md / DELIVERY_PACKAGE_SPEC.md / README.md / module.manifest.schema.json / REPACK×3（其余为参考）；
+1. `PEEC_Studio_YYYYMMDD_vX.Y.zip`——主包（37 条目，§二）；
+2. `docs_X.Y.zip`——平台文档包（当前 docs_1.6.zip，9 条目）：DATA_LAYOUT.md（**UI 必读**）/ MODULE_MANIFEST_SPEC.md / MODULE_ONBOARDING.md / DELIVERY_PACKAGE_SPEC.md / README.md / module.manifest.schema.json / REPACK×3（其余为参考）；
 3. `UI_HANDOFF_YYYYMMDD_vX.Y.md`——包外交接说明。

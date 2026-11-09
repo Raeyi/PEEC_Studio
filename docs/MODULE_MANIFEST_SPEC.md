@@ -1,6 +1,6 @@
 # 模块自描述契约规范（module.manifest.json）
 
-v1.2 · 2026-11-02 · 模块交付四件套之一（exe / README.md / ERROR_CODES.md / module.manifest.json），放模块包根目录，**模块团队维护**。v1.2 变更：对外 ref 端口类改名 `em/ports.def` → `em/source.def`、`thermal/ports.def` → `thermal/source.def`（路径对应 `Model/source_em.json` / `Model/source_thermal.json`）；新增预留 ref `em/boundary.def` / `thermal/boundary.def`（→ `Model/boundary_em.json` / `Model/boundary_thermal.json`，暂无消费方）；`defaultTemplate` 字段废止（templates/ 不再随包）。
+v1.3 · 2026-11-09 · 模块交付四件套之一（exe / README.md / ERROR_CODES.md / module.manifest.json），放模块包根目录，**模块团队维护**。v1.3 变更：§三 骨架与 §11.1/§11.2 示例更新至 gds2geo V1.2 r2（apiVersion 4 / 2 EXE / manifest 无 publishTo）与 compact_em v1.3（2026.11.04）；明确 publisher 落位双机制（manifest `publishTo` 或平台 `pipelines.json` 阶段条目 `publishes`，见 DATA_LAYOUT D7）。v1.2 变更：对外 ref 端口类改名 `em/ports.def` → `em/source.def`、`thermal/ports.def` → `thermal/source.def`（路径对应 `Model/source_em.json` / `Model/source_thermal.json`）；新增预留 ref `em/boundary.def` / `thermal/boundary.def`（→ `Model/boundary_em.json` / `Model/boundary_thermal.json`，暂无消费方）；`defaultTemplate` 字段废止（templates/ 不再随包）。
 机器校验：平台方提供 `docs/module.manifest.schema.json`（JSON Schema draft-07），模块团队可用任意 JSON Schema 校验器本地自查；task_layer 加载时按同一 schema 做结构校验。
 
 ## 一、职责切分
@@ -13,7 +13,7 @@ v1.2 · 2026-11-02 · 模块交付四件套之一（exe / README.md / ERROR_CODE
 | CLI 白名单（allowedArgs） | overrides 白名单校验 |
 | 退出码与 QS 码（ERROR_CODES.md） | 按 errorContract 归一 errorCode 并透传 |
 | 内部子阶段数据流（internal ref） | state.json 编排记录 + providers 版本快照 |
-| stage_receipt.json（可选自证） | publisher 执行 publishTo 复制（模块不搬文件） |
+| stage_receipt.json（可选自证） | publisher 执行正式件落位（manifest `publishTo` 或平台阶段条目 `publishes`；模块不搬文件） |
 
 **浅检/深检边界**：存在性/非空/schemaVersion 可读 → task_layer（依 manifest 机械执行）；格式正确性/物理一致性/数值有效性 → 模块自检并报自己的 QS 码。task_layer 不解析产物内容。
 
@@ -33,13 +33,13 @@ v1.2 · 2026-11-02 · 模块交付四件套之一（exe / README.md / ERROR_CODE
   // ── 身份与版本 ──
   "id": "gds2geo",              // [必填] providerId = 模块包目录名，全局唯一小写
   "name": "GDS2GEO 建模与网格",  // [必填]
-  "version": "2026.10.30",      // [必填] 交付批次（整包原子交付，子阶段不单独记版本）
-  "apiVersion": 1,              // [必填] 整数，判定规则见 §六
+  "version": "V1.2",               // [必填] 交付批次（整包原子交付，子阶段不单独记版本）
+  "apiVersion": 4,              // [必填] 整数，判定规则见 §六
   "minApiVersion": 1,           // [可选] 本模块可接受的最低上游 apiVersion
 
   // ── CLI ──
   "cli": {
-    "executables": ["gds2geo.exe", "geo_prepare.exe"],  // [必填] 随包 exe 清单
+    "executables": ["gds2geo.exe", "geo2msh.exe"],  // [必填] 随包 exe 清单
     "dataRootArg": "--data-root",   // [可选] 数据根参数名（R1；散参数设计可省略，由 argsTemplate 显式传路径）
     "deprecatedModes": []           // [可选] 仍保留的历史兼容模式声明（如 "no-arg-default"）
   },
@@ -47,17 +47,17 @@ v1.2 · 2026-11-02 · 模块交付四件套之一（exe / README.md / ERROR_CODE
   // ── 子阶段 ──
   "stages": [
     {
-      "id": "source",                    // [必填] = Result/<providerId>/<stageId>/ 目录名
+      "id": "em_geo",                    // [必填] = Result/<providerId>/<stageId>/ 目录名
       "executable": "gds2geo.exe",       // [必填] cli.executables 之一
       "argsTemplate": [                  // [必填] 命令模板
-        "--runtime-dir", "{runtimeDir}",
-        "source",
         "--gds", "{dataRoot}/Model/model.gds",
-        "--output-dir", "{dataRoot}/Result/gds2geo/source"
+        "--tech", "{dataRoot}/Model/model_info.csv",
+        "--target", "em",
+        "--output-dir", "{dataRoot}/Result/gds2geo/em_geo"  // msh 阶段另有 "--runtime-dir" "{runtimeDir}"（geo 阶段无）
       ],
       "allowedArgs": ["--top-cell"],     // [可选] UI 可覆盖参数白名单
       "optional": false,                 // [可选]
-      "exitCodes": { "0": "ok", "2": "input_or_config", "5": "execution" },  // [必填]
+      "exitCodes": { "0": "ok", "2": "input_or_configuration", "5": "execution_or_publication", "6": "internal" },  // [必填]（r2 geo 阶段含 6；msh 阶段 {0,2,5}）
       "errorContract": { "type": "none" } // [必填] none | qs-json-stderr
     }
   ],
@@ -66,10 +66,10 @@ v1.2 · 2026-11-02 · 模块交付四件套之一（exe / README.md / ERROR_CODE
   "artifacts": {
     "produced": [
       { "ref": "gds2geo/mesh.em",
-        "path": "Result/gds2geo/em/model_em.msh",   // [必填] 实际产出位置
+        "path": "Result/gds2geo/em_msh/model_em.msh",   // [必填] 实际产出位置
         "schemaVersion": "4",                           // [对外必填]
         "units": { "length": "mm" },                    // [可选]
-        "publishTo": "Model/model_em.msh" }             // [可选] 正式件落点（仅 Model//Setting/）
+        "publishTo": "Model/model_em.msh" }             // [可选] 正式件落点（仅 Model//Setting/；gds2geo V1.2 r2 起 manifest 不带此字段，落位改由平台阶段条目 publishes 声明）
     ],
     "consumed": [
       { "ref": "user/layout.gds",
@@ -83,7 +83,7 @@ v1.2 · 2026-11-02 · 模块交付四件套之一（exe / README.md / ERROR_CODE
   "dependsOn": {
     "modules": [],                                      // [可选] 上游 providerId
     "artifacts": ["user/layout.gds", "user/techfile"],  // [必填] 消费的全部对外 ref
-    "environment": { "gmsh": { "version": "4.11.1", "requiredBy": ["mesh_em"] } }  // [可选]
+    "environment": { "gmsh": { "version": "4.11.1", "requiredBy": ["em_msh", "thermal_msh"], "bundled": false, "environmentVariable": "GDS2GEO_GMSH_EXECUTABLE" } }  // [可选]
   },
 
   "capabilities": {
@@ -121,9 +121,9 @@ v1.2 · 2026-11-02 · 模块交付四件套之一（exe / README.md / ERROR_CODE
 子阶段间交接工件登记在 stage 上，位置限 `Result/<providerId>/<stageId>/` 自由区：
 
 ```jsonc
-{ "id": "prepare",
-  "consumesInternal": ["gds2geo/source.geo", "gds2geo/source.matdb"],
-  "producesInternal": ["gds2geo/prepared.em.geo", "gds2geo/prepared.matdb"] }
+{ "id": "em_msh",
+  "consumesInternal": ["gds2geo/prepared.em.geo", "gds2geo/prepared.em.json", "gds2geo/prepared.em.matdb"],
+  "producesInternal": ["gds2geo/mesh.em", "gds2geo/matdb.model"] }
 ```
 
 task_layer 不做 internal ref 存在性检查（深检归模块），用它做单模块多阶段调度依赖。**内部升级为对外**（补全 path/schemaVersion/accept 并进 artifacts.produced）→ apiVersion +1。
@@ -208,92 +208,114 @@ task_layer 不做 internal ref 存在性检查（深检归模块），用它做�
 
 ## 十一、示例
 
-### 11.1 gds2geo（节选）
+### 11.1 gds2geo V1.2 r2（节选，2026-11-07 交付 / 2026-11-09 集成；完整件以包内 manifest 为准）
 
 ```jsonc
 {
-  "manifestVersion": 1, "id": "gds2geo", "name": "GDS2GEO 建模与网格",
-  "version": "2026.10.30", "apiVersion": 1,
-  "cli": { "executables": ["gds2geo.exe", "geo_prepare.exe", "geo2em.exe", "geo2thermal.exe"],
-           "deprecatedModes": ["no-arg-default"] },
+  "manifestVersion": 1, "id": "gds2geo", "name": "GDS2GEO",
+  "version": "V1.2", "apiVersion": 4,
+  "cli": { "executables": ["gds2geo.exe", "geo2msh.exe"],
+           "deprecatedModes": ["no-argument mode using executable-relative settings/input/output",
+                               "gds2geo without --target (exact source only)",
+                               "geo2msh without --target (legacy dual bundle)"] },
   "stages": [
-    { "id": "source", "executable": "gds2geo.exe",
-      "argsTemplate": ["--runtime-dir", "{runtimeDir}", "source",
-                       "--gds", "{dataRoot}/Model/model.gds",
+    { "id": "em_geo", "executable": "gds2geo.exe",
+      "argsTemplate": ["--gds", "{dataRoot}/Model/model.gds",
                        "--tech", "{dataRoot}/Model/model_info.csv",
-                       "--output-dir", "{dataRoot}/Result/gds2geo/source"],
-      "allowedArgs": ["--top-cell", "--stack-mode"],
-      "exitCodes": { "0": "ok", "2": "input_or_config", "5": "execution" },
-      "errorContract": { "type": "none" } },
-    { "id": "mesh_em", "executable": "geo2em.exe",
+                       "--target", "em",
+                       "--output-dir", "{dataRoot}/Result/gds2geo/em_geo"],
+      "allowedArgs": [],
+      "exitCodes": { "0": "ok", "2": "input_or_configuration",
+                     "5": "execution_or_publication", "6": "internal" },
+      "errorContract": { "type": "none" },
+      "producesInternal": ["gds2geo/prepared.em.geo", "gds2geo/prepared.em.json",
+                           "gds2geo/prepared.em.matdb"] },
+    { "id": "em_msh", "executable": "geo2msh.exe",
       "argsTemplate": ["--runtime-dir", "{runtimeDir}",
-                       "--input-dir", "{dataRoot}/Result/gds2geo/prepared",
-                       "--output-dir", "{dataRoot}/Result/gds2geo/em"],
-      "exitCodes": { "0": "ok", "5": "execution" },
-      "errorContract": { "type": "none" } }
-    // prepare / mesh_thermal 同构，略
+                       "--target", "em",
+                       "--input-dir", "{dataRoot}/Result/gds2geo/em_geo",
+                       "--output-dir", "{dataRoot}/Result/gds2geo/em_msh"],
+      "allowedArgs": [],
+      "exitCodes": { "0": "ok", "2": "input_or_configuration",
+                     "5": "execution_or_publication" },
+      "errorContract": { "type": "none" },
+      "consumesInternal": ["gds2geo/prepared.em.geo", "gds2geo/prepared.em.json",
+                           "gds2geo/prepared.em.matdb"],
+      "producesInternal": ["gds2geo/mesh.em", "gds2geo/matdb.model"] }
+    // thermal_geo / thermal_msh 同构（--target thermal，目录 thermal_geo / thermal_msh），略
   ],
   "artifacts": {
     "produced": [
-      { "ref": "gds2geo/source.matdb", "path": "Result/gds2geo/source/matdb.json", "schemaVersion": "3" },
-      { "ref": "gds2geo/mesh.em", "path": "Result/gds2geo/em/model_em.msh",
-        "schemaVersion": "4", "units": { "length": "mm" }, "publishTo": "Model/model_em.msh" },
-      { "ref": "gds2geo/matdb.model", "path": "Result/gds2geo/em/matdb.json",
-        "schemaVersion": "3", "publishTo": "Model/matdb.json" }
+      // 共 10 件（geo 链每链 3：.geo/.json/matdb.json；msh 链每链 2：.msh/matdb.json）；
+      // r2 manifest 不含 publishTo —— 正式件落位由平台 pipelines.json 阶段条目 publishes 声明（DATA_LAYOUT D7 机制②）
+      { "ref": "gds2geo/prepared.em.geo", "stage": "em_geo",
+        "path": "Result/gds2geo/em_geo/model_em.geo", "schemaVersion": "3",
+        "units": { "length": "GDS layout user unit", "metersPerUnitField": "coordinates.dim" } },
+      { "ref": "gds2geo/mesh.em", "stage": "em_msh",
+        "path": "Result/gds2geo/em_msh/model_em.msh", "schemaVersion": "4",
+        "units": { "length": "mm" } },
+      { "ref": "gds2geo/matdb.model", "stage": "em_msh",
+        "path": "Result/gds2geo/em_msh/matdb.json", "schemaVersion": "3" }
+      // prepared.em.json / thermal 链 5 件（prepared.thermal.geo/.json/.matdb、mesh.thermal、matdb.thermal）同构，略
     ],
     "consumed": [
       { "ref": "user/layout.gds", "path": "Model/model.gds", "accept": { "extensions": [".gds"] } },
       { "ref": "user/techfile", "path": "Model/model_info.csv",
-        "accept": { "extensions": [".csv", ".xtf"], "oneOf": true } }
+        "accept": { "extensions": [".csv"] } }  // 工艺文件仅 CSV（profileTechnologyFormat = csv）
     ]
   },
   "dependsOn": { "modules": [], "artifacts": ["user/layout.gds", "user/techfile"],
-                 "environment": { "gmsh": { "version": "4.11.1", "requiredBy": ["mesh_em", "mesh_thermal"] } } },
+                 "environment": { "gmsh": { "version": "4.11.1", "bundled": false,
+                                            "requiredBy": ["em_msh", "thermal_msh"],
+                                            "environmentVariable": "GDS2GEO_GMSH_EXECUTABLE",
+                                            "platformTool": "tools/gmsh/gmsh.exe",
+                                            "resolutionOrder": ["gmsh.exe beside geo2msh.exe",
+                                                                 "absolute path in GDS2GEO_GMSH_EXECUTABLE",
+                                                                 "PATH"] } } },
   "capabilities": { "dataLayout": "peec-data/v1",
-                    "breakingChanges": [ { "version": "2026.10.30", "note": "热 receipt 升 schema 5" } ] }
+                    "breakingChanges": [
+      { "version": "V1.2",
+        "note": "This V1.2 two-executable release uses delivery API 3 and prepared target schema 3. Direct GDS2GEO replaces the former source/geo_prepare delivery stages. Each formal GEO uses the input GDS layout user unit and declares dim in meters per GEO coordinate unit. The matching GEO2MSH reads this contract and outputs MSH in mm. Each target keeps its own MATDB. EM mesh and material refs are gds2geo/mesh.em and gds2geo/matdb.model. Gmsh is provided by the platform." },
+      { "version": "V1.2",
+        "note": "Delivery API 4: MSH preserves all native CAD entities in dimensions 0/1/2/3, signed direct boundaries, native node classification and Point1/Line2/Tri3/Tet4 elements. Native unreferenced nodes are allowed. Consumers restricted to face/body entities or element types 2/4 must be adapted. CLI, artifact paths, GEO schema 3, MATDB schema 3, MSH 4.1 ASCII and mm coordinates are unchanged. Product/executable versions remain V1.2/1.2.0." } ],
+    "publicationPolicy": "Stage outputs stay in Result/gds2geo. If publication is configured by the host, use the mesh and MATDB from the same target and successful generation.",
+    "platformIntegration": "The host selects and dispatches the requested profile and native both calls. Platform registration and downstream artifact routing require separate integration." }
 }
 ```
-
-### 11.2 compact_em（节选）
+### 11.2 compact_em v1.3（节选，2026.11.04-v1.3 / 2026-11-05 集成；完整件以包内 manifest 为准）
 
 ```jsonc
 {
   "manifestVersion": 1, "id": "compact_em", "name": "Compact EM 电磁求解链",
-  "version": "2026.10.22", "apiVersion": 1,
-  "cli": { "executables": ["PEEC_Model_Extractor.exe", "PEEC_Solver.exe",
-                            "PEEC_S_Parameter_Plotter.exe", "PEEC_Post_Processing.exe"],
-           "dataRootArg": "--data-root" },
+  "version": "2026.11.04-v1.3", "apiVersion": 3,
+  "cli": {"executables":["PEEC_Model_Extractor.exe","PEEC_Solver.exe","PEEC_Post_Processing.exe"],"dataRootArg":"--data-root","deprecatedModes":["legacy-set-txt"]},
   "stages": [
     { "id": "extract", "executable": "PEEC_Model_Extractor.exe",
-      "argsTemplate": ["--data-root", "{dataRoot}", "--export", "post,report"],
-      "exitCodes": { "0": "ok", "1": "failure" },
-      "errorContract": { "type": "qs-json-stderr",
-                         "traceLog": "Result/logs/compact_em/Model_Extractor-{trace_id}.jsonl" } },
+      "argsTemplate": ["--data-root","{dataRoot}","--runtime-dir","{runtimeDir}","--export","post,report"],
+      "allowedArgs": ["--export"],
+      "exitCodes": {"0":"ok","1":"failure","2":"unhandled_exception"},
+      "errorContract": {"type":"qs-json-stderr","traceLog":"Result/logs/compact_em/Model_Extractor-{trace_id}.jsonl"} },
     { "id": "solve", "executable": "PEEC_Solver.exe",
-      "argsTemplate": ["--data-root", "{dataRoot}", "--export", "post,touchstone"],
-      "exitCodes": { "0": "ok", "1": "failure" },
-      "errorContract": { "type": "qs-json-stderr",
-                         "traceLog": "Result/logs/compact_em/Solver-{trace_id}.jsonl" } }
-    // plot / post 略
+      "argsTemplate": ["--data-root","{dataRoot}","--runtime-dir","{runtimeDir}","--export","post"],
+      "allowedArgs": ["--export","--s-columns","--post-freq-index","--post-port"],
+      "exitCodes": {"0":"ok","1":"failure"},
+      "errorContract": {"type":"qs-json-stderr","traceLog":"Result/logs/compact_em/Solver-{trace_id}.jsonl"} }
+    // post（可选，["--data-root","{dataRoot}","--runtime-dir","{runtimeDir}","--source-plots","j,qe,ve","--parts","mag"]；exitCodes 0/1，traceLog Post_Processing-{trace_id}.jsonl）略
   ],
   "artifacts": {
     "produced": [
-      { "ref": "compact_em/model.peec", "path": "Result/compact_em/extract/model.peec" },
-      { "ref": "compact_em/sp.csv", "path": "Result/compact_em/solve/S_parameter.csv" }
+      {"ref":"compact_em/model.peec","path":"Result/compact_em/extract/model.peec","schemaVersion":"1"},
+      {"ref":"compact_em/sp.csv","path":"Result/compact_em/solve/S_parameter.csv","schemaVersion":"1"}
     ],
     "consumed": [
-      { "ref": "gds2geo/mesh.em", "path": "Model/model_em.msh",
-        "accept": { "schemaVersion": { "min": 4, "max": 4 } } },
-      { "ref": "gds2geo/matdb.model", "path": "Model/matdb.json",
-        "accept": { "schemaVersion": { "min": 3, "max": 3 } } },
-      { "ref": "em/source.def", "path": "Model/source_em.json",
-        "maintainedBy": ["ui"],
-        "accept": { "fields": ["meshFile", "meshSha256", "triangleIds"] } },
-      { "ref": "user/solver.set", "path": "Setting/set_em.json" } // v1.3 起；v1.2 时代为 Setting/set.json
-    ]
+      {"ref":"gds2geo/mesh.em","path":"Model/model_em.msh","accept":{"extensions":[".msh"]}},
+      {"ref":"gds2geo/matdb.model","path":"Model/matdb.json","accept":{"schemaVersion":{"min":3,"max":3}}},
+      {"ref":"em/source.def","path":"Model/source_em.json","maintainedBy":["ui"],"accept":{"fields":["meshFile","meshSha256","ports"]}},
+      {"ref":"user/solver.set","path":"Setting/set_em.json","accept":{"schemaVersion":{"min":1,"max":1}}}
+    ]  // 设置件 set_em.json：v1.3 起唯一 JSON 设置名（set.txt 保留兼容并告警）
   },
-  "dependsOn": { "modules": ["gds2geo"],
-                 "artifacts": ["gds2geo/mesh.em", "gds2geo/matdb.model", "em/source.def", "user/solver.set"] },
-  "capabilities": { "dataLayout": "peec-data/v1", "breakingChanges": [] }
+  "dependsOn": { "modules": ["gds2geo"], "artifacts": ["gds2geo/mesh.em","gds2geo/matdb.model","em/source.def","user/solver.set"] },
+  "capabilities": { "dataLayout": "peec-data/v1",
+                    "breakingChanges": [{"version":"2026.10.30","note":"API 2: explicit dataRoot; per-stage output paths; port_em.json; flat set.json; optional receipts separated from mandatory internal artifact integrity."},{"version":"2026.11.02","note":"DATA_LAYOUT v1.2: Model/source_em.json replaces port_em.json; em/source.def replaces em/ports.def; defaultTemplate removed; examples and settings are delivered in a separate case package."},{"version":"2026.11.04-v1.3","note":"API 3 / DATA_LAYOUT v1.4 revision 1 EM requirements: Setting/set_em.json is the only accepted JSON settings name; deprecated set.txt remains supported with a warning. Old set.json artifact indexes are stale. The delivered stages/executables are extract, solve and post; the S-parameter Plotter and all Touchstone sNp exports (including legacy implicit export) are removed. Missing selected settings now report QS-FMT-SETTING-INVALID. The module directory contains only three executables, manifest, README and ERROR_CODES; schemas, technical notes and inventories are delivered outside it. This batch also includes the existing 2026-11-04 mainline PEC reference ground, real-system/memory optimizations and low-frequency full-charge accuracy fixes; differences from the 2026-11-02 numerical baseline are documented separately."}] }
 }
 ```

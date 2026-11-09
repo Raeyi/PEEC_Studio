@@ -435,3 +435,28 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
   docs/REPACK/thermal.md（第 3 轮）、docs/DATA_LAYOUT.md（v1.5 修订 3）。
   ⑥ **交付**：PEEC_Studio_20261106_v2.1.zip 重切（同版本号重发先例；含 thermal 1.0.7 + heater 算例 + 更新交付说明）。
   未改动任何模块 manifest（计划五不碰清单保持）。
+
+## 2026-11-09 gds2geo V1.2 r2 集成（publisher publishes 声明机制，增量改动）
+
+**模块**：gds2geo V1.2（GDS2GEO-V1.2-20261107-r2，2026-11-09 集成；manifest apiVersion 4，产品版本 V1.2 / EXE 1.2.0）。2 EXE（gds2geo.exe / geo2msh.exe）+ README / ERROR_CODES / manifest，共 5 文件；旧 4-EXE（gds2geo / geo_prepare / geo2em / geo2thermal）交付形态作废。
+
+**破坏性变更（vendor 声明）**：① 交付 API 3 + prepared target schema 3，Direct GDS2GEO 取代旧 source/geo_prepare 交付阶段；GEO 用 GDS 版图用户单位（dim = 每坐标单位米数），MSH 输出 mm；各 target 独立 MATDB；gmsh 由平台提供；② 交付 API 4：MSH 保留全部原生 CAD 实体（维度 0–3，Point1/Line2/Tri3/Tet4，可含未引用节点）；限制于 face/body 或元素 2/4 的消费方需适配（见 REPACK/compact_em.md 第 2 轮）。
+
+**布局**：`Result/gds2geo/` 重组为 em_geo / thermal_geo / em_msh / thermal_msh 四目录（10 件产物，receipt 取消）；两链 em_geo→mesh_em ∥ thermal_geo→mesh_thermal。
+
+**平台侧适配（增量，未改任何模块 manifest）**：
+- r2 manifest 取消 `produced[].publishTo`（vendor 声明：Platform registration and downstream artifact routing require separate integration；见 manifest `capabilities.publicationPolicy` / `capabilities.platformIntegration`）。正式件落位改由②平台 `pipelines.json` 阶段条目 `publishes` 声明（DATA_LAYOUT D7 机制②；`gds2geo/mesh.em → Model/model_em.msh`、`gds2geo/matdb.model → Model/matdb.json`，仅 EM 对）：
+  - PipelineLoader：解析阶段条目 `publishes`（ref→路径 字符串表）；
+  - ModuleRegistry：新增 `basePublishes` / `rebindDataRoot(..., publishOverrides)`（publishes 路径的 dataRoot 重绑定）；
+  - App.cpp：`publishOverridesOf(stage)` 收集阶段 publishes（pipeline 级 + local 覆盖级）并传入 3 处 publisher 重绑点；
+  - 语义：params / artifacts / publishes 均按键级合并、local 赢；两机制并存时 manifest publishTo 仍生效（thermal / compact_em 不变）。
+- `modules.json`：gds2geo 4 个模块键 gds.geo_em / gds.geo_thermal / gds.mesh_em / gds.mesh_thermal（旧 em.source / em.prepare 移除）；gmsh 仅注入 msh 阶段 env `GDS2GEO_GMSH_EXECUTABLE`。
+- `pipelines.json`：阶段库条目 gds.geo_em / gds.geo_thermal / em.mesh / em.mesh_thermal（库键 em.mesh / em.mesh_thermal 沿用 v2.1 名，module 绑定改为 gds.mesh_em / gds.mesh_thermal）；gds_full 流水线四阶段（geo_em / geo_thermal / mesh_em / mesh_thermal，两链）；thermal_basic 条目 `user/thermal.mesh` 路由 → `Result/gds2geo/thermal_msh/model_thermal.msh`。
+
+**验证（全绿）**：gds_full r2 E2E 10 件产物 + 2 Model/ 落位（sha 基线 `E:/code/_integ/r2regress/gds2geo_r2_baseline.json`）；PEEC 红线 S_parameter.csv 22,118 B 逐字节一致；thermal demo1_4.1 344.1037 K / 9564 行；heater 11/11 逐字节一致；gate 24/24；sel 22/22；rpc_smoke 8/8。
+
+**API-4 探针结论（→ REPACK）**：compact_em v1.3 标准输入拒绝 r2 em 网格的激励线元素（`QS-FMT-MSH-INVALID`，网格解析本身正常：608 点 / 1277 元素 / 2 材料）→ GDS 生成网格 → peec 全流阻塞，预烘焙网格算例不受影响（红线 PASS）；REPACK/compact_em.md 第 2 轮 + REPACK/gds2geo.md 第 3 轮已提交，待 vendor 回执。thermal 1.0.7 可正常解析 r2 热网格（8095 节点），探针失败系算例 boundary surface_ids 陈旧绑定（算例准备问题，非求解器缺陷）。
+
+**文档**：DATA_LAYOUT v1.6；MODULE_MANIFEST_SPEC v1.3（示例更新为 r2 / compact_em v1.3）；DELIVERY_PACKAGE_SPEC v1.1（主包 39→37 条目，gds2geo 7→5 文件）；UI_API.md / ERROR_CODES.md / 本 README 同步更新。
+
+未改动任何模块 manifest（计划五不碰清单保持）。
