@@ -1,8 +1,8 @@
 status SUCCESS
 model hybrid-thin-layer-mapped
-op0 C:\Users\18444\Desktop\AEDA\united_group\ThermalDelivery_1.0\thermal_cases_20261104\demo1_4.1\Model\thermal.op0
-mesh C:\Users\18444\Desktop\AEDA\united_group\ThermalDelivery_1.0\thermal_cases_20261104\demo1_4.1\Model\model_thermal.msh
-map C:\Users\18444\Desktop\AEDA\united_group\ThermalDelivery_1.0\thermal_cases_20261104\demo1_4.1\Result/thermal\extract/ThermalTemperatureMap.csv
+op0 E:\code\PEEC_Studio\_integ\p1baseline\th\Model\thermal.op0
+mesh E:\code\PEEC_Studio\_integ\p1baseline\th\Result\gds2geo\thermal_msh\model_thermal.msh
+map E:\code\PEEC_Studio\_integ\p1baseline\th\Result/thermal\extract/ThermalTemperatureMap.csv
 op0_temperature_count 12750
 mapped_temperature_count 9564
 mapping_weight_count 17878

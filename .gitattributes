@@ -1,0 +1,6 @@
+# 字节精确的夹具与密封模块包：禁用行尾转换（core.autocrlf=true 下
+# 保护案例数据指纹（meshSha256 绑定校验）与模块交付件字节一致）
+dev/cases/** binary
+freespace_em/** binary
+thermal/** binary
+gds2geo/** binary

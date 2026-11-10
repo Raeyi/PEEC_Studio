@@ -34,7 +34,7 @@
     }
   ],
   "schemaVersion": 2,
-  "meshFile": "Model/model_thermal.msh",
+  "meshFile": "Result/gds2geo/thermal_msh/model_thermal.msh",
   "meshSha256": "ebd53c3623f1b4f820875dffde0dc6fa8e2c3e801d9007f70a6cdb417f5b6e96",
   "thermal": {
     "name": "demo1_4.1",
