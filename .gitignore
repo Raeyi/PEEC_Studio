@@ -1,7 +1,15 @@
 # ===== 构建与打包产物 =====
 # task_layer 的编译输出与交付目录，都由脚本生成，不入库
 task_layer/build/
+task_layer/build_prefix/
 task_layer/dist/
+
+# ===== 验收/构建日志与临时证据（保留在盘上，不入仓） =====
+task_layer/*.log
+task_layer/validate_b.json
+_integ/
+switch_scratch/
+%SystemDrive%
 
 # ===== 编辑器 =====
 .vscode/
