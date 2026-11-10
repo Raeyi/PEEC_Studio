@@ -24,7 +24,7 @@
 | -32001 | TaskNotFound | taskId 不存在或已过期清理 | 刷新任务列表 |
 | -32002 | TaskAlreadyRunning | 已有任务在运行（当前单任务串行） | 禁用"开始"按钮，等 `task.finished` |
 | -32003 | InputInvalid | `inputs.validate` / `task.run` 输入校验失败 | 展示 `error.data.issues[]`（逐条路径+原因） |
-| -32004 | ConfigError | modules.json / pipelines.json 加载或 schema 失败（P2 起含加载期 fail-fast：阶段库未知 ref、`ref`/`module` 互斥、schemaVersion >= 3、阶段 params 键不在模块 `allowedArgs` 白名单；P3 起 `pipelines.local.json` 任何错误同样整文件拒载，错误带 `pipelines.local.json:` 前缀；serve 模式下启动即返回本错误并以退出码 2 结束） | 提示部署不完整，看 stderr |
+| -32004 | ConfigError | modules.json / pipelines.json 加载或 schema 失败（P2 起含加载期 fail-fast：阶段库未知 ref、`ref`/`module` 互斥、schemaVersion >= 3、阶段 params 键不在模块 `allowedArgs` 白名单；P3 起 `pipelines.local.json` 任何错误同样整文件拒载，错误带 `pipelines.local.json:` 前缀；serve 模式下启动即返回本错误并以退出码 2 结束；2026-11-10 起含执行前契约守卫拒绝：rebind 解析的契约路径越出 dataRoot 时 `task.run` / `inputs.validate` 直接拒绝，见 §2.7） | 提示部署不完整，看 stderr |
 | -32005 | ModuleExecFailed | 模块执行失败（`module.run` 同步返回时） | 展示 `error.data.errorCode` |
 
 ## 二、阶段层错误码（`QS-TL-*`）
@@ -89,6 +89,22 @@
 | （复用）overrides 白名单错误 | gate `values` 含 manifest `allowedArgs` 之外的键 → 整体拒绝（与 `task.run` overrides 同一校验路径与错误语义） | 是 | 按 `allowedArgs` 修正键名 |
 | `QS-TL-CANCEL`（复用） | 等待中 `task.cancel` / UI 断连 → 该阶段 Skipped，任务收尾 | 是 | 需要时重新运行 |
 
+### 2.7 执行前契约守卫（2026-11-10 起；来源 `ModuleRegistry.cpp` / `App.cpp`）
+
+任务启动时 `rebindDataRoot` 从相对模板重新展开各模块的 `outputChecks` / `publishes` 并做 dataRoot
+包含性检查（修复"切换工程后产物路径串用"缺陷：旧实现原地展开 + `isAbsolute()` 使契约在切换工程
+后冻结于首个 dataRoot）。解析后的契约路径落在当前 dataRoot 之外 → **执行前拒绝**（不创建任务、
+不启动阶段、无部分状态），错误经以下三条路径呈现：
+
+| errorCode | 触发条件 | 可恢复 | 处置 |
+| --- | --- | --- | --- |
+| `QS-TL-PATH-ESCAPE` | 模块的 `outputChecks` 或 `publishes` src/dst 经 rebind 后不落在当前 dataRoot 内（manifest / 流水线 artifacts 路由的相对路径解析越出 dataRoot；合法 manifest 不会触发——produced 受限于 `Result/<id>/` 下、publishTo 受限于 Model/ 或 Setting/ 前缀） | 否（配置错误） | 修正 manifest / 流水线 artifacts 路由；本码不出现在 `task.stage.finished`（拒绝发生在执行前，阶段未执行） |
+
+呈现路径（机器判别用 `QS-TL-PATH-ESCAPE` 字符串；人可读文本含越界路径与 dataRoot）：
+- `task.run`：RPC 错误 `-32004`（ErrConfig），`message` 含本码与越界路径；
+- `inputs.validate`：`valid:false`，`issues[]` 条目 `reason=QS-TL-PATH-ESCAPE`；
+- `run --pipeline` CLI：stdout `config error: ...`，退出码 2。
+
 ## 三、计算层错误码透传规则
 
 任务层**不重新定义**计算层错误码，只做两件事：提取 + 透传。
@@ -131,7 +147,7 @@
 | QS-TH-* | 由 thermal 产生并透传（qs-json-stderr，见 3.3） |
 | QS-TL-* | 任务层自有域，本表第二节为唯一登记处 |
 
-新增 `QS-TL-*` 码的流程：先在 `TaskOrchestrator.cpp` / `ModuleRunner.cpp` 落地实际抛出点，再回填本表（含触发条件、可恢复性、处置），最后同步 `UI_API.md` §6.2。禁止只改文档不改代码。
+新增 `QS-TL-*` 码的流程：先在 `TaskOrchestrator.cpp` / `ModuleRunner.cpp` / `App.cpp`（或注册表层）落地实际抛出点，再回填本表（含触发条件、可恢复性、处置），最后同步 `UI_API.md` §6.2。禁止只改文档不改代码。
 
 ## 五、边界说明
 

@@ -41,6 +41,8 @@ struct ModuleDef {
     int timeoutSec = 0;
     QStringList argsTemplate;        // 原始 argsTemplate（rebind 每次从此展开）
     QMap<QString, QString> consumedRefs;  // consumed ref -> 原始 POSIX 相对路径
+    QStringList outputChecksTemplate;       // 相对形态 outputChecks 快照（rebind 每次从此展开，不做原地冻结）
+    QVector<ModuleContract::PublishRule> publishesTemplate;  // 相对形态 publishes 快照（同上）
     QMap<QString, QString> env;          // 子进程环境变量（modules.json，值支持路径变量）
     QStringList allowedArgs;      // UI overrides 白名单（--key 形式）
     ModuleContract contract;
@@ -71,8 +73,12 @@ public:
     // 用给定 dataRoot 重新展开所有模块的 args / contract 路径（每个任务开始时调用）。
     // artifactOverrides：moduleId -> (ref -> dataRoot 相对路径)，流水线 stage 的
     // artifacts 字段在此注入，覆盖 manifest consumed 的默认位置（跨模块工件路由）。
-    void rebindDataRoot(const QString& dataRoot,
-                        const QMap<QString, QMap<QString, QString>>* artifactOverrides = nullptr);
+    // 契约产出路径（outputChecks / publishes）每次从相对模板重新展开；
+    // 任一解析到 dataRoot 之外时返回 false（error 写入详情），调用方须在执行前
+    // 拒绝（QS-TL-PATH-ESCAPE）。失败时未启动任何任务，不产生部分状态。
+    bool rebindDataRoot(const QString& dataRoot,
+                        const QMap<QString, QMap<QString, QString>>* artifactOverrides = nullptr,
+                        QString* error = nullptr);
 
 private:
     struct RoutingEntry {

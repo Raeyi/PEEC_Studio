@@ -18,6 +18,19 @@ QString toNative(const QString& posixPath, const QString& dataRoot)
     p.replace('/', QDir::separator());
     return QDir::cleanPath(p);
 }
+
+// 包含性守卫：绝对路径是否严格位于 dataRoot 之内（防契约路径越出数据根）。
+// 注意：入参 dataRoot 可能是 POSIX 正斜杠形态（App 侧归一化后传入），而
+// toNative 展开出的契约路径是系统反斜杠形态；QDir::cleanPath 不改变分隔符
+// 形态，两种形态直接比较会误报越界 —— 这里统一为 POSIX 形态再比较。
+bool pathWithinDataRoot(const QString& absPath, const QString& dataRoot)
+{
+    QString base = QDir::cleanPath(dataRoot).replace(QDir::separator(), '/');
+    QString p = QDir::cleanPath(absPath).replace(QDir::separator(), '/');
+    while (base.endsWith('/')) base.chop(1);
+    if (base.isEmpty() || p == base) return false;
+    return p.toLower().startsWith(base.toLower() + "/");
+}
 } // namespace
 
 bool ModuleRegistry::parseRouting(const QJsonObject& obj, QString* error)
@@ -196,6 +209,11 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
                     def.contract.publishes.append({a.path, a.publishTo});
             }
         }
+        // 模板快照：相对形态是唯一事实源，rebind 每次从这里重新展开。
+        //（修复"切换工程后产物路径串用"：旧实现原地展开并用 isAbsolute() 判定
+        //  "已展开"，第二次 rebind（切工程）跳过展开，契约冻结在首个任务的 dataRoot）
+        def.outputChecksTemplate = def.contract.outputChecks;
+        def.publishesTemplate = def.contract.publishes;
         m_modules.insert(moduleId, def);
     }
 
@@ -204,8 +222,9 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
     return !m_modules.isEmpty();
 }
 
-void ModuleRegistry::rebindDataRoot(const QString& dataRoot,
-                                    const QMap<QString, QMap<QString, QString>>* artifactOverrides)
+bool ModuleRegistry::rebindDataRoot(const QString& dataRoot,
+                                    const QMap<QString, QMap<QString, QString>>* artifactOverrides,
+                                    QString* error)
 {
     m_dataRoot = dataRoot;
     for (auto mit = m_modules.begin(); mit != m_modules.end(); ++mit) {
@@ -268,17 +287,40 @@ void ModuleRegistry::rebindDataRoot(const QString& dataRoot,
         QStringList req, chk;
         for (auto it = def.consumedRefs.constBegin(); it != def.consumedRefs.constEnd(); ++it)
             req << toNative(ov.contains(it.key()) ? ov.value(it.key()) : it.value(), dataRoot);
-        for (const QString& p : def.contract.outputChecks) {
-            if (QFileInfo(p).isAbsolute()) chk << p;
-            else chk << toNative(p, dataRoot);
-        }
         def.contract.requiredInputs = req;
+
+        // outputChecks / publishes：每次从相对模板重新展开（不再原地展开）：
+        // 旧实现原地展开并以 isAbsolute() 判"已展开"，第二次 rebind（切换工程）
+        // 跳过展开 → 契约冻结在首个 dataRoot，outputs/publish 串用旧工程。
+        for (const QString& p : def.outputChecksTemplate)
+            chk << toNative(p, dataRoot);
         def.contract.outputChecks = chk;
-        for (ModuleContract::PublishRule& pr : def.contract.publishes) {
-            if (!QFileInfo(pr.src).isAbsolute()) pr.src = toNative(pr.src, dataRoot);
-            if (!QFileInfo(pr.dst).isAbsolute()) pr.dst = toNative(pr.dst, dataRoot);
+        QVector<ModuleContract::PublishRule> pub;
+        pub.reserve(def.publishesTemplate.size());
+        for (const ModuleContract::PublishRule& tr : def.publishesTemplate)
+            pub.append({toNative(tr.src, dataRoot), toNative(tr.dst, dataRoot)});
+        def.contract.publishes = pub;
+
+        // 包含性守卫（纵深防御）：解析后的契约产出路径必须落在当前 dataRoot 内。
+        // 合法 manifest（produced 受限于 Result/<id>/ 下、publishTo 受限于 Model/ 或
+        // Setting/ 前缀）不会触发；仅异常包/路由触发，且在执行启动前即拒绝，
+        // 防止跨工程写（登记见 ERROR_CODES.md §2.7）。
+        for (const QString& p : def.contract.outputChecks) {
+            if (!pathWithinDataRoot(p, dataRoot)) {
+                if (error) *error = QStringLiteral("QS-TL-PATH-ESCAPE: module '%1' output path outside dataRoot: %2 (dataRoot=%3)")
+                                       .arg(def.id, p, dataRoot);
+                return false;
+            }
+        }
+        for (const ModuleContract::PublishRule& pr : def.contract.publishes) {
+            if (!pathWithinDataRoot(pr.src, dataRoot) || !pathWithinDataRoot(pr.dst, dataRoot)) {
+                if (error) *error = QStringLiteral("QS-TL-PATH-ESCAPE: module '%1' publish rule outside dataRoot: %2 -> %3 (dataRoot=%4)")
+                                       .arg(def.id, pr.src, pr.dst, dataRoot);
+                return false;
+            }
         }
     }
+    return true;
 }
 
 } // namespace task
