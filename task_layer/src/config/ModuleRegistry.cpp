@@ -13,16 +13,18 @@ namespace task {
 namespace {
 QString toNative(const QString& posixPath, const QString& dataRoot)
 {
-    // manifest 的 POSIX 相对路径 → 系统绝对路径
-    QString p = dataRoot + "/" + posixPath;
-    p.replace('/', QDir::separator());
-    return QDir::cleanPath(p);
+    // manifest 的 POSIX 相对路径 → 系统绝对路径（native 分隔符形态）。
+    // dataRoot 可能为 POSIX 正斜杠形态，先拼接后以 cleanPath 归一；注意
+    // QDir::cleanPath 返回 POSIX 形态（Windows 下把反斜杠转回正斜杠），
+    // 故最后统一以 toNativeSeparators 还原系统分隔符形态。
+    const QString p = dataRoot + "/" + posixPath;
+    return QDir::toNativeSeparators(QDir::cleanPath(p));
 }
 
 // 包含性守卫：绝对路径是否严格位于 dataRoot 之内（防契约路径越出数据根）。
 // 注意：入参 dataRoot 可能是 POSIX 正斜杠形态（App 侧归一化后传入），而
-// toNative 展开出的契约路径是系统反斜杠形态；QDir::cleanPath 不改变分隔符
-// 形态，两种形态直接比较会误报越界 —— 这里统一为 POSIX 形态再比较。
+// toNative 展开出的契约路径是系统反斜杠形态；两种形态直接比较会误报越界
+// —— 这里统一为 POSIX 形态再比较。
 bool pathWithinDataRoot(const QString& absPath, const QString& dataRoot)
 {
     QString base = QDir::cleanPath(dataRoot).replace(QDir::separator(), '/');
