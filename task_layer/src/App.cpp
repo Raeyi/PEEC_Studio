@@ -200,7 +200,12 @@ int App::runOnce(const QString& pipelineId, const QString& dataRoot,
     m_resolver.setInputs(inputs);
     const QMap<QString, QMap<QString, QString>> ov = artifactOverridesOf(*pipe);
     const QMap<QString, QMap<QString, QString>> pov = publishOverridesOf(*pipe);
-    m_registry.rebindDataRoot(root, &ov, &pov);   // 展开 args/契约路径（含 stage artifacts 路由 + 宿主 publishes）
+    QString rebindErr;
+    if (!m_registry.rebindDataRoot(root, &ov, &pov, &rebindErr)) {
+        QTextStream(stdout) << "config error: " << rebindErr << "\n";
+        return 2;
+    }
+    // args/契约路径已展开（含 stage artifacts 路由 + 宿主 publishes），包含性守卫已通过
     m_store.open(m_activeTaskDir, taskId, pipelineId);
     m_store.setInputs(m_resolver.resolvedInputs());
 
@@ -289,9 +294,21 @@ QJsonObject App::inspectInputs(const QString& dataRoot, const QString& pipelineI
         vpov = publishOverridesOf(*m_loader.pipeline(pipelineId),
                                   effective.isEmpty() ? nullptr : &effective);
     }
-    m_registry.rebindDataRoot(root, vov.isEmpty() ? nullptr : &vov,
-                              vpov.isEmpty() ? nullptr : &vpov);
-
+    QString rebindErr;
+    if (!m_registry.rebindDataRoot(root, vov.isEmpty() ? nullptr : &vov,
+                                   vpov.isEmpty() ? nullptr : &vpov,
+                                   &rebindErr)) {
+        // 包含性守卫触发（QS-TL-PATH-ESCAPE）：直接返回非 valid 体检报告，UI 原样展示 issue
+        QJsonArray issueArr;
+        issueArr.append(QJsonObject{{"path", rebindErr},
+                                    {"reason", QStringLiteral("QS-TL-PATH-ESCAPE")},
+                                    {"detail", QStringLiteral("resolved contract path outside current dataRoot")}});
+        return QJsonObject{{"valid", false},
+                           {"dataRoot", root},
+                           {"checked", QJsonArray()},
+                           {"issues", issueArr},
+                           {"warnings", QJsonArray()}};
+    }
     // 只校验"入口阶段"的输入契约：这是"这条流水线能否启动"的判据。
     // P1 带 selection 时：入口 = 选中且"依赖不都在选中集"的阶段（resume 已归一）；
     // 假定完成阶段的产出在 task.run 期由 resume 预检保证（validate 期不重复在盘核验）。
@@ -747,7 +764,15 @@ bool App::startTaskWith(const QJsonValue& id, const PipelineDef& pipe,
         artifactOverridesOf(pipe, sel.isFull() ? nullptr : &effSet);
     const QMap<QString, QMap<QString, QString>> pov =
         publishOverridesOf(pipe, sel.isFull() ? nullptr : &effSet);
-    m_registry.rebindDataRoot(root, &ov, &pov);
+    QString rebindErr;
+    if (!m_registry.rebindDataRoot(root, &ov, &pov, &rebindErr)) {
+        m_activeTaskId.clear();
+        m_activeDataRoot.clear();
+        m_activeTaskDir.clear();
+        m_activeInputs = QJsonObject();
+        m_transport->sendError(id, rpc::ErrConfig, rebindErr);
+        return false;
+    }
     // P1 子集入口依赖预检：选中阶段若依赖未选中上游，其产出契约必须已在盘上满足
     //（复用 optional 阶段的 requiredInputs + optionalInputs 存在性检查）→ 缺失拒绝启动。
     if (!sel.isFull()) {

@@ -447,7 +447,7 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
 **平台侧适配（增量，未改任何模块 manifest）**：
 - r2 manifest 取消 `produced[].publishTo`（vendor 声明：Platform registration and downstream artifact routing require separate integration；见 manifest `capabilities.publicationPolicy` / `capabilities.platformIntegration`）。正式件落位改由②平台 `pipelines.json` 阶段条目 `publishes` 声明（DATA_LAYOUT D7 机制②；`gds2geo/mesh.em → Model/model_em.msh`、`gds2geo/matdb.model → Model/matdb.json`，仅 EM 对）：
   - PipelineLoader：解析阶段条目 `publishes`（ref→路径 字符串表）；
-  - ModuleRegistry：新增 `basePublishes` / `rebindDataRoot(..., publishOverrides)`（publishes 路径的 dataRoot 重绑定）；
+  - ModuleRegistry：新增 `basePublishes` / `rebindDataRoot(..., publishOverrides)`（publishes 路径的 dataRoot 重绑定）；（2026-11-10 缺陷修复中 `basePublishes` 并入 `publishesTemplate` 快照机制，`rebindDataRoot` 增包含性守卫与 error 出参，见下条）
   - App.cpp：`publishOverridesOf(stage)` 收集阶段 publishes（pipeline 级 + local 覆盖级）并传入 3 处 publisher 重绑点；
   - 语义：params / artifacts / publishes 均按键级合并、local 赢；两机制并存时 manifest publishTo 仍生效（thermal / compact_em 不变）。
 - `modules.json`：gds2geo 4 个模块键 gds.geo_em / gds.geo_thermal / gds.mesh_em / gds.mesh_thermal（旧 em.source / em.prepare 移除）；gmsh 仅注入 msh 阶段 env `GDS2GEO_GMSH_EXECUTABLE`。
@@ -460,3 +460,27 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
 **文档**：DATA_LAYOUT v1.6；MODULE_MANIFEST_SPEC v1.3（示例更新为 r2 / compact_em v1.3）；DELIVERY_PACKAGE_SPEC v1.1（主包 39→37 条目，gds2geo 7→5 文件）；UI_API.md / ERROR_CODES.md / 本 README 同步更新。
 
 未改动任何模块 manifest（计划五不碰清单保持）。
+
+
+- 2026-11-10（缺陷修复：切换工程后产物路径串用；分支 `fix/project-switch-path-freeze`，基线 = 20261106 v2.1 发版切点）：
+  同一 serve 进程先跑工程 A 再跑工程 B 时，B 的 `stages[].outputs` / `resultFiles` 指向 A 的
+  `Result/`，B 的 `Model/` 发布件缺失（后端判 `done`、前端报"本次成功清单缺少必需产物"）。
+  根因：`ModuleRegistry::rebindDataRoot` 对 `outputChecks` / `publishes` src/dst **原地**展开，且以
+  `QFileInfo::isAbsolute()` 判"已展开"——第二次 rebind（切换工程）把已是绝对的路径当"已展开"跳过，
+  契约冻结在首个任务的 dataRoot（`args` 与 `requiredInputs` 每次都从模板重建，不受影响）。
+  ① `ModuleDef` 新增相对形态快照（`outputChecksTemplate` / `publishesTemplate`，加载期取自 manifest，
+  为唯一事实源），`rebindDataRoot` 每次经 `toNative` 重新展开（与 `argsTemplate` 同机制），不再原地展开；
+  ② 新增 dataRoot 包含性守卫（`pathWithinDataRoot`）：契约产出路径（outputChecks / publishes src/dst）
+  解析越出当前 dataRoot → rebind 返回 false，三个调用点均在**执行前**拒绝：`task.run` 返回
+  `-32004`（ErrConfig）且不创建任务、`inputs.validate` 返回 `valid:false`
+  （`reason=QS-TL-PATH-ESCAPE`）、`run` CLI 打 `config error:` 退出码 2。合法 manifest
+  （produced 受限于 `Result/<id>/` 下、publishTo 受限于 Model/ 或 Setting/ 前缀）不触发守卫——
+  纵深防御异常包/路由，非正常路径的阻断（P3 验收确认无误报）；
+  ③ publish 机制本身语义不变：发布失败仍按既有 `QS-TL-OUTPUT-MISSING` 判未完成（本缺陷
+  不新增 `task.stage.finished` 码，守卫码仅在执行前呈现）；
+  ④ 文档：ERROR_CODES.md 增 §2.7（QS-TL-PATH-ESCAPE 及三条呈现路径、"从不进 stage.finished"
+  说明）、-32004 行更新；UI_API.md §4.4 / §6 对应说明。
+  验收：`tools\project_switch_test.py`（v2.1 布局：同一 serve 进程 A→B→A，dataRoot 含中文+空格；
+  P1 旧版基线二进制复现（outputs/resultFiles 指向 A 根）、P2 B 的 outputs/resultFiles 全部在 B 根且
+  A 根 0 命中 + 发布件 SHA-256 相等 + A 树快照不变 + 删旧产物后重跑不复用、P3 守卫对合法 manifest
+  无误报）。未改动任何模块 manifest。

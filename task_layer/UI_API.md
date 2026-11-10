@@ -313,6 +313,10 @@ UI 应在点击"开始计算"前调用它，把 `issues` 直接展示给用户�
 
 注意：这是**静态输入检查**（文件存在性、source_em.json 与网格的 SHA-256 绑定等）。后端模块在运行中还会做自己的深度校验（格式、物理一致性等），失败时通过 `task.stage.finished` 的 `errorCode` 透传回来（见"六、错误码"与 [ERROR_CODES.md](ERROR_CODES.md)）。
 
+2026-11-10 起体检还包含**执行前契约守卫**：若模块解析后的契约产出路径（outputChecks / publishes）
+越出当前 dataRoot，返回 `valid:false`，`issues` 中 `reason=QS-TL-PATH-ESCAPE`（配置级错误；
+`task.run` 同样以 `-32004` 拒绝且不创建任务；合法 manifest 不会触发，见 ERROR_CODES.md §2.7）。
+
 ### 4.5 task.run（启动任务）
 
 ```json
@@ -578,7 +582,7 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 | -32001 | 任务不存在 | 刷新任务列表 |
 | -32002 | 已有任务在运行 | 禁用"开始"按钮，等 `task.finished` |
 | -32003 | 输入非法 | 展示 `error.data` 里的 `issues` |
-| -32004 | 配置错误（modules.json/pipelines.json 加载失败） | 提示部署不完整，看 stderr |
+| -32004 | 配置错误（modules.json/pipelines.json 加载失败；2026-11-10 起含执行前契约守卫拒绝：rebind 的契约路径越出 dataRoot 时 `task.run` 直接拒绝，`message` 含 `QS-TL-PATH-ESCAPE` + 越界路径） | 提示部署/配置异常，看 stderr / `message` |
 | -32005 | 模块执行失败 | 展示 `errorCode` |
 
 ### 6.2 阶段层（通知里的 `errorCode`）
@@ -605,6 +609,7 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 | `QS-TL-MOD-NOTCONFIGURED` | 内建动作未识别（internal 模块 command 配置错误） |
 | `QS-TL-WORKER-NOTFOUND` | DLL 模块的 worker_host 宿主未找到 |
 | `QS-TL-IO-JOB` | job JSON 写入失败（DLL 模块任务定义落盘失败） |
+| `QS-TL-PATH-ESCAPE` | 执行前契约守卫（2026-11-10）：模块 outputChecks / publishes 经 rebind 解析越出当前 dataRoot → `task.run` 以 -32004 直接拒绝（不创建任务）；`inputs.validate` 报本 issue。不出现在 `task.stage.finished` |
 | `QS-FMT-* / QS-SOLV-* / ...` | 计算层模块自身错误码，原样透传 |
 
 ---

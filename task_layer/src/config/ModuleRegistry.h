@@ -41,10 +41,12 @@ struct ModuleDef {
     int timeoutSec = 0;
     QStringList argsTemplate;        // 原始 argsTemplate（rebind 每次从此展开）
     QMap<QString, QString> consumedRefs;  // consumed ref -> 原始 POSIX 相对路径
+    QStringList outputChecksTemplate;       // 相对形态 outputChecks 快照（rebind 每次从此展开，不做原地冻结）
+    QVector<ModuleContract::PublishRule> publishesTemplate;  // 相对形态 publishes 快照（同上）
     QMap<QString, QString> env;          // 子进程环境变量（modules.json，值支持路径变量）
     QStringList allowedArgs;      // UI overrides 白名单（--key 形式）
     ModuleContract contract;
-    QVector<ModuleContract::PublishRule> basePublishes;  // manifest publishTo 基底（rebind 先重置再叠加宿主 publishes）
+
     QString errorType = "none";   // none | qs-json-stderr
     QString traceLog;
 };
@@ -74,10 +76,15 @@ public:
     // artifacts 字段在此注入，覆盖 manifest consumed 的默认位置（跨模块工件路由）。
     // publishOverrides：moduleId -> (produced ref -> Model/|Setting/ 正式件落点)，流水线 stage 的
     // publishes 字段在此注入（宿主侧发布声明：manifest 未带 publishTo 时由平台声明落位，
-    // 如 gds2geo r2 的 Model/ 网格+MATDB 配对发布）；先重置为 manifest 基底再叠加，逐次 rebind 幂等。
-    void rebindDataRoot(const QString& dataRoot,
+    // 如 gds2geo r2 的 Model/ 网格+MATDB 配对发布）；每次 rebind 从 manifest 模板重新
+    // 展开再叠加宿主声明，逐次幂等。
+    // 契约产出路径（outputChecks / publishes）每次从相对模板重新展开；
+    // 任一解析到 dataRoot 之外时返回 false（error 写入详情），调用方须在执行前
+    // 拒绝（QS-TL-PATH-ESCAPE）。失败时未启动任何任务，不产生部分状态。
+    bool rebindDataRoot(const QString& dataRoot,
                         const QMap<QString, QMap<QString, QString>>* artifactOverrides = nullptr,
-                        const QMap<QString, QMap<QString, QString>>* publishOverrides = nullptr);
+                        const QMap<QString, QMap<QString, QString>>* publishOverrides = nullptr,
+                        QString* error = nullptr);
 
 private:
     struct RoutingEntry {
