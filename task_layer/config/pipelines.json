@@ -53,6 +53,9 @@
       "name": "热路提取",
       "artifacts": {
         "user/thermal.mesh": "Result/gds2geo/thermal_msh/model_thermal.msh"
+      },
+      "publishes": {
+        "thermal/netlist.dc": "Model/ThermalNetList.sp"
       }
     },
     "thermal.post": {
