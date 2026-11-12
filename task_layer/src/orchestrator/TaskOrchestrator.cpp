@@ -273,8 +273,13 @@ bool TaskOrchestrator::isReady(const PipelineStage& s) const
     for (const QString& d : s.dependsOn) {
         const auto it = m_records.constFind(d);
         if (it == m_records.constEnd()) return false;
-        // 只有“真正跑完”的上游才能放行；被跳过/失败的上游会让下游无法满足输入契约
-        if (it->status != StageStatus::Done) return false;
+        if (it->status == StageStatus::Done) continue;
+        // 可选上游的 Skipped 视同放行：可选上游被跳过意味着它“不适用”（如输入件缺位的
+        // ALPS 阶段），主链继续；下游输入是否齐备由自身 requires/optionalInputs 门禁裁决
+        // （缺失 → SKIP-NOINPUT 干净跳过）。必需上游跳过/失败不在此放行：失败走
+        // DEP-BLOCKED，必需跳过由 propagateBlocked 统一标阻（2026-11-12 ALPS 集成轮）。
+        if (it->status == StageStatus::Skipped && stageIsOptional(d)) continue;
+        return false;
     }
     return true;
 }
@@ -504,6 +509,13 @@ QStringList TaskOrchestrator::missingFileInputs(const ModuleDef* def, const Pipe
     return missing;
 }
 
+bool TaskOrchestrator::stageIsOptional(const QString& stageId) const
+{
+    for (const PipelineStage& st : m_pipeline.stages)
+        if (st.id == stageId) return st.optional;
+    return false;
+}
+
 bool TaskOrchestrator::propagateBlocked()
 {
     bool any = false;
@@ -523,9 +535,16 @@ bool TaskOrchestrator::propagateBlocked()
                     break;
                 }
                 if (it->status == StageStatus::Skipped) {
-                    blockedBy = d;
-                    code = "QS-TL-DEP-SKIPPED";
-                    break;
+                    // 可选上游的跳过不阻断下游：下游输入是否齐备由自身 requires/optionalInputs
+                    // 门禁裁决（缺失 → QS-TL-SKIP-NOINPUT）；离线预置 op0 / 发布件落位等形态
+                    // 正是“可选上游跳过、下游照常执行”（2026-11-12 ALPS 集成轮：thermal_basic
+                    // 的 alps 缺件跳过时 post 用预置 Result/thermal/alps/thermal.op0 后处理）。
+                    // 必需上游跳过 = 链路不可行，照常阻断。
+                    if (!stageIsOptional(d)) {
+                        blockedBy = d;
+                        code = "QS-TL-DEP-SKIPPED";
+                        break;
+                    }
                 }
             }
             if (!blockedBy.isEmpty()) {

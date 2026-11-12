@@ -86,6 +86,9 @@ private:
     // 阶段磁盘输入契约检查：manifest requiredInputs（已解析绝对路径）+ 阶段 optionalInputs
     // （dataRoot 相对）；返回缺失文件列表（空 = 满足）。optional 跳过与 P1 入口复检共用。
     QStringList missingFileInputs(const ModuleDef* def, const PipelineStage& s) const;
+    // 给定 id 的阶段是否可选（查当前任务流水线定义）；供 propagateBlocked 用：
+    // 可选上游的 Skipped 不阻断下游，下游由自身输入门禁裁决（2026-11-12 ALPS 集成轮）
+    bool stageIsOptional(const QString& stageId) const;
 
     // P1.5 闸门检查：返回缺失项（"file:<相对路径>" / "confirm" / "input:<name>"；空 = 满足）
     QStringList gateMissing(const PipelineStage& s) const;
