@@ -25,6 +25,16 @@ schemaVersion 2 / thermal.op0（OP0 初值，vendor 独立稀疏求解合成补�
 max 500 K、min 293.145 K）。OP0 后处理仍严格校验映射节点温度齐备（不自动补全）；全流量/新案例
 仍须经案例导入脚本导入**自己的** OP0（导入目标 Model/thermal.op0，覆写本目录初值）。
 
+热链 1.0.9 布局（2026-11-12 集成，DATA_LAYOUT v1.7，v2.5.0_rc1）：**OP0 标准位置 = `Result/thermal/alps/thermal.op0`**
+（1.0.9 post `argsTemplate` 内置该路径为 `--op0`，显式 `--op0` 可覆盖，**无旧路径回退**；1.0.6/1.0.7 时代
+`Model/thermal.op0` 废止）。平台导入步骤（双通道）：流水线内 = thermal_basic 的 alps 阶段在 ALPS 运行完成后自动
+导入；独立通道 = JSON-RPC `alps.importOp0` / CLI `task_layer.exe alps-import-op0`；导入经 I7 三向新鲜度守卫
+（run_summary 8 项 + 网表三向 SHA）并在 OP0 旁写审计件 `import_receipt.json`。`thermal_basic` 重排为 3 阶段：
+extract →（可选）alps → post——alps 阶段 optional（缺 Setting/ALPSRunner.json 等输入 → `QS-TL-SKIP-NOINPUT`
+Skipped；可选上游 Skipped 不阻断下游，预置 OP0 时 post 直接运行）；extract 新发布公开网表 `Model/ThermalNetList.sp`
+（ALPS 输入，copy 语义）。全流量算例的 ALPS 运行配置 = `Setting/ALPSRunner.json` + `Setting/alpsrunner.key`
+（远端 SSH 配置，案例专属；本目录不含初值，demo1_4.1 案例包内含标准件）。
+
 ## 文件清单
 
 | 文件 | 时代 | 写者 | 说明 |
@@ -36,20 +46,23 @@ max 500 K、min 293.145 K）。OP0 后处理仍严格校验映射节点温度齐
 | Model/source_em.json | 全时代 | UI | EM 源定义（meshFile/meshSha256 + 端口 triangleIds） |
 | Model/source_thermal.json | 全时代（**初值 = 简化 schemaVersion 3，2026-11-06 vendor 标准**） | UI | 3 = 仅 sources（volume_ids 上 total_power，允许空数组 = 无热源；体材料按 mesh Physical 标签 + matdb.json 自动装配；无 thermal 提取对象、无 meshFile 绑定）；2 = 热源定义 + **thermal 提取对象**（四面体域/薄层/材料关联）+ meshFile（指向落位路径）+ SHA——全流量算例用，初值件已不再随包（格式见仓库 dev/cases/thermal/demo1_4.1 与 git 历史）；不含边界条件 |
 | Model/boundary_thermal.json | thermal 1.0.5 起（**初值 = schemaVersion 2，2026-11-06 vendor 标准**） | UI | 热边界条件，**必需输入**（经 --boundary 传入，SHA 入内部绑定）；schemaVersion 2 = default adiabatic + boundaries（fixed_temperature（任意面，含内部面；初值为 heater 面 3=500 K / 14=293.15 K）/ convection（h_W_m2K + ambient_temperature_K））；原 schemaVersion 1（default_external_boundary）仍可用；1.0.1 时代内嵌于 source_thermal.json |
-| Model/thermal.op0 | **初值新设（2026-11-06，vendor 标准）** | UI / 案例导入脚本 | OP0 初值（vendor 独立稀疏求解合成补齐的完整件，heater 标准；post 严格校验映射节点温度齐备，不自动补全）；全流量/新案例必须导入自己的 OP0（导入目标 = 本文件，覆写初值）；1.0.6 时代 OP0 为纯算例产物、本目录不提供初值，2026-11-06 起重切包起提供 |
+| Result/thermal/alps/thermal.op0 | **初值改址（2026-11-12，v1.7 / 1.0.9）** | UI / 平台导入步骤 | OP0 初值（heater 标准，vendor 独立稀疏求解合成补齐的完整件；post 严格校验映射节点温度齐备，不自动补全）；全流量/新案例自己的 OP0 由平台导入步骤导入（目标 = 本文件，覆写初值：流水线 alps 阶段 / 独立通道 `alps.importOp0` / CLI `alps-import-op0`）；1.0.6-1.0.8 时代初值在 `Model/thermal.op0`，2026-11-12 起重切包起改址本位置（1.0.9 无旧路径回退） |
+| ~~Model/thermal.op0~~ | ~~thermal 1.0.6-1.0.8 时代~~ | — | **已废止（v1.7，2026-11-12）**：OP0 标准位置改 `Result/thermal/alps/thermal.op0`（见上件）；本目录不再提供该位置初值 |
 
 （1.0.1 时代：boundary 字段内嵌于 source_thermal.json、无独立仿真设置文件；1.0.5 起按上表；1.0.6 起提取控制内嵌 source_thermal.json（schemaVersion 2），上表控制件行取消。1.0.5 的划分按用户最新指示实施，优先于 DATA_LAYOUT v1.3 上午的拆分文案。1.0.7 起 source 新增简化 schemaVersion 3（无 thermal 提取对象）、boundary 新增 schemaVersion 2（default adiabatic + boundaries，含内部面/对流）；程序按成对版本解析（2+1 或 3+2，错配 → 模块 exit 2）；最简单算例 = dev/cases/thermal/heater，**本目录 Model/ 初值即该标准（2026-11-06 起，vendor 案例包为准）**。）
 
 ## 使用流程
 
 **最简单算例（thermal 1.0.7 标准，无 GDS 流程）——初值即本目录 Model/（heater 标准）**：
-1. UI 建算例：拷本目录 Model/ 3 件（source_thermal.json / boundary_thermal.json /
-   thermal.op0）+ Setting/set_thermal.json + 案例自带 matdb.json（案例专属件，如 heater 案例包）到 <dataRoot>/；
+1. UI 建算例：拷本目录 Model/ 2 件（source_thermal.json / boundary_thermal.json）+
+   Result/thermal/alps/thermal.op0（OP0 初值）+ Setting/set_thermal.json + 案例自带 matdb.json（案例专属件，
+   如 heater 案例包）到 <dataRoot>/；
 2. 将算例的热网格（model_thermal.msh）放到 `Result/gds2geo/thermal/model_thermal.msh`（标准路由；
    schema 3 无 meshFile 绑定，无需回填 meshFile/meshSha256）；
 3. 若边界面 ID（初值 = heater 面 3/14）或材料与算例网格不一致，改 boundary_thermal.json 的
    surface_ids / 案例 matdb.json（初值仅示范格式，新模型须换实际值）；
-4. 跑 thermal_basic（2 阶段 extract → post；OP0 已随初值就绪，post 直接可跑）。
+4. 跑 thermal_basic（3 阶段 extract → alps → post；alps 阶段 optional——最简单算例无 ALPS 运行配置
+   （Setting/ALPSRunner.json），Skipped 且不阻断下游；OP0 已随初值就绪，post 直接可跑）。
    验收（heater 标准）：6089 节点 / 0 W / post 6089 数据行、max 500 K、min 293.145 K、
    MaximumTemperature.txt = 500。
 
@@ -70,7 +83,8 @@ max 500 K、min 293.145 K）。OP0 后处理仍严格校验映射节点温度齐
      （完整温度可视化需保留 V(*)）；
    - boundary_thermal.json：固定温度面 surface_entities 为新网格 Elementary ID（原 schemaVersion 1；
      1.0.7 起 schemaVersion 2：boundaries[].surface_ids 可为任意现有面（含内部面），另有对流边界）；
-   - thermal.op0：用户实际运行 ALPS 后经案例导入脚本导入（覆写本目录初值；post 才可跑）；
+   - thermal.op0：ALPS 运行完成后由平台导入步骤自动导入（流水线 alps 阶段，或独立通道 `alps.importOp0` /
+     CLI `alps-import-op0`；目标 = Result/thermal/alps/thermal.op0，覆写本目录初值；post 才可跑）；
 4. 跑 peec_basic / thermal_basic（OP0 就绪后 post 才可跑）。
 
 ## 注意
@@ -78,4 +92,5 @@ max 500 K、min 293.145 K）。OP0 后处理仍严格校验映射节点温度齐
 - 初值的面 ID（3/14）/ SHA / 端口 / 薄层参数等为 heater 标准（最简单算例）或取自 demo1_4.1 与
   compact_em standard 两个真实案例，仅示范格式；新模型必须全部替换为实际值；
 - 实体选择一律 Elementary ID（不是 Physical ID）；网格坐标 mm（DIM=1000）；
-- 字段规范以 DATA_LAYOUT §六/§八 为准；模板与契约版本对应关系见包内交付说明。
+- 字段规范以 DATA_LAYOUT §六/§八 为准（模板当前版对应 DATA_LAYOUT v1.7 / thermal 1.0.9，2026-11-12）；
+  模板与契约版本对应关系见包内交付说明。

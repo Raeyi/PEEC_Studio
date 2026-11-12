@@ -1,8 +1,9 @@
 # 打包交付规范（DELIVERY_PACKAGE_SPEC）
 
-版本：v1.4（2026-11-12）｜维护方：平台集成侧｜UI 模块组可对照 §二/§四 审查交付包
+版本：v1.5（2026-11-12）｜维护方：平台集成侧｜UI 模块组可对照 §二/§四 审查交付包
 修订（2026-11-12，用户确认）：§八 共享面修正 5→7 条目——REPACK 三模块轮次记录（compact_em / gds2geo / thermal）全保留入包；内务文档收窄为 DELIVERY_PACKAGE_SPEC.md + README.md 2 件。
-基线：PEEC_Studio_20261112_v2.5.0_rc（2026-11-12，42 条目，主包内容基线 2e4f146，v1.4 提交不动主包内容；task_layer exe 取 build 目录 2026-11-12 构建件）+ docs_1.6.zip（7 条目，v1.4 共享面 = 4 契约 + REPACK×3）
+修订（2026-11-12，ALPS 集成轮，用户确认 v2.5.0_rc1）：§二 白名单 42→46 条目——tools/alpsrunner/ 新增 4 件（ALPSRunner 1.1.2）；thermal 1.0.9（EXE 重交付，OP0 默认位置 → `Result/thermal/alps/thermal.op0`，无旧路径回退）；templates/ 初值 thermal.op0 改址 `Result/thermal/alps/thermal.op0`（件数仍 7）；§六/§八 计数同步；docs 共享包 → docs_1.7.zip（8 条目，+REPACK/alpsrunner.md）。
+基线：PEEC_Studio_20261112_v2.5.0_rc1（2026-11-12，46 条目，主包内容基线 = 分支 feature/alps-20261112 提交 0910b00，未合 main；task_layer exe = build 目录 ③b 终构建件 1,120,622 B）+ docs_1.7.zip（8 条目，v1.7 共享面 = 4 契约 + REPACK×4）
 
 ## 一、目的与范围
 
@@ -12,7 +13,7 @@
 
 **核心原则——白名单制：包内只允许出现 §二 所列文件；不在表内 = 不打包。**
 
-## 二、包内结构白名单（当前 42 条目）
+## 二、包内结构白名单（当前 46 条目）
 
 包根 = MODULE_ROOT。
 
@@ -21,11 +22,12 @@
 | 包根 | 给UI负责人的交付说明.md（唯一根文档；变更说明权威件，见 §五） | 1 |
 | compact_em/ | module.manifest.json / README.md / ERROR_CODES.md / PEEC_Model_Extractor.exe / PEEC_Solver.exe / PEEC_Post_Processing.exe / libiomp5md.dll（v1.4 起运行依赖，须与 EXE 同目录） | 7 |
 | gds2geo/ | module.manifest.json / README.md / ERROR_CODES.md / gds2geo.exe / geo2msh.exe / geoedit.exe / mshcheck.exe / mshfix.exe（1.3.0，2026-11-12 起；后三件为辅助命令，不接入平台流水线） | 8 |
-| thermal/ | module.manifest.json / README.md / ERROR_CODES.md / ThermalExtract.exe / TemperatureProcess.exe | 5 |
+| thermal/ | module.manifest.json / README.md / ERROR_CODES.md / ThermalExtract.exe / TemperatureProcess.exe（1.0.9，2026-11-12 起：apiVersion 8；OP0 默认位置 → `Result/thermal/alps/thermal.op0`（`--op0` 显式可覆盖，无旧路径回退）；post optional） | 5 |
 | tools/gmsh/ | gmsh.exe / gmsh-4.11.dll（平台共享工具区；模块包不含 gmsh；1.3.0 起 gmsh 4.11.1 精确匹配，gds 子进程 PATH 前置 tools/gmsh/） | 2 |
+| tools/alpsrunner/ | ALPSRunner.exe / module.manifest.json / README.md / ERROR_CODES.md（ALPS 远端仿真模块 1.1.2，2026-11-12 起；apiVersion 1，errorContract none → `QS-TL-MOD-EXEC`；`artifacts.produced` 空、无固定公开 OP0 / `publishTo`（§6.7 平台责任）；结果 OP0 由平台导入步骤落位 `Result/thermal/alps/thermal.op0`（流水线 alps 阶段 / 独立通道 `alps.importOp0` / CLI `alps-import-op0`）） | 4 |
 | task_layer/dist/ | task_layer.exe / README.md / UI_API.md / ERROR_CODES.md / Qt6Core.dll / libgcc_s_seh-1.dll / libstdc++-6.dll / libwinpthread-1.dll / bin/Qt6Core.dll / bin/worker_host.exe / config/modules.json / config/pipelines.json | 12 |
-| templates/ | README.md / Model/source_thermal.json / Model/boundary_thermal.json / Model/thermal.op0 / Model/source_em.json / Setting/set_thermal.json / Setting/set_em.json | 7 |
-| **合计** | | **42** |
+| templates/ | README.md / Model/source_thermal.json / Model/boundary_thermal.json / Model/source_em.json / Setting/set_thermal.json / Setting/set_em.json / Result/thermal/alps/thermal.op0（2026-11-12 起自 Model/thermal.op0 改址，DATA_LAYOUT v1.7） | 7 |
+| **合计** | | **46** |
 
 注：
 - 模块 EXE 清单以该模块当前版 module.manifest.json 为准（如 compact_em v1.3 起不含绘图 EXE）；构成变化时同步更新本表与 §六 验证计数；
@@ -68,9 +70,9 @@ Staging 目录 `E:\code\PEEC_Studio_YYYYMMDD`（日期 = 交付批次日），�
 
 Python `zipfile`（in-memory 读取 + SHA256；pwsh Compress-Archive 仅用于切包，验证必须走 Python）：
 
-1. 条目数 = §二 白名单计数（当前 **42**）；
+1. 条目数 = §二 白名单计数（当前 **46**）；
 2. §四 负面清单零命中（*.bak / __pycache__ / .git / Result / cases / .locks 等逐一检查）；
-3. 关键件 SHA256 与源文件（repo 或 staging）一致——至少含：各模块双 EXE + manifest、templates 7 件、config 2 件、UI_API.md、task_layer/dist/README.md、PEEC_Solver.exe、geo2msh.exe、交付说明（≥13 件）；
+3. 关键件 SHA256 与源文件（repo 或 staging）一致——至少含：各模块双 EXE + manifest（alpsrunner 单 EXE + manifest 同口径）、templates 7 件、config 2 件、UI_API.md、task_layer/dist/README.md、PEEC_Solver.exe、geo2msh.exe、ALPSRunner.exe、交付说明（≥14 件）；
 4. in-zip 交付说明 == staging 文件（逐字节一致）；
 5. 改动文档 EOL 完好（LF 文档：CRLF = 0）。
 
@@ -86,12 +88,12 @@ Python `zipfile`（in-memory 读取 + SHA256；pwsh Compress-Archive 仅用于�
 
 ## 八、交付清单（给 UI 模块组的完整集合）
 
-1. `PEEC_Studio_YYYYMMDD_vX.Y.Z.zip`——主包（42 条目，§二）；
-2. `docs_X.Y.zip`——平台契约文档包（当前 docs_1.6.zip，**7 条目**，2026-11-12 v1.4 收窄）：DATA_LAYOUT.md（**UI 必读**）/ MODULE_MANIFEST_SPEC.md / MODULE_ONBOARDING.md / module.manifest.schema.json / REPACK/compact_em.md / REPACK/gds2geo.md / REPACK/thermal.md（三模块重打包轮次记录，UI 侧参照）；
+1. `PEEC_Studio_YYYYMMDD_vX.Y.Z.zip`——主包（46 条目，§二）；
+2. `docs_X.Y.zip`——平台契约文档包（当前 docs_1.7.zip，**8 条目**，2026-11-12 v1.7 重切）：DATA_LAYOUT.md（**UI 必读**）/ MODULE_MANIFEST_SPEC.md / MODULE_ONBOARDING.md / module.manifest.schema.json / REPACK/alpsrunner.md / REPACK/compact_em.md / REPACK/gds2geo.md / REPACK/thermal.md（四模块重打包轮次记录，UI 侧参照）；
 3. `UI_HANDOFF_YYYYMMDD_vX.Y.md`——包外交接说明。
 
 **共享面收窄与版本/指纹规则（v1.4，2026-11-12，用户确认）：**
-- 共享包只收**纯契约**文档（UI / 平台两侧实际以代码实现的：DATA_LAYOUT / MODULE_MANIFEST_SPEC / MODULE_ONBOARDING / module.manifest.schema.json）+ REPACK×3（compact_em / gds2geo / thermal 三模块重打包轮次记录，同类件全保留，用户确认）；
+- 共享包只收**纯契约**文档（UI / 平台两侧实际以代码实现的：DATA_LAYOUT / MODULE_MANIFEST_SPEC / MODULE_ONBOARDING / module.manifest.schema.json）+ REPACK 轮次记录（2026-11-12 ALPS 集成轮起 = ×4：compact_em / gds2geo / thermal / alpsrunner 四模块，同类件全保留，用户确认；v1.4 时代为 ×3）；
 - **平台内务文档**（不再随共享包交付，留存仓库 docs/，经主包交付说明 / UI_HANDOFF 承载）：DELIVERY_PACKAGE_SPEC.md（本文件）、README.md（文档索引与「当前最新」行）；
 - **版本号规则**：包名 `docs_X.Y.zip` 的 X.Y = **DATA_LAYOUT 版本**；仅当共享面契约变化（DATA_LAYOUT / MODULE_MANIFEST_SPEC / MODULE_ONBOARDING / module.manifest.schema.json 任一内容变化）才重切共享包，DATA_LAYOUT 升版时包名同步变更；SPEC 升版、REPACK 轮次收口、README 当前行等内务变化**不触发共享包重切、不升版本**；
 - **指纹规则**：每次共享包重切记录 **SHA256 指纹**（整包 + 逐件）三处——切包 manifest（`docs_X.Y_YYYYMMDD_sha256.txt`）、UI_HANDOFF、交付说明（行式「docs 包：不变 / 重切（zip sha16，变化项）」）；消费方按指纹对账判新旧：**指纹不变 = 无需动作，变了 = 读变化项**，不以包名/版本号猜新旧。
