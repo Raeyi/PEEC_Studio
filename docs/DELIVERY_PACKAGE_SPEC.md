@@ -1,7 +1,7 @@
 # 打包交付规范（DELIVERY_PACKAGE_SPEC）
 
-版本：v1.1（2026-11-09）｜维护方：平台集成侧｜UI 模块组可对照 §二/§四 审查交付包
-基线：PEEC_Studio_20261109_v2.2（2026-11-09，37 条目）+ docs_1.6.zip（9 条目）
+版本：v1.2（2026-11-11）｜维护方：平台集成侧｜UI 模块组可对照 §二/§四 审查交付包
+基线：PEEC_Studio_20261111_v2.5.0（2026-11-11，37 条目，仓库基线 0ccbdc0）+ docs_1.6.zip（9 条目）
 
 ## 一、目的与范围
 
@@ -60,7 +60,7 @@ Staging 目录 `E:\code\PEEC_Studio_YYYYMMDD`（日期 = 交付批次日），�
    - 头部"修订（日期，版本）：…"每正式版本一行；
    - "**重切（日期，同版，说明）：①…②…③…**"块——**每次重切必加**，编号条目按需覆盖：模块版本变化 / 契约与布局变化 / templates 初值变化 / EXE 变化 / 回归结果（字节对比基线）/ flags（已知问题与影响）；
    - §二 本版变更、§六 UI 适配要点 常新——**UI 需要动作的事项集中在 §六**。
-2. **UI_HANDOFF_YYYYMMDD_vX.Y.md（包外）**——批次工作交接件；与 in-zip 交付说明不一致时以 in-zip 为准；
+2. **UI_HANDOFF_YYYYMMDD_vX.Y.Z.md（包外）**——批次工作交接件；与 in-zip 交付说明不一致时以 in-zip 为准；
 3. **包内各 README / UI_API.md / ERROR_CODES.md**——对应侧契约变化（协议 / 流水线 / 输入格式 / 错误码）时必须与交付说明同批同步，口径一致。
 
 ## 六、切包前验证（强制 gate，全过方可切包）
@@ -77,13 +77,13 @@ Python `zipfile`（in-memory 读取 + SHA256；pwsh Compress-Archive 仅用于�
 
 ## 七、版本与重切规则
 
-- 命名 `PEEC_Studio_YYYYMMDD_vX.Y.zip`：日期 = 该版本最终构建日；X.Y = 交付包版本（重打 +0.1、大能力 +1.0，详见 docs/README.md §四）；
+- 命名 `PEEC_Studio_YYYYMMDD_vX.Y.Z.zip`：日期 = 该版本最终构建日；**X.Y.Z = 三段版本号（2026-11-11 起，v2.5 线生效）**——X = 平台大能力 / 契约大版本，Y = 功能线 / 里程碑，Z = 线内重切序号（每次重切 Z+1，不再每次重切消耗 Y）；「定版 / 正式发布」= 当时的最高 Z，交付时显式宣告（如「v2.5 线定版 = v2.5.3」）。v2.1–v2.4 为旧规则（重打 +0.1）编号，历史件不改名；
 - **同版重切**（当日修正）：zip 同名覆盖，**交付说明头部追加一个重切块**（编号条目），并明示旧版"已被本版替代，如已获取请作废"；
 - 跨版本：新 zip 新名，交付说明头部"上一版"指向前版；
 - **交付版本被替代后，旧件必须显式作废（交付说明注明或口头交接），防止 UI 侧误用旧版。**
 
 ## 八、交付清单（给 UI 模块组的完整集合）
 
-1. `PEEC_Studio_YYYYMMDD_vX.Y.zip`——主包（37 条目，§二）；
+1. `PEEC_Studio_YYYYMMDD_vX.Y.Z.zip`——主包（37 条目，§二）；
 2. `docs_X.Y.zip`——平台文档包（当前 docs_1.6.zip，9 条目）：DATA_LAYOUT.md（**UI 必读**）/ MODULE_MANIFEST_SPEC.md / MODULE_ONBOARDING.md / DELIVERY_PACKAGE_SPEC.md / README.md / module.manifest.schema.json / REPACK×3（其余为参考）；
 3. `UI_HANDOFF_YYYYMMDD_vX.Y.md`——包外交接说明。
