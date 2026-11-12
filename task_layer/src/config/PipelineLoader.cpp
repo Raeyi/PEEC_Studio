@@ -164,6 +164,21 @@ bool PipelineLoader::parseStageLib(const QString& ref, const QJsonObject& obj, Q
         lib.userGate = gv.toObject();
         if (!validateUserGate(lib.userGate, ctx, error)) return false;
     }
+    // ALPS 结果导入声明（2026-11-12 ALPS 集成，可选键）：{"to":"Result/..."} = OP0 固定落位点
+    const QJsonValue oiv = obj.value("op0Import");
+    if (!oiv.isUndefined() && !oiv.isNull()) {
+        if (!oiv.isObject()) {
+            if (error) *error = ctx + ": op0Import must be an object";
+            return false;
+        }
+        lib.op0Import = oiv.toObject();
+        const QString to = lib.op0Import.value("to").toString();
+        if (to.isEmpty() ||
+            !(to.startsWith("Result/") || to.startsWith("Model/") || to.startsWith("Setting/"))) {
+            if (error) *error = ctx + ": op0Import.to must be a non-empty path under Model/|Setting/|Result/";
+            return false;
+        }
+    }
     m_stageLib.insert(ref, lib);
     return true;
 }
@@ -233,6 +248,22 @@ bool PipelineLoader::parsePipeline(const QString& id, const QJsonObject& obj, QS
             const QJsonObject lpubs = so.value("publishes").toObject();
             for (auto pit = lpubs.constBegin(); pit != lpubs.constEnd(); ++pit)
                 s.publishes.insert(pit.key(), pit.value().toString());
+            // op0Import：库定义为默认，本地有则整对象赢（同 optional 语义）
+            s.op0Import = lib->op0Import;
+            if (so.contains("op0Import")) {
+                const QJsonValue lo = so.value("op0Import");
+                if (!lo.isObject()) {
+                    *error = QString("pipeline '%1': stage '%2': op0Import must be an object").arg(id, s.id);
+                    return false;
+                }
+                s.op0Import = lo.toObject();
+                const QString to = s.op0Import.value("to").toString();
+                if (to.isEmpty() ||
+                    !(to.startsWith("Result/") || to.startsWith("Model/") || to.startsWith("Setting/"))) {
+                    *error = QString("pipeline '%1': stage '%2': op0Import.to must be under Model/|Setting/|Result/").arg(id, s.id);
+                    return false;
+                }
+            }
             // userGate：库定义为默认，本地可 extends（新增键）；库级闸门键不可被本地覆盖/取消
             s.userGate = lib->userGate;
             const QJsonValue lg = so.value("userGate");
@@ -274,6 +305,21 @@ bool PipelineLoader::parsePipeline(const QString& id, const QJsonObject& obj, QS
                 if (!validateUserGate(s.userGate,
                                       QString("pipeline '%1': stage '%2'").arg(id, s.id), error))
                     return false;
+            }
+            // ALPS 结果导入声明（v1 内联形态，可选键）
+            const QJsonValue oiv2 = so.value("op0Import");
+            if (!oiv2.isUndefined() && !oiv2.isNull()) {
+                if (!oiv2.isObject()) {
+                    *error = QString("pipeline '%1': stage '%2': op0Import must be an object").arg(id, s.id);
+                    return false;
+                }
+                s.op0Import = oiv2.toObject();
+                const QString to = s.op0Import.value("to").toString();
+                if (to.isEmpty() ||
+                    !(to.startsWith("Result/") || to.startsWith("Model/") || to.startsWith("Setting/"))) {
+                    *error = QString("pipeline '%1': stage '%2': op0Import.to must be under Model/|Setting/|Result/").arg(id, s.id);
+                    return false;
+                }
             }
         }
 

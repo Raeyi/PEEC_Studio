@@ -109,6 +109,9 @@ private:
 
     QMap<QString, StageRecord> m_records;      // stageId -> 运行记录
     QMap<QString, ModuleRunner*> m_running;    // stageId -> 正在运行的 runner
+    // ALPS 结果导入（2026-11-12）：op0Import 阶段 launch 前的 run bundle 目录快照
+    // （stageId -> listRunBundles(dataRoot)）；onStageFinished 用前后 diff 定位本次新增 run
+    QMap<QString, QStringList> m_alpsPreRun;
     QVector<PipelineStage> m_pending;          // 尚未就绪的阶段
     int m_maxParallel = 1;
     bool m_cancelled = false;

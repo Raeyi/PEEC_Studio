@@ -87,7 +87,7 @@ else {
             "src\main.cpp", "src\App.cpp",
             "src\config\ModuleRegistry.cpp", "src\config\ModuleManifest.cpp",
             "src\config\PipelineLoader.cpp",
-            "src\io\InputValidator.cpp", "src\io\ResultStore.cpp",
+            "src\io\AlpsImport.cpp", "src\io\InputValidator.cpp", "src\io\ResultStore.cpp",
             "src\modules\ModuleRunner.cpp", "src\orchestrator\TaskOrchestrator.cpp",
             "src\rpc\StdioTransport.cpp"
         )

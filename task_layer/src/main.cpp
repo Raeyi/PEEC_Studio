@@ -4,6 +4,7 @@
 //   task_layer.exe run --pipeline <id> --data-root <dir> [--k v ...]             # 单次执行
 //   task_layer.exe validate --data-root <dir> [--pipeline <id>]                  # 输入校验
 //   task_layer.exe modules / pipelines                                           # 列出注册表
+//   task_layer.exe alps-import-op0 --data-root <dir> --run-dir <name> [--op0-dest <rel>]  # 导入 ALPS run bundle OP0（独立通道）
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QDir>
@@ -13,6 +14,7 @@
 #include <QTextStream>
 
 #include "App.h"
+#include "io/AlpsImport.h"
 
 using namespace task;
 
@@ -56,18 +58,22 @@ int main(int argc, char* argv[])
     parser.setApplicationDescription("QS-PEEC Studio task layer: orchestration, module routing, state management");
     parser.addHelpOption();
     parser.addVersionOption();
-    parser.addPositionalArgument("command", "serve | run | validate | modules | pipelines");
+    parser.addPositionalArgument("command", "serve | run | validate | modules | pipelines | alps-import-op0");
 
     QCommandLineOption configOpt({"c", "config"}, "config directory (modules.json + pipelines.json)", "dir");
     QCommandLineOption binOpt({"b", "bin"}, "backend bin directory (worker_host.exe, modules/)", "dir");
     QCommandLineOption moduleRootOpt("module-root", "module root: dir containing the module projects (default: parent of config dir)", "dir");
     QCommandLineOption dataOpt("data-root", "case data root directory (contains Model/Setting/Result)", "dir");
     QCommandLineOption pipelineOpt("pipeline", "pipeline id", "id");
+    QCommandLineOption runDirOpt("run-dir", "ALPS run bundle dir (name or path under Result/alpsrunner/simulate/)", "name");
+    QCommandLineOption op0DestOpt("op0-dest", "OP0 landing point, dataRoot-relative (default: Result/thermal/alps/thermal.op0)", "rel");
     parser.addOption(configOpt);
     parser.addOption(binOpt);
     parser.addOption(moduleRootOpt);
     parser.addOption(dataOpt);
     parser.addOption(pipelineOpt);
+    parser.addOption(runDirOpt);
+    parser.addOption(op0DestOpt);
     parser.process(app);
 
     const QStringList args = parser.positionalArguments();
@@ -164,6 +170,31 @@ int main(int argc, char* argv[])
                     out << "  - " << s.id << "\t" << s.moduleId << (s.optional ? "\t(optional)" : "") << "\n";
             }
         }
+        out.flush();
+        return 0;
+    }
+
+    if (cmd == "alps-import-op0") {
+        // ALPS 结果导入独立通道（2026-11-12）：与 JSON-RPC alps.importOp0 共用
+        // task::alps::importFromRunDir（runSummary 门 + SHA256SUMS 复核 + 三向新鲜度
+        // 守卫 + OP0 落位 + import_receipt.json 留痕）。不依赖任务运行，用于补跑、
+        // 人工导入与算例迁移。
+        const QString dataRoot = parser.value(dataOpt);
+        const QString runDir = parser.value(runDirOpt);
+        if (dataRoot.isEmpty() || runDir.trimmed().isEmpty()) {
+            QTextStream(stdout) << "alps-import-op0 requires --data-root and --run-dir\n";
+            return 2;
+        }
+        const QString root = QDir::cleanPath(QFileInfo(dataRoot).absoluteFilePath());
+        const alps::ImportResult ir = alps::importFromRunDir(
+            root, runDir, parser.value(op0DestOpt), "manual");
+        if (!ir.ok) {
+            QTextStream(stderr) << ir.errorCode << ": " << ir.errorMessage << "\n";
+            return 2;
+        }
+        QJsonObject receipt = ir.receipt;
+        QTextStream out(stdout);
+        out << QJsonDocument(receipt).toJson(QJsonDocument::Indented);
         out.flush();
         return 0;
     }

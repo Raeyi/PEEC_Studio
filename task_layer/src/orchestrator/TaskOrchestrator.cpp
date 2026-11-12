@@ -5,6 +5,8 @@
 #include <QFileInfo>
 #include <QJsonArray>
 
+#include "io/AlpsImport.h"
+
 namespace task {
 
 namespace {
@@ -16,6 +18,15 @@ struct PumpGuard {
     explicit PumpGuard(bool& f) : flag(f) { flag = true; }
     ~PumpGuard() { flag = false; }
 };
+
+// 相对路径（POSIX 分隔符）-> dataRoot 下原生绝对路径（与 ModuleRegistry.cpp 的 toNative 同语义；
+// 该助手是文件局部的，此处复刻一份供 ALPS 导入日志使用）
+QString nativeRel(const QString& dataRoot, const QString& relPosix)
+{
+    QString p = QDir::cleanPath(dataRoot + "/" + relPosix);
+    p.replace('/', QDir::separator());
+    return p;
+}
 } // namespace
 
 bool TaskOrchestrator::startTask(const QString& taskId, const PipelineDef& pipeline,
@@ -41,6 +52,7 @@ bool TaskOrchestrator::startTask(const QString& taskId, const PipelineDef& pipel
     m_startMs = QDateTime::currentMSecsSinceEpoch();
     m_records.clear();
     m_running.clear();
+    m_alpsPreRun.clear();
     m_pending = pipeline.stages;
     m_busy = true;
 
@@ -440,6 +452,12 @@ bool TaskOrchestrator::launchStage(const PipelineStage& s)
             this, &TaskOrchestrator::onStageFinished);
     m_running.insert(s.id, runner);
 
+    // ALPS 结果导入（2026-11-12）：launch 前对 run bundle 子目录做前置快照——
+    // onStageFinished 用前后 diff 定位本次新增 run 目录（runner 退出 0 但未产生新 run
+    // 目录时按失败处理，禁止猜测"最近一次"）
+    if (!s.op0Import.isEmpty())
+        m_alpsPreRun.insert(s.id, alps::listRunBundles(m_dataRoot));
+
     QStringList extraArgs;
     // P2 阶段 params（阶段库 + 本地物化结果）：按 "--key value" 追加；
     // 顺序 = params（配置级）→ overrides（任务级）→ 闸门值（运行级），同键时
@@ -542,18 +560,53 @@ void TaskOrchestrator::onStageFinished(const QString& stageId, const RunResult& 
     if (it == m_records.end()) return;
     StageRecord& rec = *it;
 
+    // ALPS 结果导入（2026-11-12）：声明了 op0Import 的阶段在模块退出 0 后，平台执行
+    // run bundle 前后 diff + run_summary 门 + SHA256SUMS 复核 + 三向新鲜度守卫，
+    // 成功则把 OP0 落位到 op0Import.to 并写 import_receipt.json（成功留痕进 outputs/
+    // 日志）；失败则阶段标 Failed（QS-TL-ALPS-*），下游 post 经依赖链自动阻塞
+    RunResult rr = result;
+    if (rr.ok && !m_cancelled) {
+        if (const PipelineStage* sdef = activeStage(stageId)) {
+            if (!sdef->op0Import.isEmpty()) {
+                const QString to = sdef->op0Import.value("to").toString();
+                const alps::ImportResult ir =
+                    alps::importNewRunBundle(m_dataRoot, m_alpsPreRun.value(stageId),
+                                             to, "pipeline");
+                m_alpsPreRun.remove(stageId);
+                if (ir.ok) {
+                    const QString destRel = to.isEmpty()
+                        ? QString::fromLatin1(alps::kDefaultOp0Dest) : to;
+                    const QString dest = nativeRel(m_dataRoot, destRel);
+                    rr.outputs << dest;
+                    emit notify("task.stage.log", QJsonObject{
+                        {"taskId", m_taskId}, {"stageId", stageId},
+                        {"line", QString("[alps-import] run %1 -> %2 (sha256 %3)")
+                            .arg(ir.runId, dest, ir.op0Sha256)}});
+                } else {
+                    rr.ok = false;
+                    rr.errorCode = ir.errorCode;
+                    rr.errorMessage = ir.errorMessage;
+                    rr.exitCode = -1;
+                    emit notify("task.stage.log", QJsonObject{
+                        {"taskId", m_taskId}, {"stageId", stageId},
+                        {"line", "[alps-import][error] " + ir.errorMessage}});
+                }
+            }
+        }
+    }
+
     if (m_cancelled) {
         rec.status = StageStatus::Skipped;
         rec.errorCode = "QS-TL-CANCEL";
         rec.errorMessage = "cancelled by user";
     } else {
-        rec.status = result.ok ? StageStatus::Done : StageStatus::Failed;
-        rec.errorCode = result.errorCode;
-        rec.errorMessage = result.errorMessage;
+        rec.status = rr.ok ? StageStatus::Done : StageStatus::Failed;
+        rec.errorCode = rr.errorCode;
+        rec.errorMessage = rr.errorMessage;
     }
-    rec.exitCode = result.exitCode;
+    rec.exitCode = rr.exitCode;
     rec.finishedAt = QDateTime::currentMSecsSinceEpoch();
-    if (result.ok) rec.outputs = result.outputs;
+    if (rr.ok) rec.outputs = rr.outputs;
 
     emit notify("task.stage.finished", QJsonObject{
         {"taskId", m_taskId}, {"stageId", stageId},
@@ -576,6 +629,7 @@ void TaskOrchestrator::finishTask(const QString& status, const QString& summary)
     m_busy = false;
     m_pending.clear();
     m_waiting.clear();
+    m_alpsPreRun.clear();
 
     emit notify("task.finished", QJsonObject{
         {"taskId", m_taskId}, {"status", status}, {"summary", summary},

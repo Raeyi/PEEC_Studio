@@ -15,6 +15,7 @@ add_executable(task_layer
     src/App.cpp
     src/config/ModuleRegistry.cpp
     src/config/PipelineLoader.cpp
+    src/io/AlpsImport.cpp
     src/io/InputValidator.cpp
     src/io/ResultStore.cpp
     src/modules/ModuleRunner.cpp

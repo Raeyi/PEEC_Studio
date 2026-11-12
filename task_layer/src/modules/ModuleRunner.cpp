@@ -117,13 +117,15 @@ void dedupeInjectedArgs(QStringList* base, const QStringList& injected)
         deduped << flag << injected.at(i + 1);
     }
     // 2) manifest 模板（base 段）已含同一 --key：删除模板侧出现（flag + 其值），
-    //    保留注入值（尾随胜）
+    //    保留注入值（尾随胜）。模板段 = base 前段（长度 base - injected）；尾段即刚
+    //    追加的注入值本身，不参与模板侧扫描——否则模板已不含该 flag 时（{override:}
+    //    rebind 已剥离），唯一出现恰是注入值，会被误删（2026-11-12 修复）。
     for (int di = 0; di + 1 < deduped.size(); di += 2) {
         const QString flag = deduped.at(di);
-        const int baseEnd = base->size();
-        for (int bi = 0; bi < baseEnd; ++bi) {
+        const int templateEnd = base->size() - injected.size();
+        for (int bi = 0; bi < templateEnd; ++bi) {
             if (base->at(bi) != flag) continue;
-            if (bi + 1 < baseEnd && !base->at(bi + 1).startsWith("--"))
+            if (bi + 1 < templateEnd && !base->at(bi + 1).startsWith("--"))
                 base->removeAt(bi + 1);
             base->removeAt(bi);
             break;   // 模板侧至多处理一处

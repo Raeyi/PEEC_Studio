@@ -12,6 +12,7 @@
 #include <QTextStream>
 #include <QUuid>
 
+#include "io/AlpsImport.h"
 #include "io/InputValidator.h"
 #include "modules/ModuleRunner.h"
 
@@ -507,6 +508,7 @@ void App::handleRequest(const QJsonValue& reqId, const QString& method,
     else if (method == "task.provideInput") rpcProvideInput(reqId, params);
     else if (method == "task.status") rpcTaskStatus(reqId, params);
     else if (method == "task.result") rpcTaskResult(reqId, params);
+    else if (method == "alps.importOp0") rpcImportAlpsOp0(reqId, params);
     else if (method == "shutdown") rpcShutdown(reqId);
     else m_transport->sendError(reqId, rpc::MethodNotFound, "unknown method: " + method);
 }
@@ -670,6 +672,7 @@ void App::rpcRunModule(const QJsonValue& id, const QJsonObject& params)
         st.optionalInputs = routed->optionalInputs;
         st.params = routed->params;
         st.userGate = routed->userGate;
+        st.op0Import = routed->op0Import;   // 2026-11-12：ALPS 导入声明随接线带入单阶段任务
     }
     single.stages.append(st);
 
@@ -846,6 +849,40 @@ bool App::startTaskWith(const QJsonValue& id, const PipelineDef& pipe,
     if (!selRecord.isEmpty()) resp["selection"] = selRecord;
     m_transport->sendResponse(id, resp);
     return true;
+}
+
+void App::rpcImportAlpsOp0(const QJsonValue& id, const QJsonObject& params)
+{
+    // 独立导入通道（JSON-RPC alps.importOp0 / CLI alps-import-op0 共用同一实现
+    // task::alps::importFromRunDir，2026-11-12 ALPS 集成）：不依赖任务运行、不做前后
+    // diff（runDir 由调用方显式指定），用于补跑、人工导入与算例迁移。
+    const QString dataRoot = params.value("dataRoot").toString();
+    const QString runDir = params.value("runDir").toString();
+    if (dataRoot.isEmpty() || runDir.trimmed().isEmpty()) {
+        m_transport->sendError(id, rpc::InvalidParams,
+                               "alps.importOp0 requires dataRoot and runDir");
+        return;
+    }
+    const QString root = QDir::cleanPath(QFileInfo(dataRoot).absoluteFilePath());
+    const alps::ImportResult ir = alps::importFromRunDir(
+        root, runDir, params.value("op0Dest").toString(), "manual");
+    if (!ir.ok) {
+        m_transport->sendError(id, rpc::ErrModuleExec,
+                               ir.errorCode + ": " + ir.errorMessage,
+                               QJsonObject{{"errorCode", ir.errorCode},
+                                           {"dataRoot", root},
+                                           {"runDir", runDir}});
+        return;
+    }
+    const QString destRel = ir.receipt.value("op0Dest").toString();
+    QString destAp = QDir::cleanPath(root + "/" + destRel);
+    destAp.replace('/', QDir::separator());
+    QJsonObject resp{{"ok", true}, {"runId", ir.runId},
+                     {"op0Dest", destAp},
+                     {"op0Sha256", ir.op0Sha256},
+                     {"inputSha256", ir.inputSha256},
+                     {"receipt", ir.receipt}};
+    m_transport->sendResponse(id, resp);
 }
 
 void App::rpcCancelTask(const QJsonValue& id, const QJsonObject& params)

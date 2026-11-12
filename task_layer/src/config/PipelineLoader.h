@@ -22,6 +22,11 @@ struct PipelineStage {
     QStringList optionalInputs;        // 可选阶段的存在性前置（dataRoot 相对路径）：缺失则跳过
     QJsonObject userGate;                // P1.5 用户闸门（可选）：{waitForFiles:[dataRoot 相对路径], confirm:bool,
                                           // inputs:[{name,type,required,description}]}；缺省 = 无闸门
+    QJsonObject op0Import;               // ALPS 结果导入声明（2026-11-12 ALPS 集成，可选）：
+                                          // {"to":"Result/thermal/alps/thermal.op0"}；本阶段模块退出 0 后平台执行
+                                          // run bundle diff + run_summary 门 + SHA256SUMS 复核 + 三向新鲜度守卫，
+                                          // 成功把 OP0 落位到 to 并写 import_receipt.json；失败阶段标 Failed
+                                          // （QS-TL-ALPS-*）。缺省（空）= 无导入语义。
 };
 
 struct PipelineDef {
@@ -50,6 +55,7 @@ struct StageLibDef {
     QStringList requires;         // 存在性前置（dataRoot 相对路径）
     bool optional = false;
     QJsonObject userGate;
+    QJsonObject op0Import;        // ALPS 结果导入库级默认（引用方本地有则本地赢，同 optional 语义）
 };
 
 // Path variable resolver:

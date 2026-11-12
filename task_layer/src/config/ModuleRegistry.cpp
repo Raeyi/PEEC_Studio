@@ -252,6 +252,30 @@ bool ModuleRegistry::rebindDataRoot(const QString& dataRoot,
         QStringList out;
         for (const QString& a : def.argsTemplate) {
             QString v = a;
+            // {override:<flag>[:<default>]} token（2026-11-12 ALPS 集成，MODULE_MANIFEST_SPEC 补注）：
+            //   无默认 {override:<flag>}：模板占位符与紧邻其前的 flag token 成对移出模板
+            //     （若已发射 token == <flag> 则弹出且占位符不发射任何东西）→ 模块自带默认生效；
+            //     任务级 override 注入时由 launch 追加并以尾随胜去重（dedupeInjectedArgs）。
+            //   带默认 {override:<flag>:<default>}：默认值替代占位（flag 保留），注入值仍尾随胜。
+            //   flag token 缺失（占位符前不是它）→ 保留字面量让模块清晰报错，任务层不静默改写。
+            const int ob = v.indexOf("{override:");
+            if (ob == 0 && v.endsWith("}")) {
+                const QString inner = v.mid(10, v.size() - 11);
+                const int dc = inner.indexOf(':');
+                const QString flag = dc >= 0 ? inner.left(dc) : inner;
+                const QString deflt = dc >= 0 ? inner.mid(dc + 1) : QString();
+                if (!deflt.isEmpty()) {
+                    v = deflt;   // 带默认：默认值替代（flag 仍在模板中，继续走常规替换）
+                } else if (!out.isEmpty() && out.last() == flag) {
+                    out.removeLast();   // 无默认：flag + 占位符成对移出
+                    continue;           // 占位符本身不发射
+                } else {
+                    qWarning("[config] module %s: {override:%s} not preceded by its flag token; keeping literal",
+                             qPrintable(def.id), qPrintable(flag));
+                    out << v;    // 保留字面量，让模块清晰报错
+                    continue;
+                }
+            }
             const int ab = v.indexOf("{artifact:");
             if (ab >= 0 && v.endsWith("}")) {
                 const QString ref = v.mid(ab + 10, v.size() - ab - 11);
