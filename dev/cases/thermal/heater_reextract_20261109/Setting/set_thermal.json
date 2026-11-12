@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "analysis": "op",
+  "probe": ["V(*)"],
+  "mesh_length_unit": "mm"
+}

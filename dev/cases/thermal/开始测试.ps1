@@ -1,4 +1,7 @@
-﻿$ErrorActionPreference="Stop"
+# [弃用 2026-11-12 / v2.5.0_rc1] 平台路径 = task.run {pipeline: "thermal_basic"}
+# （extract → alps 可选 → post）。本脚本为 vendor CLI 手动提取便捷入口，
+# v2.5.0_rc1 交付时移除。
+$ErrorActionPreference="Stop"
 & "$PSScriptRoot\..\thermal\ThermalExtract.exe" --data-root "$PSScriptRoot\demo1_4.1"
 if ($LASTEXITCODE) { throw "Extraction failed: $LASTEXITCODE" }
 Write-Host 'Netlist: demo1_4.1\Result\thermal\extract\ThermalNetList.sp'

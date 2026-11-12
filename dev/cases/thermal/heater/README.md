@@ -9,11 +9,11 @@
 & ..\..\thermal\TemperatureProcess.exe --data-root $PWD.Path
 ```
 
-第一步生成`Result/thermal/extract/ThermalNetList.sp`、RC网表、热矩阵、映射表和报告；第二步默认读取`Model/thermal.op0`，生成`Result/thermal/post/`中的节点温度CSV、带NodeData的MSH、最高温度和报告。两个程序均不调用ALPS，也不改写Model/Setting。
+第一步生成`Result/thermal/extract/ThermalNetList.sp`、RC网表、热矩阵、映射表和报告；第二步默认读取`Result/thermal/alps/thermal.op0`（thermal 1.0.9 默认位置，2026-11-12 由 `Model/thermal.op0` 迁入），生成`Result/thermal/post/`中的节点温度CSV、带NodeData的MSH、最高温度和报告。两个程序均不调用ALPS，也不改写Model/Setting。
 
 ## OP0来源
 
-用户给出的原始`ThermalNetList.sp.op0`保存在交付总目录`validation/original_user_ThermalNetList.sp.op0`。它包含6085/6089个T节点温度，缺少T65、T68、T2681、T3806。按本案例提取的`thermal_K.mtx`和网表固定温度条件，用独立稀疏线性求解得到四个缺失值；其余6085个用户提供的温度数值保留。合成的完整工作点放在`Model/thermal.op0`，具体数值、原件与完整件SHA256见`validation/op0_completion_report.json`。原件与独立求解的对应节点最大差0.00005K，符合原OP0四位小数精度。后处理程序本身仍严格拒绝缺失节点，不自动补值，也不校验OP0是否由当前网表生成。
+用户给出的原始`ThermalNetList.sp.op0`保存在交付总目录`validation/original_user_ThermalNetList.sp.op0`。它包含6085/6089个T节点温度，缺少T65、T68、T2681、T3806。按本案例提取的`thermal_K.mtx`和网表固定温度条件，用独立稀疏线性求解得到四个缺失值；其余6085个用户提供的温度数值保留。合成的完整工作点放在`Result/thermal/alps/thermal.op0`（2026-11-12 由 `Model/thermal.op0` 迁入），具体数值、原件与完整件SHA256见`validation/op0_completion_report.json`。原件与独立求解的对应节点最大差0.00005K，符合原OP0四位小数精度。后处理程序本身仍严格拒绝缺失节点，不自动补值，也不校验OP0是否由当前网表生成。
 
 ## 验收点
 

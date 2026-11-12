@@ -1,0 +1,16 @@
+{
+  "films": [
+    {
+      "name": "thinfilm1",
+      "surface_ids": [3],
+      "material_id": 3,
+      "thickness_m": 1e-7
+    },
+    {
+      "name": "thinfilm2",
+      "surface_ids": [9],
+      "material_id": 4,
+      "thickness_m": 1e-7
+    }
+  ]
+}

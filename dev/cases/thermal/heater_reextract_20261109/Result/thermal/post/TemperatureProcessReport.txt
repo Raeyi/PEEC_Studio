@@ -1,0 +1,20 @@
+status SUCCESS
+model volume-and-surface-film-mapped
+op0 C:\Users\18444\Desktop\AEDA\united_group\heater_reextract_20261109\Result\thermal\alps\thermal.op0
+mesh C:\Users\18444\Desktop\AEDA\united_group\heater_reextract_20261109\Model\model_thermal.msh
+map C:\Users\18444\Desktop\AEDA\united_group\heater_reextract_20261109\Result/thermal\extract/ThermalTemperatureMap.csv
+op0_temperature_count 6091
+mapped_temperature_count 6094
+mapping_weight_count 6094
+max_partition_of_unity_error 0
+minimum_mapped_temperature_K 293.14999999999998
+maximum_mapped_temperature_K 500
+missing_op0_thermal_node_count 3
+nearest_fallback_mesh_node_count 3
+new_temperature_solve_performed false
+values_clamped false
+note Original mesh temperatures map directly from thermal nodes.
+nearest_fallback mesh_node 65 source_mesh_node 64 distance_m 4.9999999999999701e-07 temperature_K 293.15679999999998
+nearest_fallback mesh_node 68 source_mesh_node 69 distance_m 4.9999999999999701e-07 temperature_K 293.17099999999999
+nearest_fallback mesh_node 3790 source_mesh_node 2836 distance_m 4.4460721854437407e-07 temperature_K 323.36610000000002
+missing_op0_thermal_nodes T65 T68 T3790
