@@ -15,7 +15,11 @@
 1. （阻塞项）二选一：a) r2 MSH 提供**无线元素导出选项**（如 `--no-1d` / profile 开关）；b) r2 README/manifest 明确消费端适配方法（如何区分 CAD Line2 与激励线、以何实体为端口定义）。r2 manifest capabilities.mesh 已声明 "do not treat CAD Line2 as ports"，消费端适配口径需 vendor 确认。
 2. 案例包 `gds2geo_cases_20261107.zip`（r2 manifest externalCasePackage 声明）随下一轮交付；`validation/` 目录交付（r2 与 V1.2 1106 轮均缺）。
 
-**回执**：待 vendor 回执。回执后平台复测（compact_em 标准输入 × r2 生成网格），本轮回执写回即关闭。
+**回执（2026-11-12 平台复测，集成侧；vendor 侧仍待回执）**：
+- 平台侧执行阻塞已排除（2026-11-12）：此前 vendor 主 EXE 无法创建 `.locks`（拒绝访问，工作区内/外均现）。根因 = 原交付映像的文件对象安全描述符物化了 DSH 工作区写入 ACE（`S-1-4-805033334-89673629`，继承自工作区根 standing grant），且该 SD 内核级不可就地修改；2026-11-12 以同字节新文件对象原位替换 6 个带标记 vendor 映像（SHA256 逐一对齐、git 零 diff，vendor 包字节未动），全部恢复写入（`.locks` 创建成功）。
+- 平台复测（compact_em 标准输入 × r2 生成网格，2026-11-12）：输入四件与 11-09 探针 SHA256 逐字节一致；EXE 正常启动、`.locks` 创建成功、网格解析正常（608 点 / 1277 元素 / 2 材料 / vacuum id 4），复现 11-09 同一结论 `QS-FMT-MSH-INVALID`（"Standard MATDB/source_em.json input must not contain excitation line elements"，exit 1）⇒ 交付要求 1（阻塞项）仍待 vendor 二选一交付。
+- 红线回归（2026-11-12 gate 全套）：pswitch / baseline / p1（21/21）/ p3 / gate 全 GREEN（预烘焙网格算例 standard 字节一致 PASS）；p2 维持 2 个已知预期 FAIL（`--v1-commit cc24e18` 物化等价 gds_full / thermal_basic，11-11 已记录，非回归）。
+- 状态：**进行中 —— 待 vendor 回执**（交付要求 1/2 未变；平台侧复测能力已恢复，vendor 交付后平台复测即刻可执行，本轮回执写回即关闭）。
 
 ---
 

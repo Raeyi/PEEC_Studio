@@ -17,7 +17,10 @@
 2. （与 gds2geo 第 3 轮联动）mesh 侧选项或消费端适配二选一，由 vendor 单方定口径，避免双 vendor 互相等待。
 3. 若改输入契约：发版说明注明 apiVersion / breakingChanges（现 apiVersion 3）。
 
-**回执**：待 vendor 回执。回执后平台复测（standard × r2 生成网格全流 + 红线算例回归），本轮回执写回即关闭。
+**回执（2026-11-12 平台复测，集成侧；vendor 侧仍待回执）**：
+- 平台侧执行阻塞已排除（2026-11-12）：vendor 映像文件对象 SD 标记问题经同字节原位替换修复（根因与过程见 REPACK/gds2geo.md 第 3 轮回执），compact_em 三 EXE 恢复写入与执行。
+- 平台复测（standard × r2 生成网格全流 + 红线算例回归，2026-11-12）：r2 生成网格复测（peec_api4b 输入四件与 11-09 探针 SHA256 逐字节一致）复现 11-09 结论 —— 解析正常（608 点 / 1277 元素 / 2 材料 / MATDB schema 3 接受），标准 MATDB/source 契约拒绝激励线元素 `QS-FMT-MSH-INVALID`（exit 1）⇒ 交付要求 1（阻塞项）仍待 vendor 交付（消费端对齐或无线 MSH 输入模式，二选一）；红线回归（gate 全套 pswitch / baseline / p1 21/21 / p3 / gate）全 GREEN，预烘焙 standard 字节一致 PASS，v1.3 既有行为无变化。
+- 状态：**进行中 —— 待 vendor 回执**（交付要求 1–3 未变；vendor 交付后平台复测即刻可执行，本轮回执写回即关闭）。
 
 ---
 
