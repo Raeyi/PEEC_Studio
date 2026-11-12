@@ -1,11 +1,11 @@
 # gds2geo 模块重打包请求日志（REPACK/gds2geo）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.6）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**V1.2 r2（GDS2GEO-V1.2-20261107-r2，2026-11-09 集成；2 EXE / 5 文件 / manifest apiVersion 4；gmsh 在平台 tools/ 区）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.6）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.3.0（GDS2GEO-1.3.0-20261112，2026-11-12 集成；5 EXE / 8 文件 / manifest apiVersion 5；gmsh 4.11.1 含 gmsh-4.11.dll 在平台 tools/ 区）**。
 
-## 第 3 轮（2026-11-09 请求，进行中）
+## 第 3 轮（2026-11-09 请求 → 2026-11-12 已收口）
 
-状态：**进行中 —— 待 vendor 回执**。V1.2 r2（GDS2GEO-V1.2-20261107-r2）已于 2026-11-09 集成（2 EXE / 5 文件 / apiVersion 4；Result/gds2geo 布局重构为 em_geo/thermal_geo/em_msh/thermal_msh；EM 正式件落位改为平台 `publishes` 声明，见 task_layer README 2026-11-09 条目）。
+状态：**已收口** —— 1.3.0 已交付并集成（平台 6 腿复测全绿 + r2 全维网格全流 E2E 通过）。V1.2 r2（GDS2GEO-V1.2-20261107-r2）2026-11-09 集成，1.3.0（GDS2GEO-1.3.0-20261112，apiVersion 5）2026-11-12 落位（分支 `feature/vendor-r3-20261112`，未合 main）。
 
 **问题清单（平台 2026-11-09 API-4 探针发现）**：
 - r2 em MSH（Delivery API 4）保留全部原生 CAD 实体（dimensions 0–3，含 Line2），而 compact_em v1.3 的标准 MATDB/source 输入契约**拒绝激励线元素**（QS-FMT-MSH-INVALID "Standard MATDB/source_em.json input must not contain excitation line elements"）；网格文件本身解析正常（608 点 / 1277 元素 / 2 材料 + vacuum id 4 全部解析成功，端口 triangleIds 有效）。平台 r2 manifest 的 executionProfiles **无线元素排除选项**，vendor 程序无相应开关 ⇒ **GDS→PEEC 生成网格全流目前阻塞**（预烘焙网格算例不受影响，红线算例字节一致 PASS）。
@@ -15,12 +15,14 @@
 1. （阻塞项）二选一：a) r2 MSH 提供**无线元素导出选项**（如 `--no-1d` / profile 开关）；b) r2 README/manifest 明确消费端适配方法（如何区分 CAD Line2 与激励线、以何实体为端口定义）。r2 manifest capabilities.mesh 已声明 "do not treat CAD Line2 as ports"，消费端适配口径需 vendor 确认。
 2. 案例包 `gds2geo_cases_20261107.zip`（r2 manifest externalCasePackage 声明）随下一轮交付；`validation/` 目录交付（r2 与 V1.2 1106 轮均缺）。
 
-**回执（2026-11-12 平台复测，集成侧；vendor 侧仍待回执）**：
-- 平台侧执行阻塞已排除（2026-11-12）：此前 vendor 主 EXE 无法创建 `.locks`（拒绝访问，工作区内/外均现）。根因 = 原交付映像的文件对象安全描述符物化了 DSH 工作区写入 ACE（`S-1-4-805033334-89673629`，继承自工作区根 standing grant），且该 SD 内核级不可就地修改；2026-11-12 以同字节新文件对象原位替换 6 个带标记 vendor 映像（SHA256 逐一对齐、git 零 diff，vendor 包字节未动），全部恢复写入（`.locks` 创建成功）。
-- 平台复测（compact_em 标准输入 × r2 生成网格，2026-11-12）：输入四件与 11-09 探针 SHA256 逐字节一致；EXE 正常启动、`.locks` 创建成功、网格解析正常（608 点 / 1277 元素 / 2 材料 / vacuum id 4），复现 11-09 同一结论 `QS-FMT-MSH-INVALID`（"Standard MATDB/source_em.json input must not contain excitation line elements"，exit 1）⇒ 交付要求 1（阻塞项）仍待 vendor 二选一交付。
-- 红线回归（2026-11-12 gate 全套）：pswitch / baseline / p1（21/21）/ p3 / gate 全 GREEN（预烘焙网格算例 standard 字节一致 PASS）；p2 维持 2 个已知预期 FAIL（`--v1-commit cc24e18` 物化等价 gds_full / thermal_basic，11-11 已记录，非回归）。
-- 状态：**进行中 —— 待 vendor 回执**（交付要求 1/2 未变；平台侧复测能力已恢复，vendor 交付后平台复测即刻可执行，本轮回执写回即关闭）。
-
+**回执（2026-11-12，已收口）**：
+- 平台侧执行阻塞已排除（2026-11-12）：此前 vendor 主 EXE 无法创建 `.locks`（拒绝访问，工作区内/外均现）。根因 = 原交付映像的文件对象安全描述符物化了 DSH 工作区写入 ACE（`S-1-4-805033334-89673629`，继承自工作区根 standing grant），且该 SD 内核级不可就地修改；2026-11-12 以同字节新文件对象原位替换 6 个带标记 vendor 映像（SHA256 逐一对齐、git 零 diff，vendor 包字节未动），全部恢复写入（`.locks` 创建成功）。1.3.0 新映像不携带该 SD，问题不再适用。
+- v1.3 时代复测（2026-11-12 上午，1.3.0 落位前）：compact_em 标准输入 × r2 生成网格，输入四件与 11-09 探针 SHA256 逐字节一致；EXE 正常启动、`.locks` 创建成功、网格解析正常（608 点 / 1277 元素 / 2 材料 / vacuum id 4），复现 11-09 同一结论 `QS-FMT-MSH-INVALID`（exit 1）⇒ 当时交付要求 1（阻塞项）仍待 vendor 二选一交付；红线回归（pswitch / baseline / p1 21/21 / p3 / gate）全 GREEN，p2 维持 2 个已知预期 FAIL。
+- **1.3.0 交付接收（2026-11-12 落位：GDS2GEO-1.3.0-20261112.zip + GDS2GEO-1.3.0-third-party.zip（tools/gmsh，含 gmsh-4.11.dll 85,817,348 B）+ gds2geo_cases_20261107.zip / gds2geo_cases_20261112.zip + SHA256SUMS.txt + validation/ 目录 + 给UI负责人的交付说明.md）**：manifest version 1.3.0 / **apiVersion 4→5**，`platformIntegrationTested:false`；**交付要求 2 满足**（案例包交付、externalCasePackage 更新为 gds2geo_cases_20261112.zip；validation/ 含 summary.json / package-verification.json / case-zip-verification.json 等回执）；**交付要求 1（阻塞项）按选项 b（消费端适配）vendor 声明侧收口**：manifest capabilities.mesh consumerRequirement 明示 “CAD Line2 is geometry, not an excitation/port definition”，与 compact_em v1.4 README “Point1/Line2 仅作几何元数据” 联动，口径由 compact_em vendor 单方确认，无双 vendor 互等（联动 REPACK/compact_em.md 第 2 轮收口说明）。
+- **1.3.0 平台集成复测（2026-11-12，6 腿全绿；分支 `feature/vendor-r3-20261112`，基线 ae88dc0，未合 main）**：baseline ✓（gds_full r2 四阶段严格串行 em_geo→thermal_geo→em_msh→thermal_msh 全 exit 0，publisher 落位 Model/model_em.msh 66,834 B + matdb.json 878 B；thermal 基线 344.1037 K）、gate 22/22、p1 21/21、p3 ✓、pswitch ✓、p2 ✓1（恰为 3 个已记录预期物化 FAIL：gds_full / thermal_basic / peec_basic —— v1.4/1.3.0 二进制与契约变化导致与 cc24e18 基线字节差异，属预期）。
+- 契约变化：**errorContract=none**（失败不输出结构化 stderr JSON，平台固定 `QS-TL-MOD-EXEC` + 退出码 0/2/5/6；task_layer/ERROR_CODES.md §3.2 已同步）；锁机制改为 **Windows 命名互斥量（不产生锁文件）** —— `.locks` SD 标记问题不再适用；gmsh 4.11.1 需精确匹配，`GDS2GEO_GMSH_EXECUTABLE` 仅选 exe（平台经 modules.json env 注入），**宿主启动前须将 `tools/gmsh/` 绝对目录前置到子进程 PATH**（gmsh-4.11.dll 加载）；新增辅助工具 geoedit / mshcheck（0.23.0）/ mshfix（1.5.0）仅以辅助命令暴露、不接入平台流水线（mshfix exit 3 = $GDS2GEOUnits / Tet4 不支持，与网格契约一致）。
+- 树内适配：modules.json gds2geo 4 阶段 env 指向 tools/gmsh/gmsh.exe 并配置 PATH 前置；案例包 gds2geo_cases_20261112.zip 已接收，平台侧归档 dev/cases/gds2geo/ 待办（仅影响 dev_case 回归自测，不阻塞主包）。
+- **收口说明**：交付要求 1/2 均满足（1 = vendor 声明 + 平台 r2 全维网格全流 E2E 通过 —— 红线 standard 算例即 r2 全维网格算例，详见 compact_em.md 第 2 轮收口说明；2 = 案例包 + validation/ 交付）；平台 6 腿复测全绿，本复测证据即 `platformIntegrationTested` 收口证据（1.3.0 manifest 自报 false，平台侧不改动 vendor 文件）。**本轮收口**。
 ---
 
 ## 第 2 轮（2026-11-06 gmsh 共享化 → 已收口）
@@ -62,5 +64,5 @@
 
 ## 未决项（非重打包）
 
-- **案例包 gds2geo_cases_20261102.zip 未交付**（README 引用）：仅影响平台侧 dev_case 回归自测，不阻塞 UI 发布；经用户催收。交付后归档 dev/cases/gds2geo/。
-- **r2 案例包 gds2geo_cases_20261107.zip 亦未交付**（r2 manifest externalCasePackage 声明；2026-11-09 集成时核对包内无此件）：仅影响 dev_case 回归自测，不阻塞主包交付；已列入第 3 轮交付要求。`validation/` 目录仍缺（r2 交付 = 2 EXE + README + ERROR_CODES.md + module.manifest.json 共 5 文件）。
+- **案例包 gds2geo_cases_20261102.zip（V1.2 1102 轮 README 引用）**：由 1.3.0 交付的 gds2geo_cases_20261107.zip / gds2geo_cases_20261112.zip 取代（2026-11-12 交付树内）；平台侧归档 dev/cases/gds2geo/ 待办，不阻塞 UI 发布。
+- **r2 案例包 gds2geo_cases_20261107.zip 已交付**（随 1.3.0，2026-11-12；1.3.0 manifest externalCasePackage 已更新为 gds2geo_cases_20261112.zip）；**validation/ 目录已交付**（summary.json / package-verification.json / case-zip-verification.json 等，1.3.0 交付树内）—— 第 3 轮交付要求 2 收口。

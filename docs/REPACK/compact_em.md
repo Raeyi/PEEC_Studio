@@ -1,11 +1,11 @@
 # compact_em 模块重打包请求日志（REPACK/compact_em）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.6）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**v1.3（2026.11.04，API 3，2026-11-05 集成）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.6）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**v1.4（2026.11.10-v1.4，API 4，2026-11-12 集成，revisionId merged-post-20261111）**。
 
-## 第 2 轮（2026-11-09 请求，进行中）
+## 第 2 轮（2026-11-09 请求 → 2026-11-12 已收口）
 
-状态：**进行中 —— 待 vendor 回执**（平台 2026-11-09 集成 gds2geo V1.2 r2 时 API-4 探针发现；联动 REPACK/gds2geo.md 第 3 轮）。
+状态：**已收口** —— v1.4 已交付并集成（平台 6 腿复测全绿 + r2 全维网格全流 E2E 通过）。v1.3（2026.11.09-v1.3，API 3，2026-11-09 集成）已被 v1.4（2026.11.10-v1.4，API 4，2026-11-12 集成，revisionId merged-post-20261111）取代（2026-11-09 平台集成 gds2geo V1.2 r2 时 API-4 探针发现；分支 `feature/vendor-r3-20261112`，未合 main）。
 
 **问题清单（2026-11-09 探针证据，E:/code/_integ/peec_api4b）**：
 - compact_em v1.3（2026.11.04）对 r2 em MSH（vendor 多行记录方言，Delivery API 4：dimensions 0–3 含 Point1/Line2/Tri3/Tet4）**解析正常**（608 点 / 1277 元素 / 2 材料 / vacuum id 4 全部解析成功），但标准 MATDB/source 输入契约拒绝网格中的**激励线元素**：`QS-FMT-MSH-INVALID` "Standard MATDB/source_em.json input must not contain excitation line elements"（exit 1）。
@@ -17,11 +17,16 @@
 2. （与 gds2geo 第 3 轮联动）mesh 侧选项或消费端适配二选一，由 vendor 单方定口径，避免双 vendor 互相等待。
 3. 若改输入契约：发版说明注明 apiVersion / breakingChanges（现 apiVersion 3）。
 
-**回执（2026-11-12 平台复测，集成侧；vendor 侧仍待回执）**：
-- 平台侧执行阻塞已排除（2026-11-12）：vendor 映像文件对象 SD 标记问题经同字节原位替换修复（根因与过程见 REPACK/gds2geo.md 第 3 轮回执），compact_em 三 EXE 恢复写入与执行。
-- 平台复测（standard × r2 生成网格全流 + 红线算例回归，2026-11-12）：r2 生成网格复测（peec_api4b 输入四件与 11-09 探针 SHA256 逐字节一致）复现 11-09 结论 —— 解析正常（608 点 / 1277 元素 / 2 材料 / MATDB schema 3 接受），标准 MATDB/source 契约拒绝激励线元素 `QS-FMT-MSH-INVALID`（exit 1）⇒ 交付要求 1（阻塞项）仍待 vendor 交付（消费端对齐或无线 MSH 输入模式，二选一）；红线回归（gate 全套 pswitch / baseline / p1 21/21 / p3 / gate）全 GREEN，预烘焙 standard 字节一致 PASS，v1.3 既有行为无变化。
-- 状态：**进行中 —— 待 vendor 回执**（交付要求 1–3 未变；vendor 交付后平台复测即刻可执行，本轮回执写回即关闭）。
-
+**回执（2026-11-12，已收口）**：
+- 平台侧执行阻塞已排除（2026-11-12）：SD 标记问题（vendor 映像文件对象携带 DSH 工作区写入 ACE `S-1-4-805033334-89673629`，`.locks` 创建拒绝访问，根因与过程见 REPACK/gds2geo.md 第 3 轮回执）经同字节新文件对象原位替换修复，compact_em 三 EXE 写入与执行全部恢复。v1.4 新映像不携带该 SD。
+- v1.3 时代复测（2026-11-12 上午，v1.4 落位前）：r2 生成网格复测（peec_api4b 四输入件与 11-09 探针 SHA256 逐字节一致）复现 11-09 同一结论 —— 网格解析正常（608 点 / 1277 元素 / 2 材料 / MATDB schema 3 接受），标准 MATDB/源契约拒绝激励线元素 `QS-FMT-MSH-INVALID`（exit 1）⇒ 当时交付要求 1（阻塞项）仍待 vendor 交付；红线回归（pswitch / baseline / p1 21/21 / p3 / gate）全 GREEN。
+- **v1.4 交付接收（2026-11-12 落位：2026.11.10-v1.4，apiVersion 4，PEECFS02/version2，revisionId merged-post-20261111；正式交付树含 RELEASE_NOTES / validation / cases / contracts / SHA256SUMS.txt）**：vendor README 声明 `Model/model_em.msh` 为 Gmsh MSH 2.2/4.1（ASCII/二进制）、一阶 Tri3 导体、**Point1/Line2 仅作几何元数据，不产生支路或激励** ⇒ **交付要求 1（阻塞项）vendor 声明侧满足**（选项 A：CAD Line2 视为几何；端口/激励仅由 source_em.json ports 定义）；交付要求 3 满足（apiVersion 3→4，manifest breakingChanges 明示 PEECPK01/schema1 → PEECFS02/version2，旧模型需重提取）。
+- **平台 v1.4 集成复测（2026-11-12，6 腿全绿；分支 `feature/vendor-r3-20261112`，基线 ae88dc0，未合 main）**：gate 22/22、p1 21/21、p3 ✓、pswitch ✓、baseline ✓（thermal 基线 344.1037 K + gds_full r2 四段 + Model/ 落位 66,834 B / 878 B）、p2 ✓1（恰为 3 个已记录预期物化 FAIL）。
+- **r2 全维网格 → peec_basic 全流 E2E（交付要求 1 平台侧闭环，2026-11-12）**：红线算例 `dev/cases/compact_em/standard` 的 Model 三件（mesh 69,662 B `f8cad342…` / source 290 B `7ad37075…` / matdb 878 B `48cd560e…`）与 11-09 探针 peec_api4b 四输入件 **SHA256 逐字节一致**（同含 Point1/Line2 的 r2 全维网格）—— 即 v1.4 红线算例本身就是 r2 全维网格算例（vendor R2_PEC_Standard 参考算例，树内件件 SHA 一致）。p1 std 与 gate 全链（extract→solve→post）在 v1.4 下全 exit 0：model.peec 19,419,844 B（PEECFS02/version2，100 点提取实测 280 ms）、S_parameter.csv 12,282 B / Y 7,434 B / Z 7,434 B / Solver_Diagnostics.csv 36,903 B、Source.msh 358,047 B（14 视图）—— `QS-FMT-MSH-INVALID` 不再出现，**GDS→PEEC 生成网格全流解除阻塞**。
+- 实测产物与契约（v1.4，standard 算例）：post `Source.msh` 358,047 B（14 视图；receipt-only，不入平台 resultFiles，UI 经 stage 回执或算例目录读取）；`Field.msh`（E/H real/imag/mag 6 视图）仅空间场采样开启时生成（需可选 `Model/Space_Mesh.msh` + POST_FIELD_ER=1；红线算例未启用 → 未生成）。`--s-columns` 已移除（列固定 RI）；新增运行依赖 `libiomp5md.dll`（EXE 同目录）；`--runtime-dir` 须位于 dataRoot 内。
+- 契约变化：**errorContract=none** —— 失败不输出结构化 stderr JSON / jsonl，平台按固定 `QS-TL-MOD-EXEC` + 进程退出码上报（extract 0/1/2、solve 0/1、post 0/1/2；task_layer/ERROR_CODES.md §3.1 已同步）；set_em.json 严格 schema（DIM/FS/FE 必填，计数模式另需 N_FP，SAVE_BIN/SAVE_TXT/Taylor/MNA_WEIGHT/SOLVER_MEMORY_MB/SOLVER_THREADS 出现即拒绝、零值同拒，Solver_SET 仅 0，设置件按字节指纹）；模型容器 PEECPK01 二进制不兼容（旧算例需重提取）。
+- 树内适配：standard = vendor R2_PEC_Standard 5 件（SHA 逐件一致）；two_layer_surface_port 与 templates 的 set 文件去除 6 个禁止键（迁 v1.4 严格 schema）；modules.json `_comment` 更新。
+- **收口说明**：交付要求 1–3 均满足（1 = vendor 声明 + 平台全流 E2E 通过；2 = 口径由 compact_em vendor 单方定案 “Line2 为几何”，gds2geo 保持 r2 全维 MSH 输出，无双 vendor 互等，联动 gds2geo.md 第 3 轮收口；3 = release notes 已记录）；vendor 正式发版包已交付，平台 6 腿复测与全流 E2E 全绿。**本轮收口**。
 ---
 
 ## 第 1 轮（2026-11-02 请求 → 2026-11-05 回执，已收口）
