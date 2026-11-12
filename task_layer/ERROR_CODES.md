@@ -5,7 +5,7 @@
 
 1. **RPC 层**（JSON-RPC `error.code`，负整数）——协议级；
 2. **阶段层**（通知里的 `errorCode`，`QS-TL-*` 字符串）——任务层自身判定；
-3. **计算层处理**——thermal 保留 QS 透传契约（`QS-TH-*`，qs-json-stderr，见 3.3）；**2026-11-12 起 compact_em（v1.4）与 gds2geo（1.3.0）均 errorContract=none**：不再发出结构化 QS 码，平台固定上报 `QS-TL-MOD-EXEC` + 进程退出码（见第三节归一规则）。
+3. **计算层处理**——thermal 保留 QS 透传契约（`QS-TH-*`，qs-json-stderr，见 3.3）；**2026-11-12 起 compact_em（v1.4）、gds2geo（1.3.0）、alpsrunner（1.1.2）均 errorContract=none**：不再发出结构化 QS 码，平台固定上报 `QS-TL-MOD-EXEC` + 进程退出码（见第三节归一规则）。ALPS 结果导入码（`QS-TL-ALPS-*`）为任务层自有域（见 2.8），不属计算层透传域。
 
 机器判别一律使用 `code` / `errorCode` 字段，**不要解析文本**。人可读信息分两路：`message_dev`（英文技术描述，开发排查）与 `message_user_zh`（中文用户提示，UI 展示）。
 
@@ -29,7 +29,7 @@
 
 ## 二、阶段层错误码（`QS-TL-*`）
 
-来源：`orchestrator/TaskOrchestrator.cpp`、`modules/ModuleRunner.cpp`、`App.cpp`。
+来源：`orchestrator/TaskOrchestrator.cpp`、`modules/ModuleRunner.cpp`、`App.cpp`、`io/AlpsImport.cpp`（2026-11-12 起，ALPS 结果导入码，见 2.8）。
 出现在 `task.stage.finished` 通知的 `errorCode` 字段，以及 `state.json` 的阶段记录里。
 格式：`QS-TL-<域>-<错误名>`，TL = Task Layer。
 
@@ -57,7 +57,7 @@
 | --- | --- | --- | --- |
 | `QS-TL-MOD-NOTFOUND` | 后端可执行文件未找到（部署路径不对） | 是 | 修正部署/PATH |
 | `QS-TL-WORKER-NOTFOUND` | DLL 模块的 worker_host.exe 宿主未找到 | 是 | 修正部署 |
-| `QS-TL-MOD-EXEC` | 后端进程非 0 退出且未提取到 QS 码（compact_em v1.4 / gds2geo 1.3.0 恒为本码，见 3.1/3.2；thermal 按 3.3 透传） | 视后端 | 结合 `exitCode` 与 `task.stage.log` 定位 |
+| `QS-TL-MOD-EXEC` | 后端进程非 0 退出且未提取到 QS 码（compact_em v1.4 / gds2geo 1.3.0 / alpsrunner 1.1.2 恒为本码，见 3.1/3.2/3.5；thermal 按 3.3 透传） | 视后端 | 结合 `exitCode` 与 `task.stage.log` 定位（alpsrunner 退出码 0/2/3/4/5/124/130 见 3.5） |
 | `QS-TL-MOD-TIMEOUT` | 阶段超过 modules.json 配置的 timeout | 是 | 调大超时或优化输入规模 |
 | `QS-TL-CANCEL` | 用户取消导致该阶段终止 | — | 无需处置 |
 
@@ -66,7 +66,7 @@
 | errorCode | 触发条件 | 可恢复 | 处置 |
 | --- | --- | --- | --- |
 | `QS-TL-DEP-BLOCKED` | 上游阶段失败，本阶段跳过 | 随上游 | 先修复上游 |
-| `QS-TL-DEP-SKIPPED` | 上游阶段被跳过，本阶段连带跳过 | 随上游 | 同上 |
+| `QS-TL-DEP-SKIPPED` | 上游阶段被跳过，本阶段连带跳过（2026-11-12 起：**可选**上游跳过/取消不连带阻断，下游按自身 `requires` 判定；ALPS 场景见 3.5） | 随上游 | 同上 |
 | `QS-TL-SKIP-NOINPUT` | 可选阶段自身输入缺失，主动跳过（不算失败） | 是 | 需要该阶段时补齐输入 |
 
 ### 2.5 执行选择（P1，2026-11-05 起；来源 `App.cpp` / `TaskOrchestrator.cpp`）
@@ -105,9 +105,22 @@
 - `inputs.validate`：`valid:false`，`issues[]` 条目 `reason=QS-TL-PATH-ESCAPE`；
 - `run --pipeline` CLI：stdout `config error: ...`，退出码 2。
 
+### 2.8 ALPS 结果导入（2026-11-12 起；来源 `io/AlpsImport.cpp`）
+
+ALPS（alpsrunner 1.1.2）远端仿真 OP0 导入：流水线形态在阶段模块 exit 0 后经阶段库 `op0Import` 触发；独立通道为 JSON-RPC `alps.importOp0` / CLI `alps-import-op0`（同一 `importFromRunDir` 实现）。成功落位 OP0（默认 `Result/thermal/alps/thermal.op0`）+ 同目录审计件 `import_receipt.json`（8 字段，`source` ∈ {pipeline, manual}）；失败报以下码（流水线形态该阶段置 Failed、下游阻断；独立通道 -32005 + `data.errorCode`）。
+
+| errorCode | 触发条件 | 可恢复 | 处置 |
+| --- | --- | --- | --- |
+| `QS-TL-ALPS-NORUN` | `Result/alpsrunner/simulate/` 下无新 run 目录（前后差集为空） | 是 | 检查 alps 阶段是否实际执行并写出 bundle（console.log / 阶段日志） |
+| `QS-TL-ALPS-MULTIRUN` | 前后差集出现 ≥2 个新 run 目录 | 否（状态异常） | 人工清理 `Result/alpsrunner/simulate/` 状态后重试 |
+| `QS-TL-ALPS-BADSUMMARY` | `run_summary.json` 缺失或 8 字段门失败（schema_version / run_id / run_id==bundle 目录名 / input_sha256 / status=succeeded / result_scope=full / simulator_exit_code=0 / download_status=verified） | 视远端 | 按 alpsrunner ERROR_CODES 对应 exit 3/4/5 处置 |
+| `QS-TL-ALPS-BADSHA` | `SHA256SUMS.txt` 逐条复核失败（bundle 产物 sha 不符） | 否 | 不得覆盖或手工拼接校验失败的结果；保留本机与远端证据 |
+| `QS-TL-ALPS-STALE` | I7 三向新鲜度守卫失败：run_summary.input_sha256 ≠ 现 `Model/ThermalNetList.sp` sha 或 `thermal_binding.json.netlistSha256` | 是 | 重跑 extract 发布网表后重跑 alps 阶段（或独立导入通道） |
+| `QS-TL-ALPS-IO` | OP0 落位 / 审计件写盘失败（文件系统 IO） | 视系统原因 | 检查磁盘空间与权限 |
+
 ## 三、计算层错误码处理规则（透传 + 归一）
 
-任务层**不重新定义**计算层错误码。对带 QS 契约的模块（当前仅 thermal）做**提取 + 透传**；对 errorContract=none 的模块（compact_em v1.4、gds2geo 1.3.0，2026-11-12 起）做**归一**——固定 `QS-TL-MOD-EXEC` + 原样 `exitCode` + `task.stage.log` 原文（`ModuleRunner.cpp`：none 契约不提取模块码）。
+任务层**不重新定义**计算层错误码。对带 QS 契约的模块（当前仅 thermal）做**提取 + 透传**；对 errorContract=none 的模块（compact_em v1.4、gds2geo 1.3.0、alpsrunner 1.1.2，2026-11-12 起）做**归一**——固定 `QS-TL-MOD-EXEC` + 原样 `exitCode` + `task.stage.log` 原文（`ModuleRunner.cpp`：none 契约不提取模块码）。ALPS 结果导入码（`QS-TL-ALPS-*`）为本文例外：属任务层自有域，由平台导入步骤发出（见 2.8 / 3.5）。
 
 ### 3.1 compact_em（errorContract=none，v1.4 2026-11-10 起）
 
@@ -130,29 +143,36 @@
 
 ### 3.3 thermal（有 QS 契约，QS-TH-*）
 
-- thermal 1.0.1 起（含现行 1.0.7，2026.11.06，apiVersion 7）的 `errorContract` 为 `qs-json-stderr`：失败时在 stderr 输出结构化 JSON（字段 `code`（`QS-TH-*`）、`severity`、`message` 等）。
+- thermal 1.0.1 起（含现行 1.0.9，2026.11.12，apiVersion 8）的 `errorContract` 为 `qs-json-stderr`：失败时在 stderr 输出结构化 JSON（字段 `code`（`QS-TH-*`）、`severity`、`message` 等）。1.0.9 码表重构：exit 5 = `QS-TH-EXEC`（Windows SHA256 服务失败）、exit 6 = `QS-TH-RUN-LOCKED`（pipeline_locked）、新增 `QS-TH-CFG-PATH` / `QS-TH-CFG-BINDING`（exit 2）、`QS-TH-NUM-MAPPING`（exit 4）；`QS-TH-NUM-OP0` 移除（映射缺温改为就近填补，见下）。
 - 任务层按与 compact_em 相同的机制从输出尾部提取最后一条 QS 码作为 `errorCode` 原样上报（实测码：`QS-TH-IO-FILE`（exit=3 文件缺失/不可读）、`QS-TH-NUM-COVERAGE`（exit=4 材料覆盖 gap/overlap）等，完整表见 `thermal/ERROR_CODES.md`）。
 - extract 阶段必需件：热网格（经流水线 stage `artifacts` 路由，默认 `Result/gds2geo/thermal_msh/model_thermal.msh`）、`Model/matdb.json`（gds_full em 阶段 publisher 落位）、`Model/boundary_thermal.json`（边界条件，必需，thermal 1.0.5 起；**1.0.7 起支持 schemaVersion 2**（default adiabatic + boundaries：fixed_temperature（surface_ids 为任意现有 Elementary Surface，含内部面）/ convection（h_W_m2K>0 + ambient_temperature_K），未指定表面绝热；重复表面或共享节点冲突固定温度报 exit 2）**与原 schemaVersion 1**；1.0.1 时代内嵌于 source_thermal.json）、求解设置 `Setting/set_thermal.json`（SPICE 仿真设置，thermal 1.0.5 起）、`Model/source_thermal.json`（UI 维护；**thermal 1.0.7 起支持简化 schemaVersion 3 与原 schemaVersion 2**：3 = 仅 `sources`（volume_ids 上 total_power，允许空数组；体材料按 mesh Physical 标签 + matdb.json 自动装配，带材料标签的表面按 matdb 厚度装配面内导热与热容 film，无需 `thermal` 提取对象）；2 = meshFile/meshSha256 绑定实际网格 + `thermal` 提取对象（体域/薄层/材料关联，1.0.6 起引入）；原独立文件 `Result/thermal/thermal_extract_control.json` 已取消，旧参数 `--settings` 传入报 exit=2；v1.2 时代 `Setting/set.json` 含 `thermal` 对象的合并件不再读取）；与 boundary_thermal.json 按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2 `QS-TH-FMT-INPUT`）；1.0.1 只读新名，旧名 port_thermal.json 不再接受）。
-- post 阶段的 OP0（`Model/thermal.op0`，**thermal 1.0.6 起标准位置**：程序默认读 source_thermal.json 所在目录，显式 `--op0` 优先，无旧路径回退）是 task_layer 按 pipelines.json 的 stage `requires` 字段在启动前做存在性检查的**启动前置**，缺失则整段以 `QS-TL-SKIP-NOINPUT` 跳过（不阻断 extract 产物）；沿革：1.0.5 时代为 `Result/thermal/post/thermal.op0`（1.0.6 起废止）；1.0.1 时代的 `Model/thermal.op0` + `Model/thermal_run.json` 已废止（1.0.5 取消 thermal_run.json 与 --result-binding；1.0.6 起不做 OP0 与网表的绑定校验，post 不读取/校验 .sp；1.0.7 不变，且 post 仍严格校验 OP0 全部映射节点温度齐备（缺失/未知报 exit 5 `QS-TH-NUM-OP0`，不自动补全）。
-- 算法范围：**1.0.7 起**支持任意表面固定温度（含内部面）、对流边界（h_W_m2K>0 + ambient_temperature_K）、体域总功率（按体积均匀分布，`sources` 空数组 = 零功率源）、mesh Physical 材料标签 + matdb 自动装配（film 厚度非正报 exit 2）；退化材料三角形报 exit 4 `QS-TH-NUM-GEOMETRY`；1.0.6 时代形态（三层堆叠模型：中部线性四面体 + 平行 XY 薄层，薄层 `material_footprints` 必须完整铺满 `reference_surfaces`（无 gap/overlap，否则 exit=4）；uniform 功率 + 全局底面定温 + 其余绝热）完整保留（demo1_4.1 直跑与 1.0.6 逐字节一致，见 REPACK/thermal.md 第 3 轮）。
+- post 阶段的 OP0：**thermal 1.0.9 起标准位置为 `Result/thermal/alps/thermal.op0`**（1.0.9 argsTemplate 内置 `--op0` 读本位置，显式可覆盖，**无旧路径回退**）；task_layer 按 pipelines.json 的 stage `requires` 字段在启动前做存在性检查，缺失则整段以 `QS-TL-SKIP-NOINPUT` 跳过（不阻断 extract 产物）；alps 阶段缺位时可用预置工作点（离线/回归形态）。工作点由平台导入步骤落位：alps 阶段 exit 0 → run bundle 前后差集 + run_summary 8 字段门 + SHA256SUMS 复核 + I7 三向新鲜度守卫 → OP0 落位 + 同目录 `import_receipt.json`（`QS-TL-ALPS-*`，见 2.8 / 3.5）；独立通道 `alps.importOp0` / CLI `alps-import-op0` 等价。沿革：1.0.6–1.0.8 标准位置为 `Model/thermal.op0`（程序默认读 source_thermal.json 所在目录，显式 `--op0` 优先，无旧路径回退）；1.0.5 时代为 `Result/thermal/post/thermal.op0`（1.0.6 起废止）；1.0.1 时代的 `Model/thermal.op0` + `Model/thermal_run.json` 已废止（1.0.5 取消 thermal_run.json 与 --result-binding；1.0.6 起不做 OP0 与网表的绑定校验，post 不读取/校验 .sp；post 不检查网表来源，1.0.7 起、1.0.9 延续）。
+- 算法范围：**1.0.7 起**支持任意表面固定温度（含内部面）、对流边界（h_W_m2K>0 + ambient_temperature_K）、体域总功率（按体积均匀分布，`sources` 空数组 = 零功率源）、mesh Physical 材料标签 + matdb 自动装配（film 厚度非正报 exit 2）；退化材料三角形报 exit 4 `QS-TH-NUM-GEOMETRY`；1.0.6 时代形态（三层堆叠模型：中部线性四面体 + 平行 XY 薄层，薄层 `material_footprints` 必须完整铺满 `reference_surfaces`（无 gap/overlap，否则 exit=4）；uniform 功率 + 全局底面定温 + 其余绝热）完整保留（demo1_4.1 直跑与 1.0.6 逐字节一致，见 REPACK/thermal.md 第 3 轮）。**1.0.8 起** OP0 映射温度缺失 → post 用最近完整已知温度网格节点就近替代（CSV `value_source` 列 + 报告标记；OP0 不修改；无可用/重复/无效仍报 exit 2 `QS-TH-FMT-INPUT`；1.0.7 严格校验、不自动补全为旧版行为）；**1.0.9 起**两阶段读取 `Setting/set_thermal.json` 的可选 `mesh_length_unit`（m/mm/um），另支持可选薄膜覆写件 `Model/thinfilm_thermal.json`（缺位 = 不覆写）。
 
 ### 3.4 兜底
 
 任何后端非 0 退出且提取不到 QS 码时，一律 `QS-TL-MOD-EXEC` + `exitCode` + 原始输出（`task.stage.log`），不做文本猜测。
+
+### 3.5 alpsrunner（errorContract=none，现行 1.1.2，2026-11-12 集成）
+
+- alpsrunner 1.1.2（`tools/alpsrunner/` 完整包；单 stage `simulate`；apiVersion 1）经 SSH 做 ALPS 网表远端仿真与结果回传；客户端 EXE 在平台侧，远端主机需 ALPSRunnerHost 1.1.0 + 公钥授权 + IC618（VMware Tools + ALPS license）（`environment.alpsrunner_host`，bundled=false）；runtimePolicy：输出与 runtime 目录同一 dataRoot 下同一实际卷，不得有 junction/符号链接。
+- 退出码 0/2/3/4/5/124/130（vendor `ERROR_CODES.md` 逐字摘要）：`0` 成功；`2` 参数/输入/路径/暂存预检（此类提交前错误可能没有结果任务目录）；`3` 凭据/主机指纹/网络/SSH/VMware Tools（连接断开 ≠ ALPS 已停，先查 `simulation_status` 与远端目录）；`4` 仿真失败或远端收集失败（`result_scope=logs_only` 仅诊断回传）；`5` 下载/解压/校验/发布失败（部分文件不能当成功）；`124` 时限；`130` 用户取消（尽量回传已有日志）。调用方必须同读退出状态 + stdout + stderr；`simulation_status=unknown` ≠ 失败。
+- 模块不自行写 `Model/`、`Setting/` 正式件（artifacts.produced=[]，publicationPolicy 原文如此）；产物为 `Result/alpsrunner/simulate/<runId>\` run bundle（console.log / run_summary.json / SHA256SUMS.txt / <netlist>.sp / <netlist>.sp.sim\{.op0, .dcop0, .ic0, .log, .warn, .thread}）。
+- **OP0 落位是平台责任**（MODULE_MANIFEST_SPEC §6.7）：双通道导入（阶段库 `op0Import` + 独立通道 `alps.importOp0` / CLI `alps-import-op0`），失败 6 个 `QS-TL-ALPS-*` 码（见 2.8）；成功落位 `Result/thermal/alps/thermal.op0` + 同目录审计件 `import_receipt.json`（D1a：task_layer 写 / thermal post 读，1.0.9 post 内置 `--op0` 读本位置，无旧路径回退）。2026-11-12 实测远端 TCP 可达（192.168.136.172:22）；真远端全链路留统一 v2.5.0_rc1 交付轮（3600 s 预算）。详见 REPACK/alpsrunner.md。
 
 ## 四、与规范文档的映射
 
 | 规范域 | 任务层现状 |
 | --- | --- |
 | QS-UI-* | 不归任务层管（前端自判，不发请求） |
-| QS-IO-* / QS-FMT-* / QS-VAL-* / QS-MESH-* / QS-MAT-* / QS-BC-* / QS-SRC-* / QS-SOLV-* / QS-POST-* / QS-COMM-* / QS-INTERNAL-* | （历史行）compact_em v1.2 时代产生并透传；**2026-11-12 起 compact_em v1.4 与 gds2geo 1.3.0 均 errorContract=none，不再产生这些码**，对应失败表现为人可读文本 + 退出码（见 3.1/3.2） |
+| QS-IO-* / QS-FMT-* / QS-VAL-* / QS-MESH-* / QS-MAT-* / QS-BC-* / QS-SRC-* / QS-SOLV-* / QS-POST-* / QS-COMM-* / QS-INTERNAL-* | （历史行）compact_em v1.2 时代产生并透传；**2026-11-12 起 compact_em v1.4、gds2geo 1.3.0、alpsrunner 1.1.2 均 errorContract=none，不再产生这些码**，对应失败表现为人可读文本 + 退出码（见 3.1/3.2/3.5） |
 | QS-TH-* | 由 thermal 产生并透传（qs-json-stderr，见 3.3） |
 | QS-TL-* | 任务层自有域，本表第二节为唯一登记处 |
 
-新增 `QS-TL-*` 码的流程：先在 `TaskOrchestrator.cpp` / `ModuleRunner.cpp` / `App.cpp`（或注册表层）落地实际抛出点，再回填本表（含触发条件、可恢复性、处置），最后同步 `UI_API.md` §6.2。禁止只改文档不改代码。
+新增 `QS-TL-*` 码的流程：先在 `TaskOrchestrator.cpp` / `ModuleRunner.cpp` / `App.cpp` / `io/AlpsImport.cpp`（2026-11-12 起，ALPS 导入码）（或注册表层）落地实际抛出点，再回填本表（含触发条件、可恢复性、处置），最后同步 `UI_API.md` §6.2（独立导入通道 `alps.importOp0` / CLI `alps-import-op0` 共用同一组抛出点）。禁止只改文档不改代码。
 
 ## 五、边界说明
 
 - 本表只登记**当前源码实际会发出**的码；规划中的码（如 gds2geo G2G 系列）不在此列。v1.2 时代 compact_em 的 QS 码在 3.1 中仅作历史对照列出，不属于当前可发出集合。
 - RPC 层 -32xxx 与阶段层 QS-TL 是两层概念：RPC 码描述"这次调用本身"的结果，QS-TL 码描述"某个阶段"的结果；一次 `task.run` 可能先收到若干 `task.stage.*` 通知，最终 RPC 响应才给出整体成败。
-- 取消（`task.cancel`）后，进行中的阶段以 `QS-TL-CANCEL` 收尾，后续未启动阶段以 `QS-TL-DEP-BLOCKED`/`QS-TL-DEP-SKIPPED` 标记，整体 RPC 响应为 -32000。
+- 取消（`task.cancel`）后，进行中的阶段以 `QS-TL-CANCEL` 收尾，后续未启动阶段以 `QS-TL-DEP-BLOCKED`/`QS-TL-DEP-SKIPPED` 标记，整体 RPC 响应为 -32000（2026-11-12 起：**可选**上游跳过/取消不连带阻断，下游按自身 `requires` 判定；非可选上游 Skipped/Failed 仍照常阻断）。

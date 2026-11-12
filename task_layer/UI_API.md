@@ -118,6 +118,7 @@ task_layer.exe serve [--config <目录>] [--bin <目录>] [--module-root <目录
 | `task.cancel` | `{taskId}` | `{cancelled}` |
 | `task.status` | `{taskId}` | `state.json` 内容 |
 | `task.result` | `{taskId}` | `state` + `resultFiles` |
+| `alps.importOp0`（2026-11-12 起） | `{dataRoot, runDir, op0Dest?}` | 成功 `{ok:true, runId, op0Dest, op0Sha256, inputSha256, receipt}`；失败 -32005（`message` 含 `QS-TL-ALPS-*` 码）+ `data:{errorCode, dataRoot, runDir}`（与流水线 `op0Import` 同一导入逻辑，见 §6.2 与 ERROR_CODES §2.8/§3.5） |
 | `shutdown` | — | `{bye}` 后退出 |
 
 ### 4.1 ping（握手）
@@ -173,11 +174,16 @@ task_layer.exe serve [--config <目录>] [--bin <目录>] [--module-root <目录
   {"id":"thermal_basic","displayName":"热基本链路",
    "stages":[{"id":"extract","module":"thermal.extract","name":"热路提取",
               "ref":"thermal.extract","optional":false,"dependsOn":[],
-              "artifacts":{"user/thermal.mesh":"Result/gds2geo/thermal_msh/model_thermal.msh"}},
-              {"id":"post","module":"thermal.post","name":"温度后处理",
-              "ref":"thermal.post","optional":true,"dependsOn":["extract"],
               "artifacts":{"user/thermal.mesh":"Result/gds2geo/thermal_msh/model_thermal.msh"},
-              "requires":["Model/thermal.op0",
+              "publishes":{"thermal/netlist.dc":"Model/ThermalNetList.sp"}},
+              {"id":"alps","module":"alps.simulate","name":"ALPS 远端仿真",
+              "ref":"alps.simulate","optional":true,"dependsOn":["extract"],
+              "requires":["Model/ThermalNetList.sp","Setting/ALPSRunner.json","Setting/alpsrunner.key"],
+              "op0Import":{"to":"Result/thermal/alps/thermal.op0"}},
+              {"id":"post","module":"thermal.post","name":"温度后处理",
+              "ref":"thermal.post","optional":true,"dependsOn":["alps"],
+              "artifacts":{"user/thermal.mesh":"Result/gds2geo/thermal_msh/model_thermal.msh"},
+              "requires":["Result/thermal/alps/thermal.op0",
                           "Result/thermal/extract/ThermalNetList.sp"]}]}
 ]}}
 ```
@@ -187,17 +193,20 @@ stage 对象字段：`id / module / name / optional / dependsOn` 必有；以下
 - `requires`：dataRoot 相对路径数组，可选阶段的启动前置文件，缺失时该阶段以 `QS-TL-SKIP-NOINPUT` 跳过（不阻断主链）；
 - `ref`（P2 起）：阶段库引用（schemaVersion 2 形态的物化溯源；v1 内联形态无此字段）；
 - `params`（P2 起）：object，阶段参数（阶段库 + 本地覆盖按键级合并的物化结果），启动时按 `--key value` 追加进模块 CLI；
-- `userGate`（P1.5 起）：闸门定义（结构与 `task.provideInput` 见下文"用户闸门"小节）。
+- `userGate`（P1.5 起）：闸门定义（结构与 `task.provideInput` 见下文“用户闸门”小节）。
+- `publishes`（2026-11-12 起）：对象按键合并，本地键赢；键 = 模块 artifact ref，值 = dataRoot 相对落位路径——阶段 exit 0 后平台按 copy 语义落位（例：thermal.extract 发布 `Model/ThermalNetList.sp`，作为 alps 阶段的固定输入）。
+- `op0Import`（2026-11-12 起）：对象 `{to}`（OP0 目标，dataRoot 相对路径，须为 `Model/`/`Setting/`/`Result/` 下）——阶段模块 exit 0 后平台执行 OP0 导入：run bundle 前后差集 + `run_summary.json` 8 字段门 + `SHA256SUMS.txt` 逐条复核 + I7 三向新鲜度守卫；成功落位 OP0 并在同目录写审计件 `import_receipt.json`，失败该阶段置 Failed、下游阻断（`QS-TL-ALPS-*`，见 §6.2 与 ERROR_CODES §2.8/§3.5）；库定义为默认，本地有则整对象赢（无按键合并）。
 
 #### 阶段库与 ref 组合（`pipelines.json` schemaVersion 2，P2 起）
 
-`pipelines.json` 顶层可定义 `stages` 对象（阶段库）：key = ref，条目为同一模块接线的**库级默认**：`{module(必填), name?, params?, artifacts?, requires?, optional?, userGate?}`。
+`pipelines.json` 顶层可定义 `stages` 对象（阶段库）：key = ref，条目为同一模块接线的**库级默认**：`{module(必填), name?, params?, artifacts?, requires?, optional?, userGate?, publishes?, op0Import?}`（末两者 2026-11-12 起）。
 pipeline 的阶段条目此时写 `{id, ref, dependsOn, [本地覆盖]}`；`ref`（引用库）与 `module`（v1 内联形态）必须恰有其一，同时出现或缺失 → 加载期拒绝。
 物化规则（加载期完成，运行期行为与 v1 内联完全一致）：
 
 | 字段 | 规则 |
 |---|---|
-| `params` / `artifacts` | 对象按键合并，本地键赢 |
+| `params` / `artifacts` / `publishes` | 对象按键合并，本地键赢（2026-11-12 起含 `publishes`） |
+| `op0Import` | 库定义为默认；本地有则整对象赢（**无按键合并**）；`to` 须为 `Model/`/`Setting/`/`Result/` 下非空相对路径（阶段 exit 0 后平台执行 OP0 导入，见 §6.2 与 ERROR_CODES §2.8/§3.5） |
 | `requires` / `optional` / `name` | 本地有则本地，否则库定义（name 再兜底 stage id） |
 | `userGate` | 库定义为默认；本地可 extends（新增键），**库级闸门键不可被本地覆盖/取消** |
 | `dependsOn` / `id` | 恒为本地（DAG 局部信息） |
@@ -224,7 +233,7 @@ pipeline 的阶段条目此时写 `{id, ref, dependsOn, [本地覆盖]}`；`ref`
 |---|---|
 | `gds_full` | **建模**：源模型 → 几何准备 → 电磁网格 → 热网格（r2 四段接线：geo_em/geo_thermal/mesh_em/mesh_thermal）；EM 主网格 + 材料由任务层 **publisher 自动落位到 `Model/`**，热网格保留在 `Result/gds2geo/thermal_msh/`（r2 布局，无 handoff）。gmsh 4.11.1（随模块位于 tools/gmsh/）由 task_layer 经子进程环境变量 `GDS2GEO_GMSH_EXECUTABLE` 自动注入，UI 无需处理 |
 | `peec_basic` | **电磁**：PEEC 提取 → 频域求解 → 源/场后处理（post 段可选）；S 参数绘图由前端完成（plot 阶段自 2026-11-04 / v1.1 起移除；绘图程序与 Touchstone 导出随 compact_em v1.3 一并取消，2026-11-05 起生效） |
-| `thermal_basic` | **热**：热路提取（thermal.extract，必需）→ 温度后处理（thermal.post，可选，无 OP0 时自动跳过）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal_msh/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），热链三件由 UI 写入：`Model/source_thermal.json`（**thermal 1.0.7 起支持简化 schemaVersion 3**（仅 sources：volume_ids 上 total_power，允许空数组，体材料按 mesh Physical 标签 + matdb 自动装配，无需 thermal 提取对象）**与原 schemaVersion 2**（热源 + thermal 提取对象（体域/薄层/材料关联），1.0.6 起引入；1.0.5 时代提取控制为独立文件 `Result/thermal/thermal_extract_control.json`，已取消））+ `Model/boundary_thermal.json`（必需；**1.0.7 起支持 schemaVersion 2**（default adiabatic + boundaries：fixed_temperature（任意面，含内部面）/ convection（h_W_m2K + ambient_temperature_K））**与原 schemaVersion 1**（1.0.5 起独立文件；1.0.1 时代内嵌于 source_thermal.json））+ `Setting/set_thermal.json`（SPICE 仿真设置 analysis/probe，thermal 1.0.5 起）；程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2 QS-TH-FMT-INPUT）；最简单算例（无热源、两个固定温度面）= `dev/cases/thermal/heater`（schema 3 空 sources + schema 2 边界；验收 6089 节点 / 608 @500 K / 1961 @293.15 K / 0 W；post 6089/6089，max 500 K，min 293.145 K）；post 依赖 `Model/thermal.op0`（ALPS 结果，1.0.6 起标准位置；1.0.5 时代为 Result/thermal/post/，已废止；1.0.7 仍严格校验映射节点温度完整性，不自动补全） |
+| `thermal_basic` | **热**：热路提取（thermal.extract，必需；阶段库 `publishes` 发布网表到 `Model/ThermalNetList.sp`，copy 语义）→ ALPS 远端仿真（alps.simulate，可选：ALPS 三件 `Model/ThermalNetList.sp` + `Setting/ALPSRunner.json` + `Setting/alpsrunner.key` 缺失 → `QS-TL-SKIP-NOINPUT`，可选上游跳过不连带阻断）→ 温度后处理（thermal.post，可选；requires `Result/thermal/alps/thermal.op0`（**thermal 1.0.9 起标准位置**，无旧路径回退）+ `Result/thermal/extract/ThermalNetList.sp`）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal_msh/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），热链三件由 UI 写入：`Model/source_thermal.json`（**thermal 1.0.7 起支持简化 schemaVersion 3**（仅 sources：volume_ids 上 total_power，允许空数组，体材料按 mesh Physical 标签 + matdb 自动装配，无需 thermal 提取对象）**与原 schemaVersion 2**（热源 + thermal 提取对象（体域/薄层/材料关联），1.0.6 起引入；1.0.5 时代提取控制为独立文件 `Result/thermal/thermal_extract_control.json`，已取消））+ `Model/boundary_thermal.json`（必需；**1.0.7 起支持 schemaVersion 2**（default adiabatic + boundaries：fixed_temperature（任意面，含内部面）/ convection（h_W_m2K + ambient_temperature_K））**与原 schemaVersion 1**（1.0.5 起独立文件；1.0.1 时代内嵌于 source_thermal.json））+ `Setting/set_thermal.json`（SPICE 仿真设置 analysis/probe，thermal 1.0.5 起；1.0.9 起含可选 `mesh_length_unit`：m/mm/um，两阶段读取；1.0.9 起另支持可选薄膜覆写件 `Model/thinfilm_thermal.json`，缺位 = 不覆写）；程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2 QS-TH-FMT-INPUT）；最简单算例（无热源、两个固定温度面）= `dev/cases/thermal/heater`（schema 3 空 sources + schema 2 边界；验收 6089 节点 / 608 @500 K / 1961 @293.15 K / 0 W；post 6089/6089，max 500 K，min 293.145 K）；OP0 标准位置（**1.0.9 起 `Result/thermal/alps/thermal.op0`**，`Model/thermal.op0` 废止；1.0.5 时代 `Result/thermal/post/` 早已废止）：alps 缺位时用预置工作点（离线/回归形态），alps 成功时由平台导入步骤落位（run_summary 8 字段门 + SHA256SUMS 复核 + I7 三向新鲜度守卫，同目录审计件 `import_receipt.json`）；post 不检查网表来源（1.0.7 起，1.0.9 延续），1.0.8 起映射缺温用最近已知温度网格节点就近填补（CSV `value_source` 列标记，不自动补值 → 无法填补 exit 2 `QS-TH-FMT-INPUT`；1.0.7 严格校验为旧版行为） |
 
 进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。
 模块能否真正运行（程序是否找得到）用 `modules.list` 的 `available` 字段判断（见 4.2）。
@@ -253,9 +262,12 @@ pipeline 的阶段条目此时写 `{id, ref, dependsOn, [本地覆盖]}`；`ref`
                                         写 Model/source_thermal.json        → meshFile 指向
                                         Result/gds2geo/thermal_msh/model_thermal.msh + 其 SHA-256，
                                         sources/fixed_temperature 用网格 elementary ID
-③ UI: task.run thermal_basic         → 热路提取（post 无 OP0 时自动跳过）
-④（可选）OP0 就绪（Model/thermal.op0；thermal 1.0.6 起标准位置，
-            thermal_run.json / 独立控制件均已取消）后重跑 → 温度后处理
+③ UI: task.run thermal_basic         → 热路提取 →（alps 可选：ALPSRunner.json / alpsrunner.key 缺失则跳过）→ 温度后处理（post 无 OP0 时自动跳过；alps 缺位时用预置工作点）
+④ 工作点动态化（thermal 1.0.9 起）：alps 阶段提交 Model/ThermalNetList.sp（任务层经 stage
+            publishes 落位）经 SSH 到远端 IC618 做 ALPS 仿真；exit 0 后任务层导入步骤（run_summary 门 +
+            SHA256SUMS 复核 + I7 三向新鲜度守卫）把 OP0 落位 Result/thermal/alps/thermal.op0
+            （无旧路径回退；独立通道 alps.importOp0 / CLI alps-import-op0；
+            thermal_run.json / 独立控制件均已取消）
 ```
 
 ```json
@@ -590,18 +602,18 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 
 ### 6.2 阶段层（通知里的 `errorCode`）
 
-机器按 `errorCode` 分支，**不要解析文本**。格式为 `QS-TL-<域>-<错误名>`（2026-11-12 起两模块 errorContract=none，模块自身 QS 码不再存在；失败原因在 `errorMessage` 文本 + `exitCode`）。
+机器按 `errorCode` 分支，**不要解析文本**。格式为 `QS-TL-<域>-<错误名>`（2026-11-12 起三模块 errorContract=none：compact_em v1.4 / gds2geo 1.3.0 / alpsrunner 1.1.2，模块自身 QS 码不再存在；失败原因在 `errorMessage` 文本 + `exitCode`）。ALPS 结果导入码（`QS-TL-ALPS-*`）为任务层自有域（见下）。
 
 | errorCode | 含义 |
 |---|---|
 | `QS-TL-INPUT-MISSING` | 必需输入缺失（`errorMessage` 含具体路径） |
 | `QS-TL-MOD-NOTFOUND` | 后端程序未找到（部署路径不对） |
-| `QS-TL-MOD-EXEC` | 后端程序非 0 退出（compact_em/gds2geo 均 errorContract=none：平台固定本码 + 携带进程退出码，模块不产生结构化 stderr JSON） |
+| `QS-TL-MOD-EXEC` | 后端程序非 0 退出（compact_em/gds2geo/alpsrunner 均 errorContract=none：平台固定本码 + 携带进程退出码，模块不产生结构化 stderr JSON；alpsrunner 退出码 0/2/3/4/5/124/130 见 ERROR_CODES 3.5） |
 | `QS-TL-OUTPUT-MISSING` | 宣告成功但没有产出文件 |
 | `QS-TL-MOD-TIMEOUT` | 阶段超时 |
 | `QS-TL-CANCEL` | 用户取消 |
 | `QS-TL-DEP-BLOCKED` | 上游失败导致跳过 |
-| `QS-TL-DEP-SKIPPED` | 上游被跳过导致跳过 |
+| `QS-TL-DEP-SKIPPED` | 上游被跳过导致跳过（2026-11-12 起：**可选**上游跳过/取消不连带阻断，下游按自身 `requires` 判定；ALPS 场景：alps 阶段缺用户件 → `QS-TL-SKIP-NOINPUT`，post 用预置工作点） |
 | `QS-TL-SKIP-NOINPUT` | 可选阶段自身输入缺失 |
 | `QS-TL-INPUT-NOTWAITING` | 用户闸门（P1.5）：provideInput 时任务非活动、阶段不在等待、或未声明闸门 |
 | `QS-TL-SEL-UNKNOWNSTAGE` | 执行选择/stages 含流水线中不存在的阶段（或续跑的历史阶段不在当前流水线） |
@@ -613,7 +625,8 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 | `QS-TL-WORKER-NOTFOUND` | DLL 模块的 worker_host 宿主未找到 |
 | `QS-TL-IO-JOB` | job JSON 写入失败（DLL 模块任务定义落盘失败） |
 | `QS-TL-PATH-ESCAPE` | 执行前契约守卫（2026-11-10）：模块 outputChecks / publishes 经 rebind 解析越出当前 dataRoot → `task.run` 以 -32004 直接拒绝（不创建任务）；`inputs.validate` 报本 issue。不出现在 `task.stage.finished` |
-| ~~`QS-FMT-* / QS-SOLV-* / ...`~~ | （历史行，已失效）计算层模块自身错误码原样透传；**2026-11-12 起两模块 errorContract=none** |
+| `QS-TL-ALPS-NORUN / MULTIRUN / BADSUMMARY / BADSHA / STALE / IO` | ALPS 结果导入（2026-11-12 起；任务层自有域，抛出点 `io/AlpsImport.cpp`）：流水线形态阶段模块 exit 0 后经 `op0Import` 触发，失败该阶段置 Failed、下游阻断；独立通道 `alps.importOp0` / CLI `alps-import-op0` 失败 -32005 + `data.errorCode`；成功落位 `Result/thermal/alps/thermal.op0` + 同目录 `import_receipt.json`，I7 三向新鲜度守卫（run_summary.input_sha256 = 现 `Model/ThermalNetList.sp` sha = `thermal_binding.json.netlistSha256`，否则 STALE） |
+| ~~`QS-FMT-* / QS-SOLV-* / ...`~~ | （历史行，已失效）计算层模块自身错误码原样透传；**2026-11-12 起三模块 errorContract=none** |
 
 ---
 
@@ -668,6 +681,34 @@ dataRoot = <部署根>/cases/<项目名>/DATA
 注意：gds2geo（r2 / 1.3.0）以系统命名互斥量做并发保护、不创建锁文件（旧版文件锁位于
 `Result/gds2geo/runtime/`，不得与旧版混用同一算例）；任务层自己的 `task.log` 和 `state.json` 始终在算例的
 `Result\tasks\<taskId>\` 下。r3 另随附辅助工具 geoedit / mshcheck / mshfix（平台默认不接入流水线，仅以辅助命令暴露）。
+
+### `thermal_basic` 算例布局（按 DATA_LAYOUT v1.7）
+
+（dataRoot 下；以 dev 算例 heater_reextract_20261109 为例）
+
+```text
+case\
+├─ Model\
+│  ├─ source_thermal.json             # 热源（schema 3 空 sources 或 schema 2）
+│  ├─ boundary_thermal.json           # 边界（schema 2）
+│  ├─ matdb.json                      # 材料库（gds_full 发布）
+│  ├─ model_thermal.msh               # 热网格（gds2geo 产出）
+│  ├─ ThermalNetList.sp               # 平台发布件：extract 阶段库 publishes（copy；alps 固定输入）
+│  └─ thinfilm_thermal.json（可选）   # 1.0.9 薄膜覆写件，缺位 = 不覆写
+├─ Setting\
+│  ├─ set_thermal.json                # SPICE 设置（+ 可选 mesh_length_unit：m/mm/um）
+│  ├─ ALPSRunner.json                 # ALPS 远端配置（schema 2；随算例提交，用户确认）
+│  └─ alpsrunner.key                  # SSH 私钥（随算例提交，用户确认 2026-11-12）
+└─ Result\
+   ├─ thermal\extract\                # 发布源：ThermalNetList.sp / ThermalNetList.rc / ExtractReport + thermal_binding.json
+   ├─ thermal\alps\                   # 平台 ALPS 导入区（D1a）：thermal.op0 + import_receipt.json（同目录审计件）
+   ├─ thermal\post\                   # 7 产物：NodeTemperatureAtOperatingPoint.csv（value_source 列）/ VolumeTemperatureAtOperatingPoint.msh / MaximumTemperature.txt / 报告
+   ├─ alpsrunner\simulate\            # run bundle 镜像：<runId>\{console.log, run_summary.json, SHA256SUMS.txt, <netlist>.sp, <netlist>.sp.sim\}
+   ├─ logs\thermal\、logs\alpsrunner\  # 模块日志
+   └─ tasks\、.locks\                 # 任务状态与锁
+```
+
+工作点链路（2026-11-12 起）：extract 发布网表 → alps 可选（ALPS 三件缺位 → `QS-TL-SKIP-NOINPUT`，可选上游跳过不阻断；运行时经 SSH 远端 IC618 仿真，exit 0 后平台导入步骤落位 OP0 + 同目录 `import_receipt.json`，I7 三向新鲜度守卫）→ post 读标准位置 `Result/thermal/alps/thermal.op0`（无旧路径回退）+ extract 网表。独立通道：JSON-RPC `alps.importOp0` / CLI `alps-import-op0`（同一导入逻辑）。
 
 ---
 

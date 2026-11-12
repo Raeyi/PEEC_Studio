@@ -1,7 +1,26 @@
 # thermal 模块重打包请求日志（REPACK/thermal）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.5 修订 1）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.0.6（2026.11.04-native-1.0.6，apiVersion 7）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.7）/ `MODULE_MANIFEST_SPEC.md`（v1.4）；包内模块当前版本：**1.0.9（2026.11.12-native-1.0.9，apiVersion 8）**。ALPS 联动（工作点动态获取）见下第 4 轮与 `REPACK/alpsrunner.md`。
+
+## 第 4 轮（2026-11-12 请求 → 回执同日）
+
+状态：**已收口（2026-11-12 同日）** —— 1.0.9 已收到并集成（模块目录替换 + 平台契约变化：OP0 动态获取与 alpsrunner 1.1.2 联动 + 平台导入双通道 + 文档同步；DATA_LAYOUT v1.7 / MODULE_MANIFEST_SPEC v1.4 / REPACK/alpsrunner.md 三件活契约更新）。
+
+### 请求正文（2026-11-12，用户）
+
+- 热模块新发版（1.0.9，`ThermalDelivery_1.0.9_20261112_UI.rar`）：此前版本读取的 OP0 为固定位置，现改为运行热 pipeline 时由平台调用 ALPS 模块（alpsrunner 1.1.2，`ALPSRunner_1.1.2.zip`，集成于平台 `tools/` 子模块）动态获取工作点。
+- ALPS 模块作为 `tools/` 子模块集成，可供任意 stage / pipeline 调用；OP0 落位为平台导入职责（ALPS 模块无固定 OP0 产物名，`artifacts.produced=[]`）。
+
+### 回执正文（2026-11-12，平台侧）
+
+- **交付核验（vendor 事实）**：1.0.9 manifest `2026.11.12-native-1.0.9`，apiVersion 8（minApi 1），errorContract `qs-json-stderr`（不变）；post `optional: true`；extract 必需（5 用户引用、4 件 producesInternal）；post argsTemplate 内置 `--op0 {dataRoot}/Result/thermal/alps/thermal.op0`（显式 `--op0` 可覆盖，**无旧路径回退**）；7 个公开产物（netlist.dc / netlist.rc / extract.report / temperature.nodes / temperature.mesh / temperature.maximum / temperature.report，均无 publishTo——网表落位为平台阶段库 `publishes` 职责）；source schema 3 + 可选 `Model/thinfilm_thermal.json`；两阶段读取 `Setting/set_thermal.json` 可选字段 `mesh_length_unit`（m/mm/um）。
+- **退出码表重构（1.0.9）**：exit 6 `QS-TH-RUN-LOCKED`（pipeline_locked：同一算例已有热模块运行或锁文件无法打开；不能删除运行中的锁）；exit 5 改为 `QS-TH-EXEC`（Windows SHA256 服务失败）；新增 `QS-TH-CFG-PATH` / `QS-TH-CFG-BINDING`（exit 2）与 `QS-TH-NUM-MAPPING`（exit 4）；`QS-TH-NUM-OP0` 不在新表内（映射缺温改为就近填补，见下）。
+- **映射缺温行为（1.0.8→1.0.9）**：OP0 缺映射所需 T 节点温度时，post 用最近的完整已知温度网格节点替代，CSV（`value_source` 列）与报告显式标记；OP0 原文件不修改；无可用已知温度 / 重复映射 / 无效节点或权重 → exit 2 `QS-TH-FMT-INPUT`，不自动补值（1.0.7 严格校验为旧版行为）。
+- **平台契约变化**：OP0 标准位置 `Result/thermal/alps/thermal.op0`（D1a：task_layer 写 / thermal post 读）；ALPS 三件（`Model/ThermalNetList.sp` 平台发布 + `Setting/ALPSRunner.json` + `Setting/alpsrunner.key`）dev 算例随案提交（key 直接提交 = 用户确认 2026-11-12）；旧独立 ps1 导入脚本弃用（v2.5.0_rc1 交付时移除）。
+- **平台集成动作**：① alpsrunner 1.1.2 完整包 → `tools/alpsrunner/`（详见 REPACK/alpsrunner.md）；② 任务层双通道 OP0 导入（阶段库 `op0Import` + JSON-RPC `alps.importOp0` + CLI `alps-import-op0`；run bundle 差集 + run_summary 8 字段门 + SHA256SUMS 复核 + I7 三向新鲜度守卫；审计件 `import_receipt.json` 写于 OP0 同目录；6 个 `QS-TL-ALPS-*` 码）；③ thermal_basic 3 段链（extract publishes → alps 可选 → post）；④ 可选上游跳过语义（alps 跳过不连带阻断，post 用预置工作点）。
+- **实测**：E2E 离线 15/15（新 dataRoot、无 ALPS 输入：extract 网表与 vendor 参考逐字节一致 `7da064302ead1850…` 1,597,236 B → `publishes` 落位 → alps 跳过 `QS-TL-SKIP-NOINPUT` → post 预置工作点 6094 行 / 293.15–500 K / max 500 K = 226.85 °C / 3 处就近填补，CSV `value_source` 标记）；ALPS smoke 22/22（fake EXE + vendor 参考 run bundle，离线）；真远端 ALPS 链路（192.168.136.172:22，2026-11-12 实测 TCP 可达）在统一 v2.5.0_rc1 交付轮执行（时限预算 3600 s）。
+- **收口状态**：1.0.9 模块目录替换与文档同步收口；OP0 动态获取链路离线形态收口（预置工作点 + 独立通道可导入）；真远端形态留统一交付轮。
 
 ## 第 3 轮（2026-11-06 请求 → 回执同日）
 

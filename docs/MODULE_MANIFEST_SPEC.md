@@ -1,6 +1,6 @@
 # 模块自描述契约规范（module.manifest.json）
 
-v1.3 · 2026-11-09 · 模块交付四件套之一（exe / README.md / ERROR_CODES.md / module.manifest.json），放模块包根目录，**模块团队维护**。v1.3 变更：§三 骨架与 §11.1/§11.2 示例更新至 gds2geo V1.2 r2（apiVersion 4 / 2 EXE / manifest 无 publishTo）与 compact_em v1.3（2026.11.04）；明确 publisher 落位双机制（manifest `publishTo` 或平台 `pipelines.json` 阶段条目 `publishes`，见 DATA_LAYOUT D7）。v1.2 变更：对外 ref 端口类改名 `em/ports.def` → `em/source.def`、`thermal/ports.def` → `thermal/source.def`（路径对应 `Model/source_em.json` / `Model/source_thermal.json`）；新增预留 ref `em/boundary.def` / `thermal/boundary.def`（→ `Model/boundary_em.json` / `Model/boundary_thermal.json`，暂无消费方）；`defaultTemplate` 字段废止（templates/ 不再随包）。
+v1.4 · 2026-11-12 · 模块交付四件套之一（exe / README.md / ERROR_CODES.md / module.manifest.json），放模块包根目录，**模块团队维护**。v1.4 变更：§11.3 新增 ALPSRunner 1.1.2（apiVersion 1）manifest 全例（环境依赖 `bundled:false` = 远端运行环境、`produced=[]` 无固定对外产物、`{override:--threads}`）；明确 `artifacts.produced` 空数组语义（模块不产出固定对外产物；下游不得声明其内部 ref 为 consumed；结果正式化与平台导入归平台侧，见 DATA_LAYOUT v1.7 D1a / §2.8）；环境依赖语义补注（EXE/远端运行环境不随包、平台提供并钉定；先例 gds2geo gmsh / ALPSRunner alpsrunner_host）。v1.3 变更：§三 骨架与 §11.1/§11.2 示例更新至 gds2geo V1.2 r2（apiVersion 4 / 2 EXE / manifest 无 publishTo）与 compact_em v1.3（2026.11.04）；明确 publisher 落位双机制（manifest `publishTo` 或平台 `pipelines.json` 阶段条目 `publishes`，见 DATA_LAYOUT D7）。v1.2 变更：对外 ref 端口类改名 `em/ports.def` → `em/source.def`、`thermal/ports.def` → `thermal/source.def`（路径对应 `Model/source_em.json` / `Model/source_thermal.json`）；新增预留 ref `em/boundary.def` / `thermal/boundary.def`（→ `Model/boundary_em.json` / `Model/boundary_thermal.json`，暂无消费方）；`defaultTemplate` 字段废止（templates/ 不再随包）。
 机器校验：平台方提供 `docs/module.manifest.schema.json`（JSON Schema draft-07），模块团队可用任意 JSON Schema 校验器本地自查；task_layer 加载时按同一 schema 做结构校验。
 
 ## 一、职责切分
@@ -70,6 +70,7 @@ v1.3 · 2026-11-09 · 模块交付四件套之一（exe / README.md / ERROR_CODE
         "schemaVersion": "4",                           // [对外必填]
         "units": { "length": "mm" },                    // [可选]
         "publishTo": "Model/model_em.msh" }             // [可选] 正式件落点（仅 Model//Setting/；gds2geo V1.2 r2 起 manifest 不带此字段，落位改由平台阶段条目 publishes 声明）
+      // produced 可为空数组（v1.4 补注，ALPSRunner 1.1.2 §11.3）：模块不产出任何固定对外产物（自由形式输出，如远端运行结果 run bundle 目录）；下游模块不得声明其内部 ref 为 consumed；结果正式化与平台导入归平台侧（DATA_LAYOUT v1.7 D1a / §2.8）
     ],
     "consumed": [
       { "ref": "user/layout.gds",
@@ -84,6 +85,7 @@ v1.3 · 2026-11-09 · 模块交付四件套之一（exe / README.md / ERROR_CODE
     "modules": [],                                      // [可选] 上游 providerId
     "artifacts": ["user/layout.gds", "user/techfile"],  // [必填] 消费的全部对外 ref
     "environment": { "gmsh": { "version": "4.11.1", "requiredBy": ["em_msh", "thermal_msh"], "bundled": false, "environmentVariable": "GDS2GEO_GMSH_EXECUTABLE" } }  // [可选]
+    // v1.4 补注（ALPSRunner 1.1.2 §11.3）：环境依赖也可以是远端运行环境（非本地 EXE）——如 alpsrunner_host（bundled:false）：ALPS 远端运行环境（SSH 主机 + IC618 VM + 许可证）由平台提供并钉定（主机指纹/协议版本）；用户凭据与连接设置在 Setting/（alpsrunner.key / ALPSRunner.json，用户件）；缺失或版本不符时平台预检禁用依赖阶段或报错，模块包永不携带 EXE/凭据
   },
 
   "capabilities": {
@@ -103,7 +105,7 @@ v1.3 · 2026-11-09 · 模块交付四件套之一（exe / README.md / ERROR_CODE
 | `{runtimeDir}` | `<dataRoot>/Result/logs/<providerId>/`（R2 统一落点） |
 | `{moduleDir}` | 模块包安装目录绝对路径（只读） |
 | `{artifact:<ref>}` | 上游工件绝对路径（task_layer 查路由表填充） |
-| `{override:<key>}` | 经 allowedArgs 白名单校验后的 UI 覆盖值（未提供则整对省略） |
+| `{override:<key>}` | 经 allowedArgs 白名单校验后的 UI 覆盖值（未提供则整对省略） | key 须在同 stage `allowedArgs` 内、值类型为字符串（例：ALPSRunner 1.1.2 `--threads` + `{override:--threads}`，v1.4）
 
 **禁止**在 argsTemplate 中出现其他模块的目录名字面量。
 
@@ -319,3 +321,64 @@ task_layer 不做 internal ref 存在性检查（深检归模块），用它做�
                     "breakingChanges": [{"version":"2026.10.30","note":"API 2: explicit dataRoot; per-stage output paths; port_em.json; flat set.json; optional receipts separated from mandatory internal artifact integrity."},{"version":"2026.11.02","note":"DATA_LAYOUT v1.2: Model/source_em.json replaces port_em.json; em/source.def replaces em/ports.def; defaultTemplate removed; examples and settings are delivered in a separate case package."},{"version":"2026.11.04-v1.3","note":"API 3 / DATA_LAYOUT v1.4 revision 1 EM requirements: Setting/set_em.json is the only accepted JSON settings name; deprecated set.txt remains supported with a warning. Old set.json artifact indexes are stale. The delivered stages/executables are extract, solve and post; the S-parameter Plotter and all Touchstone sNp exports (including legacy implicit export) are removed. Missing selected settings now report QS-FMT-SETTING-INVALID. The module directory contains only three executables, manifest, README and ERROR_CODES; schemas, technical notes and inventories are delivered outside it. This batch also includes the existing 2026-11-04 mainline PEC reference ground, real-system/memory optimizations and low-frequency full-charge accuracy fixes; differences from the 2026-11-02 numerical baseline are documented separately."}] }
 }
 ```
+
+### 11.3 ALPSRunner 1.1.2（apiVersion 1，v1.4 新增，2026-11-12）
+
+要点：远端网表仿真（SSH 传输 + 远端运行 + 结果下载校验）。该模块**不产出任何固定对外产物**（`artifacts.produced=[]`；`alpsrunner/run.bundle` 为内部产物集 = `Result/alpsrunner/simulate/<runId>/` 下 run bundle 目录，内含 `run_summary.json` / `SHA256SUMS.txt` / `console.log` / netlist / `ThermalNetList.sp.sim/`），结果正式化（OP0 抽取落平台导入区）为**平台导入职责**（DATA_LAYOUT v1.7 §2.8，三向新鲜度守卫 I7，审计件 `import_receipt.json`）；**环境依赖 `bundled:false`**（`alpsrunner_host` = 远端运行环境，非本地 EXE；平台提供并钉定主机指纹/协议版本，用户凭据 `Setting/alpsrunner.key` / 连接设置 `Setting/ALPSRunner.json` 归用户件）；stage 用户件（config/key）缺位 → 平台预检跳过该阶段（QS-TL-SKIP-NOINPUT；v1.7 调度语义：可选上游跳过不阻断下游）。无 `minApiVersion`（无上游模块依赖）；无 `cli.dataRootArg`（散参数设计，argsTemplate 显式传绝对路径，合 R1）；`errorContract=none` → 非零退出码统一归一 QS-TL-MOD-EXEC（ERROR_CODES §3.5）。manifest 全例（校验样例）：
+
+```jsonc
+{
+  "manifestVersion": 1,
+  "id": "alpsrunner",
+  "name": "ALPSRunner 网表远程仿真与结果回传",
+  "version": "1.1.2",
+  "apiVersion": 1,
+  "cli": { "executables": ["ALPSRunner.exe"], "deprecatedModes": [] },
+  "stages": [
+    {
+      "id": "simulate",
+      "executable": "ALPSRunner.exe",
+      "argsTemplate": [
+        "--input", "{dataRoot}/Model/ThermalNetList.sp",
+        "--output-dir", "{dataRoot}/Result/alpsrunner/simulate",
+        "--config", "{dataRoot}/Setting/ALPSRunner.json",
+        "--runtime-dir", "{runtimeDir}",
+        "--threads", "{override:--threads}"
+      ],
+      "allowedArgs": ["--threads"],
+      "optional": false,
+      "exitCodes": { "0": "ok", "2": "input_or_configuration", "3": "transport_or_preflight", "4": "simulation", "5": "download_or_integrity", "124": "timeout", "130": "cancelled" },
+      "errorContract": { "type": "none" },
+      "producesInternal": ["alpsrunner/run.bundle"]
+    }
+  ],
+  "artifacts": {
+    "produced": [],
+    "consumed": [
+      { "ref": "user/alpsrunner.netlist", "path": "Model/ThermalNetList.sp", "maintainedBy": ["ui"], "accept": { "extensions": [".sp"] } },
+      { "ref": "user/alpsrunner.config", "path": "Setting/ALPSRunner.json", "maintainedBy": ["ui"], "accept": { "extensions": [".json"] } },
+      { "ref": "user/alpsrunner.key", "path": "Setting/alpsrunner.key", "maintainedBy": ["ui"], "accept": { "extensions": [".key"] } }
+    ]
+  },
+  "dependsOn": {
+    "modules": [],
+    "artifacts": ["user/alpsrunner.netlist", "user/alpsrunner.config", "user/alpsrunner.key"],
+    "environment": {
+      "alpsrunner_host": { "version": "1.1.0", "protocol": 1, "bundled": false, "requiredBy": ["simulate"],
+        "requirements": [ "Configured Windows SSH server is reachable and its pinned RSA host fingerprint matches",
+                            "The client public key is authorized for the fixed ALPSRunnerHost command",
+                            "IC618 is running with VMware Tools, ALPS and its license available" ] }
+    }
+  },
+  "capabilities": {
+    "dataLayout": "peec-data/v1",
+    "runtimePolicy": "This delivery profile requires output and runtime directories on the same actual volume under one dataRoot, without junctions or symbolic links. The native cross-volume compatibility fallback is outside this profile.",
+    "resultPolicy": "Each invocation creates a new timestamp-and-ID directory inside Result/alpsrunner/simulate. alpsrunner/run.bundle is an internal result set, not a fixed external artifact path.",
+    "publicationPolicy": "No fixed OP0 artifact, publishTo or automatic publication into Model/Setting is declared.",
+    "platformIntegration": "Register this provider and its user input refs in the host configuration, validate template expansion and run the platform acceptance case. Actual task_layer registration and downstream integration are not implied by schema validation."
+  }
+}
+```
+
+注：`capabilities` 五字段为 vendor 1.1.2 原样（platformIntegration 明示 schema 校验不蕴含 task_layer 注册——注册与下游集成由平台 2026-11-12 轮执行，见 REPACK/alpsrunner.md 第 1 轮）。
+

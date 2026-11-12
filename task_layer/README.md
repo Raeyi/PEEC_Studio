@@ -142,7 +142,7 @@ proc->write(QJsonDocument(QJsonObject{
 ```
 
 - `dependsOn` 声明依赖，形成 DAG；就绪阶段按 `maxParallel` 并行启动；
-- `optional: true`：输入缺失自动跳过（Skipped），不阻断主链（对应旁路：网格融合/DPEC/后处理等；S 参数绘图由前端完成，平台自 2026-11-04 起不再跑 plot 阶段）。
+- `optional: true`：输入缺失自动跳过（Skipped），不阻断主链（对应旁路：网格融合/DPEC/后处理等；S 参数绘图由前端完成，平台自 2026-11-04 起不再跑 plot 阶段）。2026-11-12 起：**可选**上游阶段跳过/取消不连带阻断下游（详见下“依赖失败/被跳过的下游阶段”条目）。
 - **注意**：`peec_basic` 的 `maxParallel` 为 **1**。Compact 用 `DATA/.peec-data.lock` 独占句柄限制并发写，
   同一 DATA 上并行跑后处理会互相锁失败（plot 阶段已移除）；并行能力留给未来不共享 DATA 的 DLL 模块。
 
@@ -152,6 +152,7 @@ proc->write(QJsonDocument(QJsonObject{
 task_layer.exe serve --config .\config --bin .\bin      # stdio RPC 服务（UI 用）
 task_layer.exe run --pipeline peec_basic --data-root D:\Cases\demo   # 单次执行
 task_layer.exe modules / pipelines                        # 打印注册表
+task_layer.exe alps-import-op0 --data-root D:\Cases\demo --run-dir <bundle 子目录名> [--op0-dest Result/thermal/alps/thermal.op0]   # 独立 ALPS OP0 导入（2026-11-12 起；等价 JSON-RPC alps.importOp0）
 ```
 
 ## 五、DLL 模块接入（目标形态）
@@ -172,7 +173,7 @@ task_layer.exe modules / pipelines                        # 打印注册表
   **模块自身错误码会原样透传**（如 `QS-FMT-SETTING-UNKNOWN_KEY`、`QS-SOLV-MEMORY-OUT_OF_MEMORY`），UI 按 `errorCode` 分支，不要解析文本；
 - 依赖失败/被跳过的下游阶段统一置 `skipped`，用 `errorCode` 区分原因：
   - `QS-TL-DEP-BLOCKED`：上游 failed；
-  - `QS-TL-DEP-SKIPPED`：上游被跳过（可选阶段输入缺失等）；
+  - `QS-TL-DEP-SKIPPED`：上游被跳过（可选阶段输入缺失等；**2026-11-12 起可选上游跳过/取消不连带阻断**——视同不适用，下游按自身 `requires` 判定，缺输入则 `QS-TL-SKIP-NOINPUT` 跳过；实例：thermal_basic 中 alps 阶段（可选）缺 ALPS 三件跳过时，post 仍用预置工作点正常运行；实现：`propagateBlocked` 可选豁免 + `isReady` 视同满足 + `stageIsOptional`）；
   - `QS-TL-CFG-DEADLOCK`：`dependsOn` 无法解析（加载期已校验 DAG，正常不会出现）；
   - `QS-TL-SKIP-NOINPUT`：可选阶段自身输入缺失；
   - `QS-TL-CANCEL` / `QS-TL-MOD-TIMEOUT`：用户取消 / 超时；
@@ -497,3 +498,12 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
   ⑤ **复测（6 腿，`--v1-commit cc24e18` 物化等价基线）**：baseline ✓0（thermal 基线 344.1037 K；gds_full r2 四段 + publisher 落位 Model/model_em.msh 66,834 B + matdb.json 878 B）、pswitch ✓0、p1 ✓0（21/21）、p3 ✓0、p2 ✓1（恰为 3 个已记录的预期物化 FAIL：gds_full / thermal_basic / peec_basic——v1.4 严格度/算例变化迫使平台侧算例/测试适配）、gate ✓0（22/22）。
   ⑥ **文档**：UI_API.md（errorContract=none、v1.4 输出契约、gds r2 布局、thermal_msh 路径）、ERROR_CODES.md §3（3.1/3.2 重写；v1.2 时代 compact_em QS 码降级为历史行）、docs/REPACK/compact_em.md + gds2geo.md 增 2026-11-12 R3 回执。
   范围说明：v1.4 严格度与算例变化迫使平台侧算例/测试适配（见 ④ 与 ⑤ 的 3 个预期 FAIL）；未改动任何模块源码（全部为 vendor 二进制），任务层源码零改动。
+- 2026-11-12（ALPS 集成轮，**v2.5.0_rc1**；分支 `feature/alps-20261112`，基线 18576e0 = main，**未合入 main**）：
+  ① **alpsrunner 1.1.2 平台集成**（`tools/alpsrunner/` 完整包：ALPSRunner.exe + manifest 88 行 + README + ERROR_CODES；provider `alpsrunner`、stage `simulate`、apiVersion 1、errorContract=none → 平台归一 `QS-TL-MOD-EXEC` + 退出码；SSH 远端 IC618/ALPS 2025；退出码 0/2/3/4/5/124/130，ERROR_CODES §3.5）；
+  ② **任务层源码改动（OP0 导入双通道）**：阶段库 `op0Import`（流水线形态：阶段模块 exit 0 后平台落位 OP0，run bundle 差集 + `run_summary.json` 8 字段门 + `SHA256SUMS.txt` 复核 + I7 三向新鲜度守卫）+ JSON-RPC `alps.importOp0` + CLI `alps-import-op0`（独立形态）；审计件 `import_receipt.json`（8 字段）写于 OP0 同目录（默认 `Result/thermal/alps/import_receipt.json`）；6 个 `QS-TL-ALPS-*` 码（NORUN/MULTIRUN/BADSUMMARY/BADSHA/STALE/IO，ERROR_CODES §2.8）；`PipelineLoader` 物化 `publishes`（按键合并、本地键赢）/`op0Import`（本地整对象赢、无按键合并）；
+  ③ **thermal 1.0.9 换版**（2026.11.12-native-1.0.9，apiVersion 7→8）：OP0 标准位置 `Result/thermal/alps/thermal.op0`（argsTemplate 内置 `--op0`，显式可覆盖，**无旧路径回退**）；exit 6 `QS-TH-RUN-LOCKED`、exit 5 改为 `QS-TH-EXEC`、新增 `QS-TH-CFG-PATH`/`QS-TH-CFG-BINDING`/`QS-TH-NUM-MAPPING`；映射缺温就近填补（CSV `value_source` 标记 + 报告注记，OP0 原文件不改，无法填补仍 exit 2）；新增可选 `Model/thinfilm_thermal.json` 与 `mesh_length_unit`（m/mm/um）；post 不检查网表来源（1.0.7 起）；
+  ④ **pipeline 与算例**：`pipelines.json` thermal_basic 三段链（extract 必需，publishes 网表 `Model/ThermalNetList.sp` → alps 可选（requires ALPS 三件：网表 + `Setting/ALPSRunner.json` + `Setting/alpsrunner.key`）→ post 可选（depends on alps，requires 标准位置 OP0 + extract 网表））；dev 算例 ALPS 三件随案提交（`alpsrunner.key` 直接提交 = 用户确认 2026-11-12）；旧独立 ps1 导入脚本标记弃用（`[弃用 2026-11-12 / v2.5.0_rc1]`，交付时移除）；
+  ⑤ **可选上游跳过语义**：可选上游阶段跳过/取消不连带阻断下游（`propagateBlocked` 可选豁免 + `isReady` 视同满足 + `stageIsOptional`），下游按自身 `requires` 判定（实例：alps 跳过 → post 用预置工作点正常运行；离线形态状态 {done,skipped,done}）；
+  ⑥ **实测**：ALPS smoke 22/22（fake EXE + vendor 参考 run bundle，离线）；离线 3 段链 live 15/15（extract 网表与 vendor 参考逐字节一致 `7da064302ead1850…` 1,597,236 B → `publishes` 落位 → alps 跳过 `QS-TL-SKIP-NOINPUT` → post 预置工作点 6094 行 / 293.15–500 K / max 500 K = 226.85 °C / 3 处就近填补）；基线回归（p1/p3/gate）与真远端 ALPS 链路在统一交付轮执行；
+  ⑦ **文档**：DATA_LAYOUT v1.7（OP0 标准位置 D1a / ALPS 自由区 / mesh_length_unit / I7）、MODULE_MANIFEST_SPEC v1.4（op0Import / publishTo / alpsrunner §3.5）、ERROR_CODES §2.8+§3.5、UI_API 双通道契约、REPACK/thermal 第 4 轮 + REPACK/alpsrunner.md。
+  范围说明：本轮**含任务层源码改动**（导入双通道 + 物化 + 可选跳过语义）；模块侧全部为 vendor 二进制（alpsrunner 1.1.2 / thermal 1.0.9）。

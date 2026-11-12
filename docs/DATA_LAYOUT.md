@@ -1,6 +1,6 @@
 # PEEC Studio 数据布局规范（DATA_LAYOUT）
 
-v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径与目录的唯一事实源；manifest 中所有 path 以本文件为基准；冲突时以本文件为准。
+v1.7 · 2026-11-12 · 适用：所有计算层模块与 UI、task_layer。路径与目录的唯一事实源；manifest 中所有 path 以本文件为基准；冲突时以本文件为准。
 变更（v1.2）：`port_em.json` → `source_em.json`、`port_thermal.json` → `source_thermal.json`；新增预留件 `boundary_em.json`、`boundary_thermal.json`（均 UI 输入）；模块包不再携带 examples//templates/（案例改为包外单独交付，见 ONBOARDING §1.1）。
 变更（v1.3）：求解设置拆分为 `Setting/set_em.json`（EM 字段，compact_em 消费）与 `Setting/set_thermal.json`（热对象，热模块消费）；原合并件 `set.json` 为 v1.2 时代格式（见 §八）。生效条件：thermal ≥1.0.2 与 compact_em ≥v1.3 重发版集成起（模块按各自 manifest consumed 声明读取，平台代码不改）。
 变更（v1.4）：热侧设置定形按 thermal 1.0.5 重发版（2026-11-02，按用户最新指示实施，优先于 v1.3 热侧稿）：`Setting/set_thermal.json` 为 SPICE 仿真设置（analysis/probe，§八.1）；`thermal` 对象移入 `Result/thermal/thermal_extract_control.json`（提取控制，暂存于此、拆分位置待定）；`Model/boundary_thermal.json` 为必需输入（§八.2）；OP0 默认路径 `Result/thermal/post/thermal.op0`。EM 侧 `set_em.json` 改名不变（compact_em ≥v1.3 重发版待到位）。
@@ -10,6 +10,7 @@ v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径
 变更（v1.5 修订 2，2026-11-05，EM 侧设置定形，compact_em v1.3 集成）：① EM 链唯一 JSON 设置 = `Setting/set_em.json`（平铺 schemaVersion=1；旧平铺 `set.json` 不再读取，v1.2 时代合并件废止，templates/ 的 set.json 初值件删除）；② 绘图程序与全部 Touchstone sNp 导出（含 legacy 隐式导出）取消，S 参数由前端自 `S_parameter.csv` 计算（平台 peec.plotter 路由同步移除）；③ 新增设置字段 `GROUND_PLANE_ENABLED`/`GROUND_PLANE_Z_METERS`（无限 PEC 参考地，默认关闭，约束见 compact_em README）与设置指纹规则（设置文件整体纳入 artifacts/receipt 指纹，内容变化不可复用旧上游结果），见 §八。
 变更（v1.5 修订 3，2026-11-06，thermal 1.0.7 集成，布局不变、输入格式接受）：① source_thermal.json 新增**简化 schemaVersion 3**（仅 sources：volume_ids 上 total_power，空数组 = 无热源允许；体材料按 mesh Physical 标签 + matdb 自动装配，无 thermal 提取对象、无 meshFile/meshSha256 绑定）与原 schemaVersion 2 并存；② boundary_thermal.json 新增 **schemaVersion 2**（default adiabatic + boundaries：fixed_temperature（surface_ids 为任意现有 Elementary Surface，含内部面）/ convection（h_W_m2K>0 + ambient_temperature_K））与原 schemaVersion 1 并存；③ 程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2 QS-TH-FMT-INPUT）；④ 最简单算例（零热源 + 两个固定温度面）= dev/cases/thermal/heater（schema 3 空 sources + schema 2 边界；验收 6089 节点 / 0 W / post 6089 行、max 500 K、min 293.145 K）；⑤ OP0 后处理严格校验映射节点温度齐备（不自动补全，1.0.7 起不变）；⑥ 目录布局与 §四 所有权表不变（模块输入接受能力扩展，task_layer 零代码改动）。
 变更（v1.6，2026-11-09，gds2geo V1.2 r2 集成，Result/gds2geo 布局重构，EM 正式件落位机制改为平台声明）：① gds2geo V1.2 r2（GDS2GEO-V1.2-20261107-r2，manifest apiVersion 1 → 4）：包内 4 EXE 收敛为 2 EXE（gds2geo.exe 几何准备 / geo2msh.exe 网格化，`--target em|thermal` 区分两链）；`Result/gds2geo/` 二级目录由 source/prepared/em/thermal 改为 **em_geo / thermal_geo / em_msh / thermal_msh**（EM/热 两条链并行：geo_em→mesh_em ∥ geo_thermal→mesh_thermal）；② 对外产物 10 件（geo 链每链 3 件：.geo/.json/matdb.json + msh 链每链 2 件：.msh/matdb.json；**receipt 类 .msh.json 不再产出**）；EM 正式件 = `em_msh/model_em.msh` + `em_msh/matdb.json`，热网格 = `thermal_msh/model_thermal.msh`（热链输入路由改指此路径）；③ **EM 正式件落位机制变更**：r2 manifest 移除 `publishTo`（manifest capabilities 声明 publicationPolicy = 阶段产物留在 Result/gds2geo，若宿主配置 publication 须用同 target 同一次成功生成的 mesh 与 MATDB；platformIntegration = 注册与路由由宿主负责），落位改由**平台侧** `pipelines.json` 阶段条目 `publishes` 声明（`<gds2geo produced ref> → Model/|Setting/ 落点`），task_layer publisher 按两机制之一执行（manifest `publishTo` 或阶段条目 `publishes`，D7；manifest 无 publishTo 时以阶段条目 publishes 为准）；task_layer 为此做一处增量代码改动（平台零代码策略例外项，模块零改动，见 task_layer README 2026-11-09 条目）；④ r2 MSH 为**保留全部原生 CAD 实体**的交付件（Delivery API 4：dimensions 0–3，Point1/Line2/Tri3/Tet4，vendor 多行记录方言，非经典 gmsh 4.1 单记录行格式），EM/热网格均含线元素；GEO 坐标为 GDS 布局用户单位（GEO 头 `coordinates.dim` 声明每 GEO 单位米数），MSH 长度单位 mm（GEO→MSH 比例 = dim×1000）；⑤ 模块日志收敛为 `Result/logs/gds2geo/geo2msh.log`（仅 msh 阶段写日志，em_msh/thermal_msh 两阶段共享追加同一文件；geo 阶段不写模块日志）；⑥ **网格重生成后绑定件必须重做**：`source_em.json` 的 meshFile/meshSha256 与 port triangleIds、`boundary_thermal.json` 的 surface_ids 均绑定具体网格（r2 网格编号重排，旧算例绑定件不能复用于新网格；属 UI 算例制备责任，非模块缺陷）；⑦ 工艺文件仍**仅接受 CSV**（manifest nativeTechnologyFormats 含 xtf，但平台 profile profileTechnologyFormat = csv，即可执行文件仅接受 CSV）；⑧ 已知问题：r2 em MSH 的激励线元素被 compact_em v1.3 标准 MATDB/source 输入契约拒绝（QS-FMT-MSH-INVALID "must not contain excitation line elements"），GDS→PEEC 生成网格全流阻塞，REPACK 轮已开（REPACK/gds2geo.md 第 3 轮 / REPACK/compact_em.md 第 2 轮，待 vendor 回执）；预烘焙网格算例（红线算例）不受影响。
+变更（v1.7，2026-11-12，thermal 1.0.9 + ALPSRunner 1.1.2 集成，ALPS 远端仿真接入平台，用户确认）：① **OP0 默认路径 = `Result/thermal/alps/thermal.op0`**（thermal 1.0.9 交付覆写：post 阶段 `--op0` 模板默认由 v1.5 标准位置 `Model/thermal.op0`（**自此废止**）改为 `Result/thermal/alps/thermal.op0`；显式 `--op0` 仍优先、无旧路径回退；vendor manifest `dataLayoutRevision` 维持 1.5 不变——本项为**平台侧交付覆写**，不改 vendor manifest）；`Result/thermal/alps/` 为**平台 ALPS 导入区**（task_layer 写、非 thermal 模块写；thermal post 阶段只读其内 op0；D1 例外见 §三 D1a）；② **ALPSRunner 1.1.2 接入**（新模块，provider `alpsrunner`，stage `simulate`，`bundled:false` = 平台环境依赖、EXE 不随模块包交付）：自由区 `Result/alpsrunner/simulate/`（远端运行结果 run bundle 镜像，目录名 = runId）；日志 `Result/logs/alpsrunner/`；thermal_basic 流水线重排为 extract →（可选）alps → post，alps 阶段用户件缺位（`Setting/ALPSRunner.json` / `Setting/alpsrunner.key`）跳过（QS-TL-SKIP-NOINPUT）；**可选上游跳过不再阻断下游**（平台调度语义变更：非可选上游跳过仍按 QS-TL-DEP-SKIPPED 阻断，见 task_layer README 2026-11-12 条目）；alps 成功后平台导入 OP0（三向新鲜度守卫 I7）并写 `Result/thermal/alps/import_receipt.json`（审计件）；离线回归 = 预置 `Result/thermal/alps/thermal.op0` 形态（alps 阶段跳过、post 用现有 OP0）；③ **extract 发布 netlist**：`Result/thermal/extract/ThermalNetList.sp` → `Model/ThermalNetList.sp`（平台侧 `pipelines.json` 阶段库 `publishes` 声明，机制②/D7，复制语义，Result/ 源保留；RC netlist 仍留 Result/ 内区）；`Model/ThermalNetList.sp` 为平台发布正式件（alpsrunner 固定输入位），写者 = task_layer publisher，读者 = alpsrunner 与平台导入校验；④ `set_thermal.json` 增可选字段 `mesh_length_unit`（m/mm/um，thermal 1.0.9 两阶段读取）与新增可选输入 `Model/thinfilm_thermal.json`（thermal 1.0.9 薄膜覆写件，缺位 = 不覆写，§八.1）；⑤ I7 新增（ALPS 导入三向 netlist sha 守卫，QS-TL-ALPS-STALE）。回执：REPACK/thermal.md 第 4 轮、REPACK/alpsrunner.md 第 1 轮。
 
 ## 一、总则
 
@@ -33,13 +34,16 @@ v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径
 │   ├── boundary_em.json       [UI]       EM 边界定义（预留，格式 TBD，暂无消费方）
 │   ├── boundary_thermal.json  [UI]       热边界定义（热模块消费，格式见 §八.2；
 │                                             2026-11-02 前内嵌于 source_thermal.json）
-│   └── thermal.op0            [UI 导入]  OP0 工作点（post 输入；thermal 1.0.6 起标准位置，
-│                                             程序默认读本目录（source_thermal.json 同目录）；
-│                                             1.0.5 时代为 Result/thermal/post/，已废止）
+│   ├── thermal.op0            [UI 导入]  OP0 工作点（post 输入；**v1.7 起废止**：1.0.6-1.0.8 时代标准位置、v1.5 定形；
+│                                             thermal 1.0.9 起默认 OP0 位置改 Result/thermal/alps\，变更 v1.7 ①）
+│   ├── ThermalNetList.sp      [publisher] extract 发布网表（v1.7 新增；读者：alpsrunner、平台导入校验）
+│   └── thinfilm_thermal.json  [UI] 可选  薄膜覆写件（thermal 1.0.9；v1.7 新增，缺位 = 不覆写）
 ├── Setting\          【配置】跨任务持久
 │   ├── set_em.json           [UI]       EM 求解设置（compact_em 消费；v1.3 起生效，2026-11-05）
-│   └── set_thermal.json      [UI]       SPICE 仿真设置（analysis/probe；热模块消费；thermal 1.0.5 起）
-│                                 （v1.2 时代为合并单件 set.json，2026-11-05 起废止，格式与作用域见 §八）
+│   ├── set_thermal.json      [UI]       SPICE 仿真设置（analysis/probe；热模块消费；thermal 1.0.5 起；
+│                                 v1.7 增可选字段 mesh_length_unit；v1.2 时代为合并单件 set.json，2026-11-05 起废止，格式与作用域见 §八）
+│   ├── ALPSRunner.json       [用户]     ALPS 远端连接设置（alpsrunner 读取；缺位 → alps 阶段跳过）
+│   └── alpsrunner.key        [用户]     ALPS SSH 私钥（alpsrunner 读取；缺位 → alps 阶段跳过）
 ├── Result\
 │   ├── gds2geo\        【模块产物区：gds2geo 独占】
 │   │   ├── em_geo\      model_em.geo / model_em.json / matdb.json
@@ -56,13 +60,19 @@ v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径
 │   │   ├── extract\  ThermalNetList.sp / ThermalNetList_RC.sp / thermal_nodes.csv /
 │   │   │              thermal_K.mtx / ThermalTemperatureMap.csv / extraction_report.json /
 │   │   │              thermal_binding.json / stage_receipt.json
-│   │   └── post\      VolumeTemperatureAtOperatingPoint.msh / NodeTemperatureAtOperatingPoint.csv /
-│   │                   MaximumTemperature.txt / TemperatureProcessReport.txt /
-│   │                   thermal.op0 / post_binding.json / stage_receipt.json
+│   │   ├── post\      VolumeTemperatureAtOperatingPoint.msh / NodeTemperatureAtOperatingPoint.csv /
+│   │   │               MaximumTemperature.txt / TemperatureProcessReport.txt /
+│   │                   post_binding.json / stage_receipt.json
+│   │   └── alps\      【平台导入区（v1.7）：task_layer 写、thermal post 读，§三 D1a】
+│   │                   thermal.op0（post 默认 op0 位置）/ import_receipt.json（审计件）
+│   ├── alpsrunner\     【模块产物区：alpsrunner 独占】
+│   │   └── simulate\ <runId>\  run bundle（run_summary.json / SHA256SUMS.txt / console.log /
+│   │                      ThermalNetList.sp / ThermalNetList.sp.sim\ / .op0 …）
 │   ├── logs\           【模块诊断日志】按模块子目录隔离
 │   │   ├── gds2geo\   geo2msh.log（两 msh 阶段共享追加；geo 阶段不写模块日志）
 │   │   ├── compact_em\<exe>-<trace_id>.jsonl
-│   │   └── thermal\   extract-<trace_id>.jsonl / post-<trace_id>.jsonl
+│   │   ├── thermal\   extract-<trace_id>.jsonl / post-<trace_id>.jsonl
+│   │   └── alpsrunner\ <exe>-<trace_id>.jsonl
 │   └── tasks\          【任务编排记录：task_layer 独占，模块不写不读】
 │       └── <taskId>\  state.json / task.log / job.<stageId>.json
 └── .locks\         【锁集中处】<providerId>.*.lock
@@ -77,6 +87,7 @@ v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径
 | # | 规则 |
 |---|---|
 | D1 | `Result/<providerId>/` 模块独占；providerId = manifest 的 id（= 模块包目录名，小写） |
+| D1a | **平台导入区例外**（v1.7）：`Result/thermal/alps/` 由 task_layer 写入（ALPS 结果导入：`thermal.op0` / `import_receipt.json`）、thermal post 阶段读取；唯一“模块不写、平台写”的 `Result/<providerId>/<subdir>` 例外区（thermal 模块只读该目录） |
 | D2 | 模块内二级目录 = 子阶段名（manifest.stages[].id），一一对应 |
 | D3 | `Model/` 是唯一跨模块共享区；源/边界文件按链路命名（source_em.json / source_thermal.json，boundary_em.json / boundary_thermal.json），各消费方只认自己那份；热边界条件一律写 boundary_thermal.json，不得内嵌 source_thermal.json（格式见 §八.2） |
 | D4 | 模块诊断日志 → `Result/logs/<providerId>/`；任务编排记录 → `Result/tasks/`（task_layer 所有） |
@@ -94,6 +105,12 @@ v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径
 | `Model/source_thermal.json` | UI | 热模块（1.0.1 起消费；meshFile 指向热网格实际落位路径） |
 | `Model/boundary_em.json` | UI | 预留（暂无消费方） |
 | `Model/boundary_thermal.json` | UI | 热模块（边界条件，**必需输入**；格式见 §八.2；thermal 1.0.5 起经 --boundary 传入、SHA 入内部绑定；1.0.1 时代内嵌于 source_thermal.json） |
+| `Model/thermal.op0` | ~~UI~~ | ~~热模块（1.0.6-1.0.8 标准位置）~~（**v1.7 起废止**：默认 OP0 位置改 `Result/thermal/alps/thermal.op0`，变更 v1.7 ①） |
+| `Model/ThermalNetList.sp` | task_layer publisher（源：thermal extract 阶段） | alpsrunner、task_layer（导入新鲜度校验） |
+| `Model/thinfilm_thermal.json` | UI（可选） | 热模块（1.0.9 起） |
+| `Setting/ALPSRunner.json`、`Setting/alpsrunner.key` | 用户 | alpsrunner（缺位 → alps 阶段跳过） |
+| `Result/thermal/alps/` | task_layer（ALPS 结果导入，v1.7） | 热模块（post 读 op0）、task_layer |
+| `Result/alpsrunner/**` | alpsrunner | task_layer（导入校验）、排错 |
 | `Setting/set_em.json` | UI | compact_em（v1.3 起生效，2026-11-05；v1.2 时代读合并件 set.json，已废止） |
 | `Setting/set_thermal.json` | UI | 热模块（SPICE 仿真设置；thermal 1.0.5 起，格式见 §八.1） |
 | ~~`Result/thermal/thermal_extract_control.json`~~ | — | 热模块（**1.0.6 起取消**：提取控制内嵌 `source_thermal.json`（schemaVersion 2）的 `thermal` 对象；1.0.5 时代曾暂存此处，见 §八.1 沿革） |
@@ -118,7 +135,7 @@ v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径
 
 ## 六、命名与不变式
 
-固定名工件（名字定死，模块不得改）：`model.gds`、`model_info.csv/.xtf`、`matdb.json`、`source_em.json`、`source_thermal.json`、`boundary_em.json`、`boundary_thermal.json`、`set.json`（v1.2 时代）/ `set_em.json` / `set_thermal.json`（v1.3 起）、`thermal_extract_control.json`（Result/thermal/，thermal 1.0.5 起）、`stage_receipt.json`。
+固定名工件（名字定死，模块不得改）：`model.gds`、`model_info.csv/.xtf`、`matdb.json`、`source_em.json`、`source_thermal.json`、`boundary_em.json`、`boundary_thermal.json`、`set.json`（v1.2 时代）/ `set_em.json` / `set_thermal.json`（v1.3 起）、`thermal_extract_control.json`（Result/thermal/，thermal 1.0.5 起）、`ThermalNetList.sp`（Model/ 发布网表 与 Result/thermal/extract/ 源，v1.7）、`thermal.op0`（Result/thermal/alps/ 平台导入区，v1.7）、`stage_receipt.json`。
 模块内部自由区：`Result/<providerId>/<stageId>/` 之内中间产物命名自定，须以 internal ref 登记（MANIFEST_SPEC §五）。
 
 | # | 不变式 | 违反时报 |
@@ -129,6 +146,7 @@ v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径
 | I4 | receipt schemaVersion 在消费者 accept 区间内 | 消费者自报 QS-FMT-* |
 | I5 | 锁文件存在 ≠ 错误；运行中不得删除 `.locks/` 内文件 | — |
 | I6 | 求解设置文件（按消费者 manifest consumed 声明：set_em.json / set_thermal.json；v1.2 时代为 set.json）存在且 schemaVersion 在消费者 accept 区间内 | 消费者自报 / 预检 |
+| I7 | ALPS 导入三向 netlist sha 一致：`run_summary.input_sha256` == sha256(`Model/ThermalNetList.sp`) == `thermal_binding.json.netlistSha256`（平台导入步骤执行；违例 → 导入中止、op0 不落位，v1.7） | QS-TL-ALPS-STALE |
 
 ## 七、状态文件职责划分（消除双源）
 
@@ -209,12 +227,14 @@ v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径
 {
   "schemaVersion": 1,
   "analysis": "op",            // 当前仅支持 op；其他类型明确报错，瞬态暂不支持
-  "probe": [ "V(*)" ]          // V(*) = 全部节点（完整温度可视化须保留）；或 V(Tn) 单节点
+  "probe": [ "V(*)" ],         // V(*) = 全部节点（完整温度可视化须保留）；或 V(Tn) 单节点
+  "mesh_length_unit": "mm"     // 可选（v1.7 / 1.0.9 起）：m | mm | um，网格长度单位；缺位 = 程序默认
 }
 ````
 
 - 提取程序将其写入两份网表的 `.op` 与 `.probe` 指令（末尾 `.end` 由程序生成）；后处理校验设置指纹——仿真设置更改后需重新生成网表并使用相应求解结果；
 - 文件是输入，程序不覆写；默认路径 `Setting/set_thermal.json`（CLI `--simulation-settings` 可指别处）。
+- **v1.7（1.0.9）**：新增可选字段 `mesh_length_unit`（m/mm/um，网格长度单位；提取/后处理两阶段均读，缺位 = 程序默认）；新增可选输入 `Model/thinfilm_thermal.json`（薄膜覆写件；缺位 = 不覆写，格式以 vendor 1.0.9 交付件为准）。
 
 **提取控制（thermal 对象）**：1.0.5 时代为独立文件 `Result/thermal/thermal_extract_control.json`（暂存于此，**1.0.6 起取消**）；1.0.6 起内嵌于 `Model/source_thermal.json` 顶层 `thermal` 字段（schemaVersion 2，必需）。内容为原 `thermal` 对象（v1.2 时代合并件 set.json 去掉全部 EM 字段）：
 
@@ -240,7 +260,7 @@ v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径
 
 - 1.0.5 默认路径 `Result/thermal/thermal_extract_control.json`（CLI `--settings`）；**1.0.6 起独立文件与 `--settings` 参数取消**（传入报 exit=2，未知参数）；程序不覆写；
 - **暂存说明**：1.0.5 按用户最新指示将该文件置于模块产物区（Result/thermal/），后续拆分/迁移位置由用户再定，届时本规范升版本；
-- **最终定形（2026-11-04，用户与 thermal 侧确认，v1.5）**：thermal 下一版起本独立文件**移除**（程序不再消费）；提取控制数据的载体以 vendor 下一版 manifest/README 声明为准（若移入 `source_thermal.json`，格式须发版说明明确，平台预检随 manifest consumed 走）；OP0 默认路径定形为 `Model/thermal.op0`（程序去 source_thermal.json 所在目录读取；1.0.5 时代 `Result/thermal/post/thermal.op0` 自下一版起不再使用）；OP0 与 SPICE 网表暂不做校验。**已落地（thermal 1.0.6，2026-11-04 集成，v1.5 修订 1）**：`thermal` 对象内嵌 `Model/source_thermal.json`（schemaVersion 2：原 sources 字段保留 + 新增 `thermal` = name / selection_id_type / mesh_length_scale_to_m / tetrahedral_domains[] / thin_layers[]）；OP0 标准位置 `Model/thermal.op0` 落地（默认随 source 目录、无旧路径回退）；`boundary_thermal.json`（schemaVersion 1）与 `set_thermal.json`（schemaVersion 1）格式不变。详见 REPACK/thermal.md 第 2 轮回执。
+- **最终定形（2026-11-04，用户与 thermal 侧确认，v1.5）**：thermal 下一版起本独立文件**移除**（程序不再消费）；提取控制数据的载体以 vendor 下一版 manifest/README 声明为准（若移入 `source_thermal.json`，格式须发版说明明确，平台预检随 manifest consumed 走）；OP0 默认路径定形为 `Model/thermal.op0`（程序去 source_thermal.json 所在目录读取；1.0.5 时代 `Result/thermal/post/thermal.op0` 自下一版起不再使用）；OP0 与 SPICE 网表暂不做校验。**已落地（thermal 1.0.6，2026-11-04 集成，v1.5 修订 1）**：`thermal` 对象内嵌 `Model/source_thermal.json`（schemaVersion 2：原 sources 字段保留 + 新增 `thermal` = name / selection_id_type / mesh_length_scale_to_m / tetrahedral_domains[] / thin_layers[]）；OP0 标准位置 `Model/thermal.op0` 落地（默认随 source 目录、无旧路径回退）；`boundary_thermal.json`（schemaVersion 1）与 `set_thermal.json`（schemaVersion 1）格式不变。详见 REPACK/thermal.md 第 2 轮回执。 **v1.7 覆写（2026-11-12，thermal 1.0.9 交付覆写，用户确认）**：OP0 默认路径改 `Result/thermal/alps/thermal.op0`（post `--op0` 模板内置该路径、显式 `--op0` 可覆盖、无旧路径回退）；`Model/thermal.op0` 自本版起为历史位置（废止），详见变更 v1.7 ①。
 - **版本沿革**：v1.3（2026-11-02 上午稿）曾将 set_thermal.json 定义为 thermal 对象独立件；thermal 1.0.5 重发版（2026-11-02）按用户最新指示将 set_thermal.json 改为 SPICE 仿真设置、thermal 对象移入 thermal_extract_control.json，本条（v1.4）按 1.0.5 实况定形；
 - v1.2 过渡期作用域规则（纯热算例 set.json 不复制 EM 字段）自 1.0.5 起随热侧定形取消：热链 set.json 不再存在，set_thermal.json 为纯仿真设置、提取控制无 EM 字段（20261102 案例 set.json 混入 EM 字段的问题已解决）。
 
@@ -274,8 +294,10 @@ v1.6 · 2026-11-09 · 适用：所有计算层模块与 UI、task_layer。路径
 
 ## 十、版本
 
-本规范带版本（当前 v1.6），manifest 的 `capabilities.dataLayout` 声明遵循版本。破坏性变更（移动契约件/改固定名/改 set 格式）→ 版本 +1，窗口期内全模块适配；新增模块或自由区目录不升版本。
-版本记录：v1.1（2026-10-30）→ v1.2（2026-11-02）：port_* → source_* 改名、新增 boundary_* 预留件、包内 examples//templates/ 改为包外案例包交付 → v1.3（2026-11-02）：Setting/set.json 拆分为 set_em.json + set_thermal.json；自 thermal ≥1.0.2 与 compact_em ≥v1.3 重发版集成起生效（模块读取由 manifest consumed 驱动，平台代码不变；v1.2 时代模块继续读合并件 set.json） → v1.4（2026-11-03）：热侧设置按 thermal 1.0.5 重发版定形（set_thermal.json = SPICE 仿真设置；thermal 对象 → Result/thermal/thermal_extract_control.json 暂存；boundary_thermal.json 必需；OP0 默认路径 Result/thermal/post/thermal.op0）；按用户最新指示实施，优先于 v1.3 热侧稿（§八.1）；EM 侧 set_em.json 不变（compact_em v1.3 重发版待到位）→ v1.5（2026-11-04）：thermal 下一版布局定形（用户与 thermal 侧确认）：OP0 默认路径 = Model/thermal.op0（程序去 source_thermal.json 所在目录读取）；移除 thermal_extract_control.json 独立文件（程序不再消费，载体以 vendor 下一版声明为准）；OP0 与 SPICE 网表暂不做校验；自 thermal 下一版重发版集成起生效（**已集成：1.0.6，2026-11-04，见 v1.5 修订 1**） → v1.5 修订 2（2026-11-05）：EM 侧设置定形（compact_em v1.3 集成）：set_em.json 为唯一 JSON 设置（旧 set.json 废止）；绘图程序/Touchstone 导出取消；新增 PEC 参考地字段与设置指纹规则（§八） → v1.5 修订 3（2026-11-06）：thermal 1.0.7 集成（source_thermal.json schema 3 / boundary_thermal.json schema 2 成对接受，布局不变） → v1.6（2026-11-09）：gds2geo V1.2 r2 集成（Result/gds2geo 四目录 em_geo/thermal_geo/em_msh/thermal_msh、10 件产物、receipt 取消、日志收敛 geo2msh.log；EM 正式件落位改为平台侧 pipelines.json `publishes` 声明（机制②），manifest `publishTo`（机制①）保留并存；网格重生成后绑定件重做规则；已知问题：生成网格全流被 compact_em 线元素契约阻塞，见 REPACK）。
+本规范带版本（当前 v1.7），manifest 的 `capabilities.dataLayout` 声明遵循版本。破坏性变更（移动契约件/改固定名/改 set 格式）→ 版本 +1，窗口期内全模块适配；新增模块或自由区目录不升版本。
+版本记录：v1.1（2026-10-30）→ v1.2（2026-11-02）：port_* → source_* 改名、新增 boundary_* 预留件、包内 examples//templates/ 改为包外案例包交付 → v1.3（2026-11-02）：Setting/set.json 拆分为 set_em.json + set_thermal.json；自 thermal ≥1.0.2 与 compact_em ≥v1.3 重发版集成起生效（模块读取由 manifest consumed 驱动，平台代码不变；v1.2 时代模块继续读合并件 set.json） → v1.4（2026-11-03）：热侧设置按 thermal 1.0.5 重发版定形（set_thermal.json = SPICE 仿真设置；thermal 对象 → Result/thermal/thermal_extract_control.json 暂存；boundary_thermal.json 必需；OP0 默认路径 Result/thermal/post/thermal.op0）；按用户最新指示实施，优先于 v1.3 热侧稿（§八.1）；EM 侧 set_em.json 不变（compact_em v1.3 重发版待到位）→ v1.5（2026-11-04）：thermal 下一版布局定形（用户与 thermal 侧确认）：OP0 默认路径 = Model/thermal.op0（程序去 source_thermal.json 所在目录读取）；移除 thermal_extract_control.json 独立文件（程序不再消费，载体以 vendor 下一版声明为准）；OP0 与 SPICE 网表暂不做校验；自 thermal 下一版重发版集成起生效（**已集成：1.0.6，2026-11-04，见 v1.5 修订 1**） → v1.5 修订 2（2026-11-05）：EM 侧设置定形（compact_em v1.3 集成）：set_em.json 为唯一 JSON 设置（旧 set.json 废止）；绘图程序/Touchstone 导出取消；新增 PEC 参考地字段与设置指纹规则（§八） → v1.5 修订 3（2026-11-06）：thermal 1.0.7 集成（source_thermal.json schema 3 / boundary_thermal.json schema 2 成对接受，布局不变） → v1.6（2026-11-09）：gds2geo V1.2 r2 集成（Result/gds2geo 四目录 em_geo/thermal_geo/em_msh/thermal_msh、10 件产物、receipt 取消、日志收敛 geo2msh.log；EM 正式件落位改为平台侧 pipelines.json `publishes` 声明（机制②），manifest `publishTo`（机制①）保留并存；网格重生成后绑定件重做规则；已知问题：生成网格全流被 compact_em 线元素契约阻塞，见 REPACK）。 → v1.7（2026-11-12）：thermal 1.0.9 + ALPSRunner 1.1.2 集成（OP0 默认位置 → `Result/thermal/alps/thermal.op0`（交付覆写，v1.5 `Model/thermal.op0` 废止；`Result/thermal/alps/` = 平台导入区 D1a）；`Result/alpsrunner/simulate/` 自由区 + `Result/logs/alpsrunner/` 日志 + thermal_basic 重排 extract →（可选）alps → post + 平台 ALPS 导入（I7 三向新鲜度守卫 + `import_receipt.json` 审计件）；`Model/ThermalNetList.sp` 发布网表（机制②）；set_thermal.json `mesh_length_unit` 可选字段 + `Model/thinfilm_thermal.json` 可选输入；I7 新增）。
+
+v1.7（2026-11-12，thermal 1.0.9 + ALPSRunner 1.1.2 集成，ALPS 远端仿真接入平台，用户确认）：① OP0 默认路径 = `Result/thermal/alps/thermal.op0`（thermal 1.0.9 交付覆写：post `--op0` 模板内置该路径、显式 `--op0` 可覆盖、无旧路径回退；vendor manifest `dataLayoutRevision` 维持 1.5 不变——平台侧覆写不改 vendor 件；v1.5 `Model/thermal.op0` 自此废止，v1.4 时代 `Result/thermal/post/thermal.op0` 早已废止）；`Result/thermal/alps/` = 平台 ALPS 导入区（D1a：task_layer 写、thermal post 读；含 `import_receipt.json` 审计件）；② ALPSRunner 1.1.2（provider `alpsrunner`、stage `simulate`、`bundled:false` 平台环境依赖、EXE 不随模块包）：`Result/alpsrunner/simulate/` 自由区（run bundle 镜像，目录名 = runId）+ `Result/logs/alpsrunner/` 日志；thermal_basic 流水线重排 extract →（可选）alps → post；alps 用户件（`Setting/ALPSRunner.json` / `Setting/alpsrunner.key`）缺位 → 跳过（QS-TL-SKIP-NOINPUT）；**可选上游跳过不再阻断下游**（非可选上游跳过仍阻断，QS-TL-DEP-SKIPPED 语义细化；平台调度变更，见 task_layer README 2026-11-12 条目）；alps 成功后平台导入 OP0：三向新鲜度守卫（I7）+ 导入回执；离线回归 = 预置 `Result/thermal/alps/thermal.op0` 形态；③ `Model/ThermalNetList.sp` 发布网表（extract `thermal/netlist.dc` 经平台阶段库 `publishes` 机制②落位，复制语义、Result/ 源保留；alpsrunner 固定输入位）；④ `set_thermal.json` 增可选字段 `mesh_length_unit`（m/mm/um）+ `Model/thinfilm_thermal.json` 可选输入（§八.1）；⑤ I7 新增（三向 netlist sha 守卫，QS-TL-ALPS-STALE）。
 
 v1.2 修订 2（2026-11-02 下午，布局不变、契约细化）：① 定义 boundary_thermal.json 格式（§八.2），热边界条件移出 source_thermal.json（thermal 重发版起落地）；② 明确 set.json 作用域（§八.1）：纯热算例不携带 EM 字段；③ 目录树补 Result/thermal 产物区与 logs/thermal 日志行；④ gds2geo 热网格标记为必需（V1.1 起）；⑤ 工艺文件固定为 model_info.csv（gds2geo V1.1 仅接受 CSV，XTF 不再支持）；⑥ D5 锁机制按模块细化（gds2geo V1.1 为系统命名互斥量、无锁文件）。
 
