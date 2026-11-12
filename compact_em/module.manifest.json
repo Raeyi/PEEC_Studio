@@ -1,20 +1,16 @@
 {
   "manifestVersion": 1,
   "id": "compact_em",
-  "name": "Compact EM 电磁求解链",
-  "version": "2026.11.04-v1.3",
-  "apiVersion": 3,
-  "minApiVersion": 1,
+  "name": "Compact_EM",
+  "version": "2026.11.10-v1.4",
+  "apiVersion": 4,
   "cli": {
     "executables": [
       "PEEC_Model_Extractor.exe",
       "PEEC_Solver.exe",
       "PEEC_Post_Processing.exe"
     ],
-    "dataRootArg": "--data-root",
-    "deprecatedModes": [
-      "legacy-set-txt"
-    ]
+    "dataRootArg": "--data-root"
   },
   "stages": [
     {
@@ -26,9 +22,8 @@
         "--runtime-dir",
         "{runtimeDir}",
         "--export",
-        "post,report"
+        "model"
       ],
-      "optional": false,
       "allowedArgs": [
         "--export"
       ],
@@ -38,13 +33,11 @@
         "2": "unhandled_exception"
       },
       "errorContract": {
-        "type": "qs-json-stderr",
-        "traceLog": "Result/logs/compact_em/Model_Extractor-{trace_id}.jsonl"
+        "type": "none"
       },
       "consumesInternal": [],
       "producesInternal": [
-        "compact_em/extract.model",
-        "compact_em/extract.post"
+        "compact_em/extract.model"
       ]
     },
     {
@@ -56,22 +49,20 @@
         "--runtime-dir",
         "{runtimeDir}",
         "--export",
-        "post"
+        "csv"
       ],
-      "optional": false,
       "allowedArgs": [
         "--export",
-        "--s-columns",
-        "--post-freq-index",
-        "--post-port"
+        "--accuracy",
+        "--workers",
+        "--mkl-threads"
       ],
       "exitCodes": {
         "0": "ok",
         "1": "failure"
       },
       "errorContract": {
-        "type": "qs-json-stderr",
-        "traceLog": "Result/logs/compact_em/Solver-{trace_id}.jsonl"
+        "type": "none"
       },
       "consumesInternal": [
         "compact_em/extract.model"
@@ -84,32 +75,28 @@
     {
       "id": "post",
       "executable": "PEEC_Post_Processing.exe",
+      "optional": true,
       "argsTemplate": [
         "--data-root",
         "{dataRoot}",
         "--runtime-dir",
         "{runtimeDir}",
-        "--source-plots",
-        "j,qe,ve",
-        "--parts",
-        "mag"
+        "--export",
+        "post"
       ],
-      "optional": true,
       "allowedArgs": [
-        "--source-plots",
-        "--field-plots",
-        "--parts"
+        "--export"
       ],
       "exitCodes": {
         "0": "ok",
-        "1": "failure"
+        "1": "failure",
+        "2": "invalid_cli"
       },
       "errorContract": {
-        "type": "qs-json-stderr",
-        "traceLog": "Result/logs/compact_em/Post_Processing-{trace_id}.jsonl"
+        "type": "none"
       },
       "consumesInternal": [
-        "compact_em/extract.post",
+        "compact_em/extract.model",
         "compact_em/solve.post"
       ],
       "producesInternal": []
@@ -120,11 +107,21 @@
       {
         "ref": "compact_em/model.peec",
         "path": "Result/compact_em/extract/model.peec",
-        "schemaVersion": "1"
+        "schemaVersion": "2"
       },
       {
         "ref": "compact_em/sp.csv",
         "path": "Result/compact_em/solve/S_parameter.csv",
+        "schemaVersion": "1"
+      },
+      {
+        "ref": "compact_em/y.csv",
+        "path": "Result/compact_em/solve/Y_parameter.csv",
+        "schemaVersion": "1"
+      },
+      {
+        "ref": "compact_em/z.csv",
+        "path": "Result/compact_em/solve/Z_parameter.csv",
         "schemaVersion": "1"
       }
     ],
@@ -151,9 +148,6 @@
       {
         "ref": "em/source.def",
         "path": "Model/source_em.json",
-        "maintainedBy": [
-          "ui"
-        ],
         "accept": {
           "fields": [
             "meshFile",
@@ -175,9 +169,6 @@
     ]
   },
   "dependsOn": {
-    "modules": [
-      "gds2geo"
-    ],
     "artifacts": [
       "gds2geo/mesh.em",
       "gds2geo/matdb.model",
@@ -187,20 +178,33 @@
   },
   "capabilities": {
     "dataLayout": "peec-data/v1",
+    "dataLayoutRevision": "1.6",
+    "physics": "Lossless surface PEC in vacuum, optional infinite horizontal PEC ground",
+    "publicExports": [
+      "FreeSpace PEECFS02 model.peec",
+      "S/Y/Z CSV"
+    ],
+    "postFileExports": "Configured source/field files are listed in the stage receipt; no automatic host artifact/UI routes are declared for them.",
+    "stageReceipts": "v1, best effort; integrity state remains mandatory",
+    "modelFormat": {
+      "magic": "PEECFS02",
+      "version": 2,
+      "binaryCompatibleWithCompact": false
+    },
     "breakingChanges": [
       {
-        "version": "2026.10.30",
-        "note": "API 2: explicit dataRoot; per-stage output paths; port_em.json; flat set.json; optional receipts separated from mandatory internal artifact integrity."
+        "version": "2026.11.09-model-peec-v2",
+        "note": "API 2 replaces API 1 model.state text/loose matrix outputs with direct public extract/model.peec. New production writes no bin/txt artifacts, including private/staging files. Standard SAVE_BIN/SAVE_TXT are rejected by presence; legacy controls warn as deprecated. Geometry/topology are in the package; source snapshots, model/stage states and standard context are structured JSON."
       },
       {
-        "version": "2026.11.02",
-        "note": "DATA_LAYOUT v1.2: Model/source_em.json replaces port_em.json; em/source.def replaces em/ports.def; defaultTemplate removed; examples and settings are delivered in a separate case package."
+        "version": "2026.11.10-v1.4",
+        "note": "Compact_EM identity with the FreeSpace PEC/vacuum implementation. API 4 replaces legacy Compact PEECPK01/schema1 with FreeSpace PEECFS02/version2 and model schema2. Re-extract models; old Compact model files are not binary compatible. Provider output/log/receipt identity is compact_em. The S CSV reference remains compact_em/sp.csv; Y/Z are optional additions. Existing FreeSpace stderr behavior is declared as errorContract none."
       },
       {
-        "version": "2026.11.04-v1.3",
-        "note": "API 3 / DATA_LAYOUT v1.4 revision 1 EM requirements: Setting/set_em.json is the only accepted JSON settings name; deprecated set.txt remains supported with a warning. Old set.json artifact indexes are stale. The delivered stages/executables are extract, solve and post; the S-parameter Plotter and all Touchstone sNp exports (including legacy implicit export) are removed. Missing selected settings now report QS-FMT-SETTING-INVALID. The module directory contains only three executables, manifest, README and ERROR_CODES; schemas, technical notes and inventories are delivered outside it. This batch also includes the existing 2026-11-04 mainline PEC reference ground, real-system/memory optimizations and low-frequency full-charge accuracy fixes; differences from the 2026-11-02 numerical baseline are documented separately."
+        "version": "2026.11.10-v1.4",
+        "revisionId": "merged-post-20261111",
+        "note": "Same-version revision requested by the user: retain Compact_EM v1.4/API4. Post outputs are Source.msh and Field.msh with _real/_imag/_mag views. Split paths are no longer produced; use revisionId and package SHA-256 to identify this output arrangement. Numerical code, executable bytes, model PEECFS02/version2 and public model/S/Y/Z artifacts are unchanged."
       }
-    ],
-    "dataLayoutRevision": "1.3"
+    ]
   }
 }

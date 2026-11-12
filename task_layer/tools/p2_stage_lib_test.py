@@ -163,11 +163,13 @@ def main():
         check("② serve 配置错误退出码 2", rc == 2, str(rc))
 
         # ③ 合并规则（lib + 本地覆盖 + userGate extends + 白名单附加）
+        # 2026-11-12：v1.4 solve 移除 --s-columns（allowedArgs=export/accuracy/
+        # workers/mkl-threads），fixture 键同步（用户确认，vendor r3 集成）
         merge = json.loads(v2_text)
         merge["stages"]["lib.merge"] = {
             "module": "peec.solver",
             "name": "libname",
-            "params": {"export": "post,report", "s-columns": 100},
+            "params": {"export": "csv", "workers": 100},
             "artifacts": {"r1": "A.txt", "r2": "B.txt"},
             "requires": ["libreq.txt"],
             "optional": False,
@@ -181,7 +183,7 @@ def main():
                 {"id": "over", "ref": "lib.merge", "dependsOn": [],
                  "name": "localname", "optional": True,
                  "requires": ["localreq.txt"],
-                 "params": {"s-columns": 41, "export": "report"},
+                 "params": {"workers": 41, "mkl-threads": 41},
                  "artifacts": {"r2": "B2.txt"},
                  "userGate": {"waitForFiles": ["x.json"], "confirm": False}},
                 {"id": "clean", "ref": "lib.merge", "dependsOn": []},
@@ -194,7 +196,7 @@ def main():
             st = {s["id"]: s for s in pm["merge_test"]["stages"]}
             over = st["over"]
             check("③ params 键级合并本地赢",
-                  over["params"] == {"export": "report", "s-columns": 41},
+                  over["params"] == {"export": "csv", "workers": 41, "mkl-threads": 41},
                   json.dumps(over["params"]))
             check("③ requires 本地赢", over["requires"] == ["localreq.txt"],
                   json.dumps(over["requires"]))
@@ -210,7 +212,7 @@ def main():
             check("③ 无本地覆盖 -> 库默认原样",
                   clean["name"] == "libname" and clean["optional"] is False
                   and clean["requires"] == ["libreq.txt"]
-                  and clean["params"] == {"export": "post,report", "s-columns": 100}
+                  and clean["params"] == {"export": "csv", "workers": 100}
                   and clean["artifacts"] == {"r1": "A.txt", "r2": "B.txt"},
                   json.dumps(clean))
             plain = st["full"]
@@ -243,18 +245,18 @@ def main():
         chains = json.loads(v2_text)
         chains["stages"]["lib.solver2"] = {
             "module": "peec.solver", "name": "共享求解",
-            "params": {"s-columns": 5},
+            "params": {"mkl-threads": 5},
             "requires": ["Result/compact_em/extract/model.peec"],
         }
         chains["pipelines"]["chainA"] = {
             "displayName": "A", "maxParallel": 1,
             "stages": [{"id": "solveA", "ref": "lib.solver2", "dependsOn": [],
-                        "params": {"s-columns": 10}}],
+                        "params": {"mkl-threads": 10}}],
         }
         chains["pipelines"]["chainB"] = {
             "displayName": "B", "maxParallel": 1,
             "stages": [{"id": "solveB", "ref": "lib.solver2", "dependsOn": [],
-                        "params": {"s-columns": 20}}],
+                        "params": {"mkl-threads": 20}}],
         }
         ccfg = make_cfg(work, "chains", json.dumps(chains, ensure_ascii=False), args.cfg_src)
         s4 = Srv(exe, ccfg)
@@ -263,8 +265,8 @@ def main():
             sa = pc["chainA"]["stages"][0]
             sb = pc["chainB"]["stages"][0]
             check("④ 同 ref 两链各自 params 生效",
-                  sa["params"] == {"s-columns": 10}
-                  and sb["params"] == {"s-columns": 20},
+                  sa["params"] == {"mkl-threads": 10}
+                  and sb["params"] == {"mkl-threads": 20},
                   json.dumps(sa["params"]) + " / " + json.dumps(sb["params"]))
             check("④ 库级接线两链共享（requires）",
                   sa["requires"] == sb["requires"] == ["Result/compact_em/extract/model.peec"],

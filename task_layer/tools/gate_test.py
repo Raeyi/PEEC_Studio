@@ -4,6 +4,9 @@
 用法：
   python gate_test.py --exe <task_layer.exe> --ref <std100 DATA 参考目录> --work <工作目录> --cfg-src <task_layer/config 目录>
 
+2026-11-12：compact_em v1.4 extract --export 值 = model（v1.3 的 post,report 已废弃），
+fixture 值同步（用户确认，vendor r3 集成）。
+
 测试用流水线 gate_demo（单阶段 userGate，独立配置目录，不入内置三流水线）：
   extract: peec.model_extract, userGate={
     waitForFiles:["Model/gate_probe.json"], confirm:true,
@@ -258,7 +261,7 @@ def main():
         check("T1 类型校验拒绝", "type" in err, err)
         rpc.rpc_call("task.provideInput",
                      {"taskId": tid, "stageId": "extract",
-                      "values": {"export": "post,report"}})
+                      "values": {"export": "model"}})
         aw2 = rpc.wait_awaiting()
         miss2 = aw2.get("missing", {})
         check("T1 ① 值+确认满足后仅缺文件",
@@ -280,7 +283,7 @@ def main():
         launch = [l for l in log.splitlines()
                   if "[launch]" in l and "Model_Extractor" in l]
         check("T1 ⑥ gate 值拼进 CLI（launch 行）",
-              bool(launch) and launch[-1].rstrip().endswith("--export post,report"),
+              bool(launch) and launch[-1].rstrip().endswith("--export model"),
               (launch[-1][-110:] if launch else "无 [launch] 行"))
         check("T1 ⑥ 无重复 --key（注入覆盖模板默认）",
               bool(launch) and launch[-1].count("--export") == 1,
@@ -289,7 +292,7 @@ def main():
         pi = st.get("providedInputs", {})
         pe = pi.get("extract", {})
         check("T1 审计 providedInputs 留痕",
-              pe.get("values", {}).get("export") == "post,report"
+              pe.get("values", {}).get("export") == "model"
               and pe.get("confirmed") is True and pe.get("ts", 0) > 0,
               json.dumps(pe, ensure_ascii=False)[:160])
 
@@ -339,17 +342,23 @@ def main():
               json.dumps(m4b, ensure_ascii=False))
         rpc.rpc_call("task.provideInput",
                      {"taskId": tid4, "stageId": "extract",
-                      "values": {"export": "post,report"}})
-        time.sleep(1)        # 阶段进入 running（extract 实际耗时 1min+，余量充足）
-        st4 = read_state(root, tid4)
-        se4 = stage_of(st4, "extract")
-        check("T4 阶段确已 running", se4.get("status") == "running",
-              se4.get("status"))
+                      "values": {"export": "model"}})
+        # v1.4 + R2 用例 extract 为百毫秒级（2026-11-12 重测实测 280ms）：
+        # 原 sleep(1) 采样 running 窗口必然错过（届时阶段已 done）；
+        # 闸门解除 => 阶段不再 waiting，紧接着的第二次 provideInput 必为 NOTWAITING（确定性，不依赖采样）
         err = rpc.expect_error("task.provideInput",
                                {"taskId": tid4, "stageId": "extract", "values": {}})
         check("T4 运行中 provideInput 拒绝", "QS-TL-INPUT-NOTWAITING" in err, err)
         fin = rpc.wait_finished(timeout=600)
         check("T4 阶段照常完成", fin["status"] == "done", fin["summary"])
+        # 阶段启动轨迹以 task.log 的 started 行（永久留痕）验证，避免采样瞬态 running 状态
+        with open(os.path.join(root, "Result", "tasks", tid4, "task.log"),
+                  encoding="utf-8", errors="replace") as f:
+            started = [l for l in f.read().splitlines()
+                       if "stage extract started" in l]
+        check("T4 阶段已启动（日志留痕）",
+              bool(started),
+              started[-1][-100:] if started else "无 started 行")
 
         # ── T5 UI 断连（④）──
         print("[T5] 等待中 UI 断连")

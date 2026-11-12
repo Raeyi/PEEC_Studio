@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "_comment": "v2 = 路由表：契约来自各包 module.manifest.json（docs/MODULE_MANIFEST_SPEC.md）。kind: external/dll；provider = manifest id = 模块包目录名；stage = manifest stages[].id。gds2geo r2（V1.2-20261107-r2，2026-11-09 集成）：4 EXE → 2 EXE（gds2geo.exe / geo2msh.exe），stage 集 = em_geo / thermal_geo / em_msh / thermal_msh；gmsh 仅 em_msh/thermal_msh 需要（requiredBy）。",
+  "_comment": "v2 = 路由表：契约来自各包 module.manifest.json（docs/MODULE_MANIFEST_SPEC.md）。kind: external/dll；provider = manifest id = 模块包目录名；stage = manifest stages[].id。gds2geo r2（V1.2-20261107-r2，2026-11-09 集成）：4 EXE → 2 EXE（gds2geo.exe / geo2msh.exe），stage 集 = em_geo / thermal_geo / em_msh / thermal_msh；compact_em 2026.11.10-v1.4（apiVersion 4，2026-11-12 集成）：后处理合并，extract/solve/post 的 CLI 与产物以 manifest 为准；solve 新产 Y/Z 参数 CSV；errorContract 转 none。gds2geo 1.3.0（apiVersion 5，2026-11-12 集成）：4 主阶段与 CLI/产物路径不变；新增辅助 EXE geoedit/mshcheck/mshfix（不在流水线 DAG，见 manifest capabilities.auxiliaryCommands）；gmsh 4.11.1 共享：GDS2GEO_GMSH_EXECUTABLE 指 gmsh.exe，gmsh-4.11.dll 为 mshfix 直接 PE 依赖（tools/gmsh/）。",
   "modules": {
     "peec.model_extract": {
       "displayName": "等效电路模型 · PEEC 提取",

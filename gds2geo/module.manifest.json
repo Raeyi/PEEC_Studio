@@ -2,17 +2,22 @@
   "manifestVersion": 1,
   "id": "gds2geo",
   "name": "GDS2GEO",
-  "version": "V1.2",
-  "apiVersion": 4,
+  "version": "1.3.0",
+  "apiVersion": 5,
   "cli": {
     "executables": [
       "gds2geo.exe",
-      "geo2msh.exe"
+      "geo2msh.exe",
+      "geoedit.exe",
+      "mshcheck.exe",
+      "mshfix.exe"
     ],
     "deprecatedModes": [
       "no-argument mode using executable-relative settings/input/output",
       "gds2geo without --target (exact source only)",
-      "geo2msh without --target (legacy dual bundle)"
+      "geo2msh without --target (legacy dual bundle)",
+      "mshcheck without arguments (executable-relative portable DATA mode)",
+      "mshfix without arguments (executable-relative portable DATA mode)"
     ]
   },
   "stages": [
@@ -207,7 +212,10 @@
         "path": "Result/gds2geo/em_msh/model_em.msh",
         "schemaVersion": "4",
         "units": {
-          "length": "mm"
+          "length": "same coordinate scale as the matching GEO",
+          "metersPerUnitSection": "$GDS2GEOUnits",
+          "metersPerUnitField": "dim",
+          "unitsVersion": 1
         }
       },
       {
@@ -222,7 +230,10 @@
         "path": "Result/gds2geo/thermal_msh/model_thermal.msh",
         "schemaVersion": "4",
         "units": {
-          "length": "mm"
+          "length": "same coordinate scale as the matching GEO",
+          "metersPerUnitSection": "$GDS2GEOUnits",
+          "metersPerUnitField": "dim",
+          "unitsVersion": 1
         }
       },
       {
@@ -265,7 +276,8 @@
         "bundled": false,
         "requiredBy": [
           "em_msh",
-          "thermal_msh"
+          "thermal_msh",
+          "geoedit (auxiliary command)"
         ],
         "environmentVariable": "GDS2GEO_GMSH_EXECUTABLE",
         "platformTool": "tools/gmsh/gmsh.exe",
@@ -275,6 +287,17 @@
           "PATH"
         ],
         "configuration": "The platform sets GDS2GEO_GMSH_EXECUTABLE to the absolute path of its external Gmsh 4.11.1 executable."
+      },
+      "gmshLibrary": {
+        "version": "4.11.1",
+        "bundled": true,
+        "requiredBy": [
+          "mshfix (auxiliary commands, including help and version)"
+        ],
+        "platformTool": "tools/gmsh/gmsh-4.11.dll",
+        "environmentVariable": "PATH",
+        "configuration": "Before starting mshfix, prepend the absolute platform tools/gmsh directory to the child process PATH. The Windows loader resolves this direct PE dependency before main. GDS2GEO_GMSH_EXECUTABLE only selects gmsh.exe and does not locate this DLL.",
+        "architecture": "Windows x64"
       }
     }
   },
@@ -288,23 +311,42 @@
       {
         "version": "V1.2",
         "note": "Delivery API 4: MSH preserves all native CAD entities in dimensions 0/1/2/3, signed direct boundaries, native node classification and Point1/Line2/Tri3/Tet4 elements. Native unreferenced nodes are allowed. Consumers restricted to face/body entities or element types 2/4 must be adapted. CLI, artifact paths, GEO schema 3, MATDB schema 3, MSH 4.1 ASCII and mm coordinates are unchanged. Product/executable versions remain V1.2/1.2.0."
+      },
+      {
+        "version": "1.3.0",
+        "note": "Delivery API 5: formal MSH 4.1 keeps the matching GEO coordinate scale and declares meters per coordinate unit in $GDS2GEOUnits (version = 1, dim = ...). MSH coordinates are no longer universally mm; downstream importers must read dim. Schemas 3/4 require matching GEO/JSON dim. Historical schema 2 remains mm and new MSH declares dim = 0.001. GEOEDIT adds independently callable point/line/planar-surface editing; mesh stages consume the edited actual GEO. Auxiliary mshcheck/mshfix are separately callable and are not automatically inserted into the four-stage DAG. mshcheck skips the units section; mshfix 1.5.0 does not accept it or Tet4. Artifact paths and main-stage CLI are unchanged."
       }
     ],
     "deliveryFiles": [
       "gds2geo.exe",
       "geo2msh.exe",
+      "geoedit.exe",
+      "mshcheck.exe",
+      "mshfix.exe",
       "README.md",
       "ERROR_CODES.md",
       "module.manifest.json"
     ],
     "executables": {
       "gds2geo.exe": {
-        "version": "1.2.0",
-        "sha256": "e982a45b52e86ce6ca38cff1a7c399bc3e28a6192113bd8afecbd7dca5f60b67"
+        "version": "1.3.0",
+        "sha256": "2a7bdf4050c34c4de8b092973668f3be0f4f162681ea1465a0c172e4775d04a2"
       },
       "geo2msh.exe": {
-        "version": "1.2.0",
-        "sha256": "c40a788930f51f42b94f6e6ad0b4d81de500572e76e160be7490623df1f87c25"
+        "version": "1.3.0",
+        "sha256": "d70b2811837785a7789d8c476e3882d08846e4490eeba1efc9cea8fd525af7c9"
+      },
+      "geoedit.exe": {
+        "version": "1.3.0",
+        "sha256": "3f0aa46465b4a74fe564d2e6bea0027d7a73515523a5e2120fa3d0e029eaee7f"
+      },
+      "mshcheck.exe": {
+        "version": "0.23.0",
+        "sha256": "970df7e31c7cd9092dda940b87e16e78df43b4e11f69195725577791417e62bd"
+      },
+      "mshfix.exe": {
+        "version": "1.5.0",
+        "sha256": "ab1eafb6ca81f1e370ca1f01335d5d8db729ac1a167b3daa79a1dad453805144"
       }
     },
     "geometry": {
@@ -322,11 +364,17 @@
       "dimDefinition": "For GDS UNITS (a, b), dim = b/a. a is user units per DBU; b is meters per DBU. The GEO header and its same-stem JSON declare this scale.",
       "modelLengthUnit": "mm",
       "privateMeshLengthUnit": "um",
-      "materialSchemaVersion": 3
+      "materialSchemaVersion": 3,
+      "editableSchemaVersions": [
+        2,
+        3,
+        4
+      ],
+      "editedSchemaVersion": 4
     },
     "mesh": {
       "format": "Gmsh 4.1 ASCII",
-      "lengthUnit": "mm",
+      "lengthUnit": "same coordinate scale as the matching GEO; read embedded dim",
       "artifactSchemaVersionMeaning": "MSH major format version",
       "materialSchemaVersion": 3,
       "materialPairing": {
@@ -355,9 +403,19 @@
       "directBoundaries": "Native immediate boundary entities, with orientation where applicable.",
       "nodeClassification": "Native CAD entity dimension and tag; unreferenced native nodes may be present. Every element node reference must be valid.",
       "ungroupedEntities": "Allowed; no synthetic Physical 0 or fake material. CAD Point1/Line2 are not excitation definitions.",
-      "coordinateScaleFromGeo": "coordinates.dim * 1000",
-      "consumerRequirement": "Read all entity dimensions and supported element types. Select solver elements by dimension and Physical/material membership; do not treat CAD Line2 as ports.",
-      "stableMeshIds": false
+      "coordinateScaleFromGeo": "1 (formal MSH 4.1)",
+      "consumerRequirement": "Read all CAD entity dimensions and Point1/Line2/Tri3/Tet4. Read dim and scale once at the consumer boundary. CAD Line2 is geometry, not an excitation/port definition; solver ports come from the explicit source definition bound to this mesh and its selected elements. Select solver elements by dimension and Physical/MATDB membership; do not delete line records or synthesize materials as an integration workaround.",
+      "stableMeshIds": false,
+      "metersPerMeshUnit": "$GDS2GEOUnits.dim",
+      "unitsSection": {
+        "begin": "$GDS2GEOUnits",
+        "version": 1,
+        "dimMeaning": "meters per coordinate unit",
+        "end": "$EndGDS2GEOUnits",
+        "position": "after $EndMeshFormat on output; may move to file end when saved by Gmsh",
+        "missingDeclaration": "Do not assume mm for a new file. Historical explicit-unit contracts retain their own semantics."
+      },
+      "sourceBindings": "After editing or remeshing, rebuild mesh SHA-256 and selected triangle/entity bindings in source/boundary inputs. Neither element/node IDs nor tags across edited models are stable."
     },
     "requestContract": {
       "required": [
@@ -548,8 +606,165 @@
       }
     ],
     "publicationPolicy": "Stage outputs stay in Result/gds2geo. If publication is configured by the host, use the mesh and MATDB from the same target and successful generation.",
-    "platformIntegration": "The host selects and dispatches the requested profile and native both calls. Platform registration and downstream artifact routing require separate integration.",
-    "deliveryBatch": "GDS2GEO-V1.2-20261107-r2",
-    "externalCasePackage": "gds2geo_cases_20261107.zip"
+    "platformIntegration": "Four main stages and six execution profiles remain the automated contract. GEOEDIT and MSH tools are explicit auxiliary commands; host registration, child-process environment, source/boundary rebinding and downstream solver unit adaptation require integration. No platform solver end-to-end qualification is claimed.",
+    "deliveryBatch": "GDS2GEO-1.3.0-20261112",
+    "externalCasePackage": "gds2geo_cases_20261112.zip",
+    "supplementalDeliveryFiles": [
+      {
+        "path": "tools/gmsh/gmsh-4.11.dll",
+        "installPath": "{MODULE_ROOT}/tools/gmsh/gmsh-4.11.dll",
+        "version": "4.11.1",
+        "requiredBy": [
+          "mshfix.exe"
+        ],
+        "sha256": "3ba50dfe5d6e83e8672f4db026ce28188b9f12bc7c9d2bae33ef1a8396997b67"
+      }
+    ],
+    "auxiliaryCommands": [
+      {
+        "id": "geoedit",
+        "executable": "geoedit.exe",
+        "automaticPipelineStage": false,
+        "requiredArguments": [
+          "--input-dir",
+          "--output-dir",
+          "--request"
+        ],
+        "optionalArguments": [
+          "--help",
+          "--version"
+        ],
+        "requestVersion": 1,
+        "operations": [
+          "add-point",
+          "add-line",
+          "add-surface"
+        ],
+        "requestCoordinates": "input GEO coordinate scale, meters = coordinate * dim",
+        "input": "One independent target GEO, same-stem JSON and matching matdb.json (schema 2/3/4).",
+        "output": "Same three names; schema 4 edited model; unchanged MATDB bytes; output directory may equal input.",
+        "outputRoot": "Result/gds2geo/<host-selected-edit-directory>",
+        "requestRoot": "Model/<host-selected-request>.json",
+        "exitCodes": {
+          "0": "ok",
+          "2": "input_or_request",
+          "5": "geometry_execution_or_recoverable_publication"
+        },
+        "errorContract": {
+          "type": "none"
+        }
+      },
+      {
+        "id": "mshcheck",
+        "executable": "mshcheck.exe",
+        "automaticPipelineStage": false,
+        "requiredArguments": [
+          "<input.msh>"
+        ],
+        "optionalArguments": [
+          "--output",
+          "--annotated-msh",
+          "--abs-tol",
+          "--rel-tol",
+          "--compact",
+          "--help",
+          "--version"
+        ],
+        "input": "MSH 2.2/4.1 ASCII; checks Tri3 surfaces, not tetrahedral interiors. $GDS2GEOUnits is skipped, not interpreted or validated.",
+        "output": "Detection JSON schema 1.5 on success; optional annotated MSH/OPT are visualization copies, not repaired meshes.",
+        "outputRoot": "Result/gds2geo/<host-selected-check-directory>",
+        "exitCodes": {
+          "0": "detection_completed_including_issues",
+          "2": "argument_or_path",
+          "3": "read_or_detection",
+          "4": "output"
+        },
+        "errorContract": {
+          "type": "none"
+        },
+        "successPolicy": "Require normal exit 0 and valid success JSON, then inspect both summary.issueCount and summary.topologyIssueCount."
+      },
+      {
+        "id": "mshfix",
+        "executable": "mshfix.exe",
+        "automaticPipelineStage": false,
+        "subcommands": {
+          "plan": {
+            "requiredArguments": [
+              "--geo",
+              "--source-msh",
+              "--detection",
+              "--output"
+            ],
+            "optionalArguments": [
+              "--detector",
+              "--keep-temp"
+            ],
+            "outputSchemaVersion": "1.5"
+          },
+          "heal": {
+            "requiredArguments": [
+              "--geo",
+              "--source-msh",
+              "--detection",
+              "--plan",
+              "--output",
+              "--report"
+            ],
+            "optionalArguments": [
+              "--detector",
+              "--mesh-size-factor",
+              "--set-number",
+              "--keep-temp"
+            ],
+            "reportSchemaVersion": "1.4"
+          },
+          "verify": {
+            "requiredArguments": [
+              "--source-msh",
+              "--healed-msh",
+              "--detection",
+              "--plan",
+              "--healing-report",
+              "--report"
+            ],
+            "optionalArguments": [
+              "--detector"
+            ],
+            "reportSchemaVersion": "1.4"
+          },
+          "capabilities": {
+            "requiredArguments": [
+              "--json"
+            ],
+            "outputSchemaVersion": "1.4"
+          }
+        },
+        "queryArguments": [
+          "--help",
+          "--version"
+        ],
+        "input": "Matched GEO and MSH 2.2/4.1 ASCII with Point1/Line2/Tri3 only, detection JSON and subsequent unchanged plan/report bindings. Does not accept $GDS2GEOUnits or Tet4.",
+        "output": "Repaired MSH 2.2 ASCII and bound reports, all in new explicit paths.",
+        "outputRoot": "Result/gds2geo/<host-selected-repair-directory>",
+        "exitCodes": {
+          "0": "subcommand_success",
+          "2": "argument_plan_or_no_connect_actions",
+          "3": "input_schema_or_binding",
+          "4": "gmsh_execution",
+          "5": "unsupported_safe_repair",
+          "6": "verification",
+          "7": "output_transaction_or_recovery",
+          "8": "detector_invocation"
+        },
+        "errorContract": {
+          "type": "none"
+        },
+        "errorOutput": "When unified error handling is reached, stdout contains schema 1.0 success:false with error.code/message/exitCode; this is not qs-json-stderr.",
+        "successPolicy": "Accept a repaired mesh only after successful independent verify, success=true, zero geometric/topological issue counts and all validation gates. A no-changes plan retains the original mesh; do not call heal for a no-op.",
+        "detectorPolicy": "Explicitly pass the absolute path to the bundled mshcheck.exe for plan/heal/verify."
+      }
+    ],
+    "validationDelivery": "Separate validation/ delivery; not stored in the runtime module directory."
   }
 }

@@ -160,7 +160,7 @@ task_layer.exe serve [--config <目录>] [--bin <目录>] [--module-root <目录
 
 ```json
 {"jsonrpc":"2.0","id":2,"result":{"pipelines":[
-  {"id":"peec_basic","displayName":"电磁基本链路（PEEC 三段）","maxParallel":1,
+  {"id":"peec_basic","displayName":"电磁基本链路","maxParallel":1,
    "stages":[{"id":"extract","module":"peec.model_extract","name":"PEEC 模型提取",
               "ref":"em.model_extract","optional":false,"dependsOn":[]},
              {"id":"solve","module":"peec.solver","name":"频域求解",
@@ -170,13 +170,13 @@ task_layer.exe serve [--config <目录>] [--bin <目录>] [--module-root <目录
               "ref":"em.post","optional":true,"dependsOn":["solve"],
               "requires":["Result/compact_em/extract/model.peec",
                           "Result/compact_em/solve/S_parameter.csv"]}]},
-  {"id":"thermal_basic","displayName":"热基本链路（thermal 两段）",
+  {"id":"thermal_basic","displayName":"热基本链路",
    "stages":[{"id":"extract","module":"thermal.extract","name":"热路提取",
               "ref":"thermal.extract","optional":false,"dependsOn":[],
-              "artifacts":{"user/thermal.mesh":"Result/gds2geo/thermal/model_thermal.msh"}},
-             {"id":"post","module":"thermal.post","name":"温度后处理（OP0 映射）",
+              "artifacts":{"user/thermal.mesh":"Result/gds2geo/thermal_msh/model_thermal.msh"}},
+              {"id":"post","module":"thermal.post","name":"温度后处理",
               "ref":"thermal.post","optional":true,"dependsOn":["extract"],
-              "artifacts":{"user/thermal.mesh":"Result/gds2geo/thermal/model_thermal.msh"},
+              "artifacts":{"user/thermal.mesh":"Result/gds2geo/thermal_msh/model_thermal.msh"},
               "requires":["Model/thermal.op0",
                           "Result/thermal/extract/ThermalNetList.sp"]}]}
 ]}}
@@ -222,9 +222,9 @@ pipeline 的阶段条目此时写 `{id, ref, dependsOn, [本地覆盖]}`；`ref`
 
 | pipeline | 说明 |
 |---|---|
-| `gds_full` | **建模**：源模型 → 几何准备 → 电磁网格 → 热网格（1102 版起四段全必需）；EM 主网格 + 材料由任务层 **publisher 自动落位到 `Model/`**，热网格保留在 `Result/gds2geo/thermal/`（v1.1 布局，无 handoff）。gds2geo 1102 版需要的 gmsh 4.11.1 由 task_layer 经子进程环境变量 `GDS2GEO_GMSH_EXECUTABLE` 自动注入，UI 无需处理 |
+| `gds_full` | **建模**：源模型 → 几何准备 → 电磁网格 → 热网格（r2 四段接线：geo_em/geo_thermal/mesh_em/mesh_thermal）；EM 主网格 + 材料由任务层 **publisher 自动落位到 `Model/`**，热网格保留在 `Result/gds2geo/thermal_msh/`（r2 布局，无 handoff）。gmsh 4.11.1（随模块位于 tools/gmsh/）由 task_layer 经子进程环境变量 `GDS2GEO_GMSH_EXECUTABLE` 自动注入，UI 无需处理 |
 | `peec_basic` | **电磁**：PEEC 提取 → 频域求解 → 源/场后处理（post 段可选）；S 参数绘图由前端完成（plot 阶段自 2026-11-04 / v1.1 起移除；绘图程序与 Touchstone 导出随 compact_em v1.3 一并取消，2026-11-05 起生效） |
-| `thermal_basic` | **热**：热路提取（thermal.extract，必需）→ 温度后处理（thermal.post，可选，无 OP0 时自动跳过）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），热链三件由 UI 写入：`Model/source_thermal.json`（**thermal 1.0.7 起支持简化 schemaVersion 3**（仅 sources：volume_ids 上 total_power，允许空数组，体材料按 mesh Physical 标签 + matdb 自动装配，无需 thermal 提取对象）**与原 schemaVersion 2**（热源 + thermal 提取对象（体域/薄层/材料关联），1.0.6 起引入；1.0.5 时代提取控制为独立文件 `Result/thermal/thermal_extract_control.json`，已取消））+ `Model/boundary_thermal.json`（必需；**1.0.7 起支持 schemaVersion 2**（default adiabatic + boundaries：fixed_temperature（任意面，含内部面）/ convection（h_W_m2K + ambient_temperature_K））**与原 schemaVersion 1**（1.0.5 起独立文件；1.0.1 时代内嵌于 source_thermal.json））+ `Setting/set_thermal.json`（SPICE 仿真设置 analysis/probe，thermal 1.0.5 起）；程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2 QS-TH-FMT-INPUT）；最简单算例（无热源、两个固定温度面）= `dev/cases/thermal/heater`（schema 3 空 sources + schema 2 边界；验收 6089 节点 / 608 @500 K / 1961 @293.15 K / 0 W；post 6089/6089，max 500 K，min 293.145 K）；post 依赖 `Model/thermal.op0`（ALPS 结果，1.0.6 起标准位置；1.0.5 时代为 Result/thermal/post/，已废止；1.0.7 仍严格校验映射节点温度完整性，不自动补全） |
+| `thermal_basic` | **热**：热路提取（thermal.extract，必需）→ 温度后处理（thermal.post，可选，无 OP0 时自动跳过）。输入全部来自上游：热网格经 stage `artifacts` 路由到 `Result/gds2geo/thermal_msh/model_thermal.msh`，材料用 `Model/matdb.json`（gds_full 发布），热链三件由 UI 写入：`Model/source_thermal.json`（**thermal 1.0.7 起支持简化 schemaVersion 3**（仅 sources：volume_ids 上 total_power，允许空数组，体材料按 mesh Physical 标签 + matdb 自动装配，无需 thermal 提取对象）**与原 schemaVersion 2**（热源 + thermal 提取对象（体域/薄层/材料关联），1.0.6 起引入；1.0.5 时代提取控制为独立文件 `Result/thermal/thermal_extract_control.json`，已取消））+ `Model/boundary_thermal.json`（必需；**1.0.7 起支持 schemaVersion 2**（default adiabatic + boundaries：fixed_temperature（任意面，含内部面）/ convection（h_W_m2K + ambient_temperature_K））**与原 schemaVersion 1**（1.0.5 起独立文件；1.0.1 时代内嵌于 source_thermal.json））+ `Setting/set_thermal.json`（SPICE 仿真设置 analysis/probe，thermal 1.0.5 起）；程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2 QS-TH-FMT-INPUT）；最简单算例（无热源、两个固定温度面）= `dev/cases/thermal/heater`（schema 3 空 sources + schema 2 边界；验收 6089 节点 / 608 @500 K / 1961 @293.15 K / 0 W；post 6089/6089，max 500 K，min 293.145 K）；post 依赖 `Model/thermal.op0`（ALPS 结果，1.0.6 起标准位置；1.0.5 时代为 Result/thermal/post/，已废止；1.0.7 仍严格校验映射节点温度完整性，不自动补全） |
 
 进度说明：计算层模块没有百分比/进度条接口，任务层的进度是**阶段级**的（`task.stage.started` / `task.stage.log` / `task.stage.finished`），详见下文"五（补充）、进度与日志的边界"。
 模块能否真正运行（程序是否找得到）用 `modules.list` 的 `available` 字段判断（见 4.2）。
@@ -246,12 +246,12 @@ pipeline 的阶段条目此时写 `{id, ref, dependsOn, [本地覆盖]}`；`ref`
 热链同样在 gds_full 之后展开（热网格不经过 `Model/`，直接引用 gds2geo 的产物）：
 
 ```text
-① UI: task.run gds_full              → 热网格产出在 Result/gds2geo/thermal/（matdb 含热物性）
+① UI: task.run gds_full              → 热网格产出在 Result/gds2geo/thermal_msh/（matdb 含热物性）
 ② UI: 写求解设置            → v1.2 时代：set.json 增加 "thermal" 对象；thermal 1.0.6 起：写 Setting/set_thermal.json（SPICE 仿真设置）；提取控制（thermal 对象）内嵌于 Model/source_thermal.json（schemaVersion 2；1.0.7 起亦可用简化 schemaVersion 3——无 thermal 对象，见 heater 算例）
                                         （tetrahedral_domains / thin_layers，elementary 实体 ID；
                                         薄层 material_footprints 必须完整铺满 reference_surfaces）
                                         写 Model/source_thermal.json        → meshFile 指向
-                                        Result/gds2geo/thermal/model_thermal.msh + 其 SHA-256，
+                                        Result/gds2geo/thermal_msh/model_thermal.msh + 其 SHA-256，
                                         sources/fixed_temperature 用网格 elementary ID
 ③ UI: task.run thermal_basic         → 热路提取（post 无 OP0 时自动跳过）
 ④（可选）OP0 就绪（Model/thermal.op0；thermal 1.0.6 起标准位置，
@@ -422,7 +422,7 @@ UI 断连按既有 inputClosed→cancel 逻辑收尾。
 - 返回的 `pipeline` 字段形如 `single:<moduleId>`，便于 UI 区分"流水线任务"与"单模块任务"；
 - 同一进程仍然一次只能跑一个任务（`-32002`）；
 - 模块自身的输入契约照常生效，缺输入时报 `QS-TL-INPUT-MISSING`；
-- **接线路由（P3 起）**：单模块任务的阶段接线（`artifacts` 工件路由 / `requires` / `params` / `userGate`）从该模块在**所有流水线（含 local）中的物化阶段条目**自动采用——恰好 1 处接线时直接用其库级默认（例如 `thermal.extract` 单跑时 `user/thermal.mesh` 自动路由到 `Result/gds2geo/thermal/model_thermal.msh`，而非 manifest 默认的 `Model/model_thermal.msh`）；0 处 = 无路由（manifest 默认位置）；**>=2 处**时报错并列出候选（形如 `peec_basic/extract, dup_chain/x`），调用方传 `stageRef`（值 = 候选之一，`"pipelineId/stageId"` 格式）消歧后放行：
+- **接线路由（P3 起）**：单模块任务的阶段接线（`artifacts` 工件路由 / `requires` / `params` / `userGate`）从该模块在**所有流水线（含 local）中的物化阶段条目**自动采用——恰好 1 处接线时直接用其库级默认（例如 `thermal.extract` 单跑时 `user/thermal.mesh` 自动路由到 `Result/gds2geo/thermal_msh/model_thermal.msh`，而非 manifest 默认的 `Model/model_thermal.msh`）；0 处 = 无路由（manifest 默认位置）；**>=2 处**时报错并列出候选（形如 `peec_basic/extract, dup_chain/x`），调用方传 `stageRef`（值 = 候选之一，`"pipelineId/stageId"` 格式）消歧后放行：
 
 ```json
 {"jsonrpc":"2.0","id":5,"method":"module.run","params":{
@@ -440,8 +440,8 @@ UI 断连按既有 inputClosed→cancel 逻辑收尾。
 端口只能由用户在网格上选取，任务层既生成不了也猜不出来，所以**端口文件由 UI 直接写到
 `{dataRoot}/Model/`**，不经过 task_layer。按 DATA_LAYOUT v1.2 D3，EM 链路规范名为 **`source_em.json`**
 （热链路 `source_thermal.json`；`boundary_em.json` / `boundary_thermal.json` 为预留槽位，
-暂无消费方、格式待定，UI 可不写）。**UI 只写 `source_em.json`**（当前交付的 compact_em v1.2
-版 2026-11-02 起实读新名、不回退旧名）；平台预检仍兼容旧名 `port_em.json`
+暂无消费方、格式待定，UI 可不写）。**UI 只写 `source_em.json`**（当前交付的 compact_em v1.4
+版 2026-11-10 起实读新名、不回退旧名）；平台预检仍兼容旧名 `port_em.json`
 （新名优先），用于过渡存量算例：
 
 ```json
@@ -485,11 +485,14 @@ UI 断连按既有 inputClosed→cancel 逻辑收尾。
 （DATA_LAYOUT：`Model/source_em.json`、`Setting/` 求解设置 等），不经过该通道**——
 为后续模块预留。
 
-- 当前 `peec_basic` 的输入全部是固定名：`Model/model_em.msh`、`Model/matdb.json`、
+- 当前 `peec_basic` 的输入全部是固定名：`Model/model_em.msh`、`Model/matdb.json`（schemaVersion 必须为 3）、
   求解设置（`Setting/set_em.json`，平铺 schemaVersion=1，compact_em v1.3 起生效（2026-11-05）；旧 set.json 不再读取；
-  compact_em v1.2 版起 set.txt 弃用；样例随平台交付包 templates/ 提供）。
+  compact_em v1.2 版起 set.txt 弃用；样例随平台交付包 templates/ 提供）；**v1.4（2026-11-10）起严格 schema 校验**：
+  DIM/FS/FE 必填（计点模式另需 N_FP）；Solver_SET 仅 0；SAVE_BIN/SAVE_TXT/Taylor/MNA_WEIGHT/SOLVER_MEMORY_MB/SOLVER_THREADS
+  出现即拒绝（0 值亦不允许）；GROUND_PLANE_ENABLED=1 需 GROUND_PLANE_Z_METERS；POST_* 控制后处理（POST_FREQ_INDEX -1=最后频点）。
 - UI 要改求解设置（FS/FE/N_FP 等）直接写 dataRoot 的 `Setting/`，不经任务层代理；设置文件整体纳入模块 artifacts/receipt 指纹，内容变化后旧上游结果不可复用（需重新提取/求解）；
-- S 参数 CSV（`S_parameter.csv`）默认列为 `frequency_Hz` + `S<i>_<j>_real`/`S<i>_<j>_imag`（1-based，i=响应端口、j=激励端口，S 无量纲；SI 赫兹）；模块支持 `--s-columns full`（附加模块计算的 dB/相位列），平台默认 RI 列，前端按 dB = 20·log10(|Sij|)、相位 = atan2(imag, real) 换算；
+- v1.4（2026-11-10）起输出列**固定 RI**（`--s-columns` 已移除）：solve 产出 `S_parameter.csv` / `Y_parameter.csv` / `Z_parameter.csv`（`frequency_Hz` + `<i>_<j>_real`/`<i>_<j>_imag`，1-based，i=响应端口、j=激励端口，SI 赫兹）+ `Solver_Diagnostics.csv`；前端自行换算 dB/相位（dB = 20·log10(|Sij|)、相位 = atan2(imag, real)）；
+- **post（v1.4 merged-post-20261111）**：产出合并视图 `Result/compact_em/post/Source.msh`（14 视图 J/Qe/Ve/M/Qm/Vm × _real/_imag/_mag）+ `Field.msh`（6 视图 E/H），取 1 个频点（POST_FREQ_INDEX，-1=最后）+ 1 个端口（POST_PORT）；旧版拆分文件（`.msh_Re` 等）不再产出；这两个文件仅列于阶段回执，**不进入平台 resultFiles**（UI 按需读算例目录或回执）。
 - `inputs.validate` 会校验必需输入文件存在、`meshFile` 存在且哈希与主网格一致。
 
 ### 4.9 task.status / task.result
@@ -554,20 +557,20 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 
 ## 五（补充）、进度与日志的边界
 
-计算层模块（gds2geo / compact_em）目前**没有结构化的进度接口**：它们只在 stdout/stderr 输出人可读文本，机器侧只有进程退出码与（compact_em 的）stderr JSON 错误记录。因此任务层回传给 UI 的"进度"是三层信息，UI 需要区分使用：
+计算层模块（gds2geo / compact_em）目前**没有结构化的进度接口**：它们只在 stdout/stderr 输出人可读文本，机器侧只有进程退出码（2026-11-12 起两模块 errorContract=none，不再提供结构化 stderr JSON）。因此任务层回传给 UI 的"进度"是三层信息，UI 需要区分使用：
 
 | 来源 | 内容 | 性质 |
 |---|---|---|
 | `task.stage.started` / `task.stage.finished` | 阶段打点与终态（含 exitCode/errorCode/outputs） | **结构化**，可驱动进度条骨架与阶段状态 |
-| `task.stage.log` | 后端 stdout/stderr 逐行转发（UTF-8 优先，出现替换字符回退本地代码页） | **非结构化文本**；compact_em 的 stderr JSON 错误行也在这里 |
+| `task.stage.log` | 后端 stdout/stderr 逐行转发（UTF-8 优先，出现替换字符回退本地代码页） | **非结构化文本**；失败原因在此 + `exitCode` |
 | `state.json`（`task.status` / `task.result`） | 全量阶段记录 + 结果文件清单 | 结构化，可随时拉取兜底 |
 
 要点：
 
 1. 任务层**不会解析**后端的百分比/进度行（当前后端也没有这种输出），不做假进度；UI 进度条建议按"阶段数"打点，用 `task.stage.log` 填充日志窗（高频，需限流）。
-2. 失败时 `task.stage.finished` 的 `errorCode` 优先取后端输出中最后一条 `"code":"QS-..."`（compact_em 契约），否则为 `QS-TL-MOD-EXEC`；gds2geo 无 QS 码，固定 `QS-TL-MOD-EXEC` + 退出码（2=输入/配置，5=执行）。
-3. 完整错误对象字段（severity/message_user_zh/user_action/trace_id 等）由 compact_em 自己写在 stderr 与 `Result/logs/compact_em/<exe>-<trace_id>.jsonl`（DATA_LAYOUT 规范位置；当前 compact_em 2026.10.22 版仍写旧 `Result/Logs/`，过渡期两处都读），任务层不重组，只透传文本并提取 code；UI 若要展示中文提示，从 `task.stage.log` 里对应 JSON 行解析，或让 UI 直接读该 jsonl。
-4. gds2geo 的日志由任务层经 `--runtime-dir` 写到算例目录的 `Result/logs/gds2geo/`（符合 DATA_LAYOUT R2）；V1.1 以系统命名互斥量控制并发、不创建 `.lock` 文件（不得与旧版文件锁程序混用同一算例）；任务层的 `task.log`/`state.json` 在 `Result/tasks/<taskId>/`。
+2. 2026-11-12 起**两模块 errorContract=none**（无结构化 stderr JSON）：失败 `errorCode` 固定 `QS-TL-MOD-EXEC` + 进程 `exitCode`（compact_em：extract 0/1/2、solve 0/1、post 0/1/2；gds2geo：0/2/5）；失败原因在 `task.stage.log` 文本与 `errorMessage`。
+3. **v1.4（2026-11-10）起不再写 stderr JSON / jsonl 诊断文件**：失败原因在 `task.stage.log` 文本 + 进程退出码（见第 2 条）；各阶段运行回执 `stage_receipt.json`（best effort，与产出同目录落盘）可按需读取。
+4. gds2geo 的日志由任务层经 `--runtime-dir` 写到算例目录的 `Result/logs/gds2geo/`（符合 DATA_LAYOUT R2）；当前版本（r2/1.3.0）以系统命名互斥量控制并发、不创建 `.lock` 文件（不得与旧版文件锁程序混用同一算例）；任务层的 `task.log`/`state.json` 在 `Result/tasks/<taskId>/`。
 
 ---
 
@@ -587,13 +590,13 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 
 ### 6.2 阶段层（通知里的 `errorCode`）
 
-机器按 `errorCode` 分支，**不要解析文本**。格式为 `QS-TL-<域>-<错误名>`，后端模块自身的错误码会原样透传。
+机器按 `errorCode` 分支，**不要解析文本**。格式为 `QS-TL-<域>-<错误名>`（2026-11-12 起两模块 errorContract=none，模块自身 QS 码不再存在；失败原因在 `errorMessage` 文本 + `exitCode`）。
 
 | errorCode | 含义 |
 |---|---|
 | `QS-TL-INPUT-MISSING` | 必需输入缺失（`errorMessage` 含具体路径） |
 | `QS-TL-MOD-NOTFOUND` | 后端程序未找到（部署路径不对） |
-| `QS-TL-MOD-EXEC` | 后端程序非 0 退出 |
+| `QS-TL-MOD-EXEC` | 后端程序非 0 退出（compact_em/gds2geo 均 errorContract=none：平台固定本码 + 携带进程退出码，模块不产生结构化 stderr JSON） |
 | `QS-TL-OUTPUT-MISSING` | 宣告成功但没有产出文件 |
 | `QS-TL-MOD-TIMEOUT` | 阶段超时 |
 | `QS-TL-CANCEL` | 用户取消 |
@@ -610,7 +613,7 @@ UI 建议映射：`task.stage.started` → 阶段打点；`task.stage.log` → �
 | `QS-TL-WORKER-NOTFOUND` | DLL 模块的 worker_host 宿主未找到 |
 | `QS-TL-IO-JOB` | job JSON 写入失败（DLL 模块任务定义落盘失败） |
 | `QS-TL-PATH-ESCAPE` | 执行前契约守卫（2026-11-10）：模块 outputChecks / publishes 经 rebind 解析越出当前 dataRoot → `task.run` 以 -32004 直接拒绝（不创建任务）；`inputs.validate` 报本 issue。不出现在 `task.stage.finished` |
-| `QS-FMT-* / QS-SOLV-* / ...` | 计算层模块自身错误码，原样透传 |
+| ~~`QS-FMT-* / QS-SOLV-* / ...`~~ | （历史行，已失效）计算层模块自身错误码原样透传；**2026-11-12 起两模块 errorContract=none** |
 
 ---
 
@@ -630,10 +633,10 @@ dataRoot = <部署根>/cases/<项目名>/DATA
 <case>\DATA\
 ├── Model\        主网格 *.msh（恰好一份）、matdb.json、source_em.json（规范名，v1.2）
 │                 + boundary_em.json（预留）；平台预检仍兼容旧名 port_em.json（compact_em 不再读旧名）
-├── Setting\      求解设置：set_em.json（EM，compact_em v1.3 起生效）+ set_thermal.json（SPICE 仿真设置）；v1.2 时代合并件 set.json 已废止
+├── Setting\      求解设置：set_em.json（EM，compact_em v1.3 起生效；v1.4（2026-11-10）起严格 schema 校验，见 4.8）+ set_thermal.json（SPICE 仿真设置）；v1.2 时代合并件 set.json 已废止
 ├── Result\
-│   ├── compact_em\  模块产物区（按 stage 子目录）：extract\ solve\ post\（plot\ 目录自 v1.1 起不再生成）
-│   ├── logs\compact_em\  诊断 jsonl
+│   ├── compact_em\  模块产物区（按 stage 子目录）：extract\（model.peec）solve\（S/Y/Z_parameter.csv + Solver_Diagnostics.csv）post\（Source.msh/Field.msh 合并视图，仅回执列出）
+│   ├── logs\compact_em\  运行日志（--runtime-dir 写入，人可读文本；v1.4 起不再写 jsonl）
 │   └── tasks\<taskId>\  state.json + task.log（仅任务层写）
 └── .locks\       锁文件（规范位置）
 ```
@@ -641,29 +644,30 @@ dataRoot = <部署根>/cases/<项目名>/DATA
 `source_em.json` 必须与主网格绑定（`meshFile` + `meshSha256`），改动网格后要重新生成源文件，
 否则提取阶段会报文件损坏类错误（`QS-IO-FILE-CORRUPTED`）。
 
-注意：当前交付 compact_em v1.2（2026-11-02）产物按阶段落到 `Result/compact_em/<stage>/`，
-二进制实读 `source_em.json`（不再读旧名 `port_em.json`，见 4.7）。
+注意：当前交付 compact_em v1.4（2026-11-10）产物按阶段落到 `Result/compact_em/<stage>/`，
+二进制实读 `source_em.json`（不再读旧名 `port_em.json`，见 4.7）。v1.4 模型为 FreeSpace `PEECFS02`/version2
+（2026.11.10-v1.4），与旧 Compact `PEECPK01` 模型二进制不兼容——旧版本算例需重新提取；set_em.json 严格 schema 见 4.8。
 
 **`gds_full` 的算例布局**（输入是版图而不是网格）：
 
 ```text
 <case>\DATA\
-├── Model\        输入：model.gds + model_info.csv（gds2geo V1.1 仅支持 CSV，不接受 XTF）
+├── Model\        输入：model.gds + model_info.csv（平台契约仅 CSV，不接受 XTF；原生 CLI 的 XTF 子集平台不使用）
 │                 输出（publisher 自动落位）：model_em.msh + matdb.json
 ├── Result\
 │   ├── gds2geo\
-│   │   ├── source\    源模型：model.geo / model.json / matdb.json
-│   │   ├── prepared\  派生几何：em.geo / em.json / thermal.geo / thermal.json / matdb.json
-│   │   ├── em\        电磁网格：model_em.msh / model_em.msh.json（receipt）/ matdb.json
-│   │   └── thermal\   热网格：model_thermal.msh / model_thermal.msh.json（receipt）/ matdb.json（V1.1 起必需）
-│   ├── logs\gds2geo\  日志/诊断/私有暂存（V1.1 无锁文件，系统命名互斥量）
+│   │   ├── em_geo\      电磁几何：model_em.geo / model_em.json / matdb.json
+│   │   ├── thermal_geo\ 热几何：model_thermal.geo / model_thermal.json / matdb.json
+│   │   ├── em_msh\      电磁网格：model_em.msh / matdb.json（主网格由任务层 publisher 自动落位 Model/）
+│   │   └── thermal_msh\ 热网格：model_thermal.msh / matdb.json（r2 起必需）
+│   ├── logs\gds2geo\  日志/诊断/私有暂存（无锁文件，系统命名互斥量；任务层经 --runtime-dir 写入）
 │   └── tasks\<taskId>\  state.json + task.log
 └── .locks\       锁文件（规范位置）
 ```
 
-注意：gds2geo V1.1 以系统命名互斥量做并发保护、不创建锁文件（旧版文件锁位于
+注意：gds2geo（r2 / 1.3.0）以系统命名互斥量做并发保护、不创建锁文件（旧版文件锁位于
 `Result/gds2geo/runtime/`，不得与旧版混用同一算例）；任务层自己的 `task.log` 和 `state.json` 始终在算例的
-`Result\tasks\<taskId>\` 下。
+`Result\tasks\<taskId>\` 下。r3 另随附辅助工具 geoedit / mshcheck / mshfix（平台默认不接入流水线，仅以辅助命令暴露）。
 
 ---
 

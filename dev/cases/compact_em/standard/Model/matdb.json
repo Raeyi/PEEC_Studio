@@ -1,80 +1,41 @@
 {
   "materials": [
     {
-      "dimension": "volume",
-      "id": 1,
-      "name": "UPPER__Volume",
-      "properties": {
-        "conductivity": {
-          "model": "constant",
-          "unit": "S/m",
-          "value": 1e+16
-        }
-      },
-      "type": "C"
-    },
-    {
-      "dimension": "volume",
-      "id": 2,
-      "name": "LOWER__Volume",
-      "properties": {
-        "conductivity": {
-          "model": "constant",
-          "unit": "S/m",
-          "value": 1e+16
-        }
-      },
-      "type": "C"
-    },
-    {
-      "dimension": "volume",
+      "dimension": "surface",
       "id": 3,
-      "name": "AIR",
+      "name": "HEATER__Surface_0.0001mm",
       "properties": {
         "conductivity": {
           "model": "constant",
           "unit": "S/m",
-          "value": 0.0
+          "value": 2500000.0
         },
-        "relativePermittivity": {
+        "density": {
+          "model": "constant",
+          "unit": "kg/m^3",
+          "value": 5450.0
+        },
+        "relativePermeability": {
           "model": "constant",
           "unit": "1",
           "value": 1.0
-        }
-      },
-      "type": "D"
-    },
-    {
-      "dimension": "surface",
-      "id": 4,
-      "name": "UPPER__Surface_0.0005mm",
-      "properties": {
-        "conductivity": {
+        },
+        "specificHeat": {
           "model": "constant",
-          "unit": "S/m",
-          "value": 1e+16
-        }
-      },
-      "thickness": 0.0005,
-      "thicknessUnit": "mm",
-      "type": "C"
-    },
-    {
-      "dimension": "surface",
-      "id": 5,
-      "name": "LOWER__Surface_0.0005mm",
-      "properties": {
-        "conductivity": {
+          "unit": "J/(kg*K)",
+          "value": 636.0
+        },
+        "thermalConductivity": {
           "model": "constant",
-          "unit": "S/m",
-          "value": 1e+16
+          "unit": "W/(m*K)",
+          "value": 26.96
         }
       },
-      "thickness": 0.0005,
+      "thickness": 0.0001,
       "thicknessUnit": "mm",
       "type": "C"
     }
   ],
-  "nextId": 6,
+  "nextId": 4,
   "schemaVersion": 3
 }

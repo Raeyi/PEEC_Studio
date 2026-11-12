@@ -484,3 +484,16 @@ python .\tools\rpc_smoke.py --exe .\build\task_layer.exe --data-root ..\demo\min
   P1 旧版基线二进制复现（outputs/resultFiles 指向 A 根）、P2 B 的 outputs/resultFiles 全部在 B 根且
   A 根 0 命中 + 发布件 SHA-256 相等 + A 树快照不变 + 删旧产物后重跑不复用、P3 守卫对合法 manifest
   无误报）。未改动任何模块 manifest。
+
+- 2026-11-12（vendor R3 换版：compact_em v1.4 + gds2geo 1.3.0；分支 `feature/vendor-r3-20261112`，基线 ae88dc0；**未合入 main**，待 UI 侧验证）：
+  ① **模块换版**（manifest 驱动，任务层**未重编译**）：compact_em v1.4（2026.11.10-v1.4，apiVersion 3→4；Extractor/Solver/Post 三 EXE + 新增运行时依赖 `libiomp5md.dll`（与 EXE 同目录）+ ERROR_CODES 改英文人可读诊断版）；
+  gds2geo 1.3.0（r2，apiVersion 4→5，`platformIntegrationTested:false`；gds2geo.exe / geo2msh.exe + 新增辅助工具 geoedit / mshcheck（0.23.0）/ mshfix（1.5.0），平台默认不接入流水线、仅以辅助命令暴露；gmsh 4.11.1（含 `gmsh-4.11.dll`）位于平台共享工具区 `tools/gmsh/`）。
+  ② **契约变化（两模块 errorContract=none）**：失败不再输出结构化 stderr JSON / jsonl；平台固定上报 `QS-TL-MOD-EXEC` + 进程退出码（compact_em：extract 0/1/2、solve 0/1、post 0/1/2；gds2geo：0/2/5/6）。
+  compact_em v1.4 严格 set_em.json schema：DIM/FS/FE 必填（计点模式另需 N_FP）、SAVE_BIN/SAVE_TXT/Taylor/MNA_WEIGHT/SOLVER_MEMORY_MB/SOLVER_THREADS 出现即拒绝（0 值亦不允许）、Solver_SET 仅 0、GROUND_PLANE_ENABLED=1 需 GROUND_PLANE_Z_METERS、设置文件字节指纹化；
+  `--s-columns` 移除（列固定 RI）；solve 产出 S/Y/Z_parameter.csv + Solver_Diagnostics.csv；post 合并视图（Source.msh 14 视图 + Field.msh 6 视图，POST_FREQ_INDEX -1=最后频点，仅列于阶段回执、**不进入平台 resultFiles**）；
+  模型容器 FreeSpace PEECFS02/version2 与旧 PEECPK01 二进制不兼容（旧算例需重新提取）；gds 1.3.0 产出布局 em_geo/thermal_geo/em_msh/thermal_msh 四目录（无 .msh.json 强制回执），系统命名互斥量保留、无锁文件。
+  ③ **算例与配置适配**：树内标准算例 `dev/cases/compact_em/standard/` 整体替换为 vendor R2 五件套（SHA 一致）；`two_layer_surface_port/Setting/set_em.json` 与 `templates/Setting/set_em.json` 迁出 6 个禁键；`modules.json` `_comment` 刷新；`pipelines.json` displayName/name 去括号注释（0e9c14e，用户确认）。
+  ④ **测试适配**：gate_test.py T4 改确定性即时断言（NOTWAITING 即时校验 + task.log `stage extract started` 行追踪；v1.4 100 点 extract 实测 280 ms，旧版 1 秒等待会误判）；p2_stage_lib_test.py ③/④ fixture 改 v1.4 参数（`export:csv` / `mkl-threads` / `workers`，mkl-threads 10/20）。
+  ⑤ **复测（6 腿，`--v1-commit cc24e18` 物化等价基线）**：baseline ✓0（thermal 基线 344.1037 K；gds_full r2 四段 + publisher 落位 Model/model_em.msh 66,834 B + matdb.json 878 B）、pswitch ✓0、p1 ✓0（21/21）、p3 ✓0、p2 ✓1（恰为 3 个已记录的预期物化 FAIL：gds_full / thermal_basic / peec_basic——v1.4 严格度/算例变化迫使平台侧算例/测试适配）、gate ✓0（22/22）。
+  ⑥ **文档**：UI_API.md（errorContract=none、v1.4 输出契约、gds r2 布局、thermal_msh 路径）、ERROR_CODES.md §3（3.1/3.2 重写；v1.2 时代 compact_em QS 码降级为历史行）、docs/REPACK/compact_em.md + gds2geo.md 增 2026-11-12 R3 回执。
+  范围说明：v1.4 严格度与算例变化迫使平台侧算例/测试适配（见 ④ 与 ⑤ 的 3 个预期 FAIL）；未改动任何模块源码（全部为 vendor 二进制），任务层源码零改动。

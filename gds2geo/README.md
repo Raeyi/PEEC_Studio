@@ -1,313 +1,265 @@
-# GDS2GEO V1.2 · 几何与网格接口
+# GDS2GEO 1.3.0 · 几何、网格、编辑与检测修复接口
 
-本包面向 Windows x64。输入二维 GDS 版图和 CSV/XTF 工艺叠层，`gds2geo.exe` 生成电磁或电热三维几何；`geo2msh.exe` 读取相应的几何包，生成网格。两个程序均支持 `em`（电磁）、`thermal`（电热）和 `both`（两者）。只需要查看几何时，完成第一步即可。
+交付批次：`GDS2GEO-1.3.0-20261112`，Windows x64。产品及 `gds2geo.exe`、`geo2msh.exe`、`geoedit.exe` 版本为 **1.3.0**；随附独立工具 `mshcheck.exe` 为 **0.23.0**，`mshfix.exe` 为 **1.5.0**。平台 manifest 使用 `manifestVersion: 1`、`apiVersion: 5`，数据布局标识仍为 `peec-data/v1`。文件身份以交付 manifest 中的 SHA-256 为准。
 
-## 本次交付的变化
+## 相对 r2 的四项主要更新
 
-| 接收方原先的调用 | 本包的调用方式 |
-| --- | --- |
-| 依次运行源模型、几何准备，再分别启动两个网格程序 | 从原始 GDS 和工艺文件直接调用 `gds2geo --target …`。需要网格时再调用 `geo2msh --target …`。只使用这两个 EXE。 |
-| 共享准备目录和材料库 | EM 和电热各用一个几何目录、一个网格目录。每份目标 GEO 带同主名 JSON 和本目标 MATDB；每份 MSH 带本目标 MATDB。 |
-| 用网格回执判断独立目标完成 | 等进程正常退出且退出码为 0，再取本次目标的 MSH 和 MATDB。双目标的几何阶段一次建立源模型，网格阶段核验两套输入后成组发布四件结果。 |
-| 从模块包取网格工具 | 平台提供 Gmsh **4.11.1**，通过 `GDS2GEO_GMSH_EXECUTABLE` 指定绝对路径。生成 GEO 可独立运行。 |
+1. **GEOEDIT 点、线、面编辑**：新增独立 `geoedit.exe`，按实际位置嵌入或切分几何，支持累计编辑、原位更新、另存和保存重开；原材料参数保留，配套 GEO2MSH 直接剖分保存的实际 GEO。
+2. **MSH 检测**：随附 `mshcheck.exe`，检查三角形表面并输出问题和定位证据。
+3. **MSH 修复**：随附 `mshfix.exe`，对支持的输入生成计划、修复/重网格并独立复检。
+4. **GEO → MSH 的 dim 传递**：新完整 MSH 保持 GEO 坐标尺度并保存单位比例，不再统一转换为 mm。
 
-## 本批次网格与下游读取要求
+薄导体默认阈值等属于现有参数调整，不列为新增功能。材料文件仍为现有 `matdb.json`；`mapping.json + materials.json` 三件套迁移尚未实施。
 
-本批次标识为 **GDS2GEO-V1.2-20261107-r2**；`r2` 只区分同日交付，产品仍为 **V1.2**，两个 EXE 的 `--version` 仍为 **1.2.0**。请成对部署并按 manifest 核对 SHA-256。
+MSH 两个工具是独立调用能力，未自动接入几何/网格主流水线。**当前 mshfix 1.5.0 拒绝含 `$GDS2GEOUnits` 的源 MSH，也不支持 Tet4 体网格；不能直接修复本版带 dim 的正式网格。** mshcheck 可跳过该单位段读取，但不解释或校验 dim，对含体单元的文件也只检查 Tri3 表面。接收方不得将表面检测成功当作体网格验收。
 
-生成的 MSH 保留对应目标 GEO 经 Gmsh 4.11.1 加载后的全部真实 Point、Curve、Surface、Volume，实体身份为 `(dimension, tag)`；同时保留直接边界及适用方向、点坐标/实体范围和节点原生归属。单元包括 Point1（类型 15）、Line2（类型 1）、Tri3（类型 2）、Tet4（类型 4），以实际目标中存在的维度为准。坐标为 mm，即 GEO 坐标乘 `coordinates.dim * 1000`。
+## 1. 安装布局和依赖
 
-接收方读取器须支持以上四维实体及单元，允许无 Physical 分组的 CAD 实体以及未被单元引用的原生节点；所有单元引用的节点仍必须存在。CAD 点线不是端口或激励，不能自动作为热边界条件。求解单元按维度及 Physical/MATDB 语义选取，不为无分组实体补 Physical 0 或材料。材料 Physical 分组与配套 MATDB 的含义保持不变。实体身份仅对应本目标几何，不保证不同目标、几何修改或重新剖分后的节点/单元编号相同。
+模块压缩包名为 `GDS2GEO-1.3.0-20261112.zip`，展开后包含：
 
-本批次按 doc1.5 不兼容工件规则将 manifest `apiVersion` 从 3 升至 **4**；GEO/MATDB schema 仍为 3，MSH 格式仍为 4.1 ASCII。接口版本检查本身不会自动阻止所有旧消费者，接收方应先验证读取兼容性，再启用本包。六组 CLI 参数与工件路径保持不变。
+```text
+GDS2GEO-1.3.0-20261112/
+├── gds2geo/
+│   ├── gds2geo.exe
+│   ├── geo2msh.exe
+│   ├── geoedit.exe
+│   ├── mshcheck.exe
+│   ├── mshfix.exe
+│   ├── README.md
+│   ├── ERROR_CODES.md
+│   └── module.manifest.json
+└── tools/gmsh/
+    └── gmsh-4.11.dll
+```
 
-## 坐标单位与 `dim`
+将 `gds2geo/` 放到平台部署根 `{MODULE_ROOT}/gds2geo/`。**建议将随附 `gmsh-4.11.dll` 放入平台共享 `tools/gmsh/` 文件夹**，与平台已提供的 `gmsh.exe` 并列；两个文件均须是配套的 **Gmsh 4.11.1 / Windows x64**。本模块包不重复携带 `gmsh.exe`。第三方许可材料单独放在 `GDS2GEO-1.3.0-third-party.zip`，必须与二进制一同转交并保留，不计入模块目录八文件。
 
-**本次 V1.2 交付使用带 `dim` 的配套双 EXE。** 几何阶段从每个 GDS 的 `UNITS` 读取每个 DBU 对应的用户单位数 `a` 和米数 `b`，用 `dim = b/a` 算出一个 GEO 坐标单位对应多少米。正式 GEO 的 XY、Z、厚度以及几何容差统一按该版图的用户单位写出。GEO 头部的 `// dim = …` 可直接读取，程序同时将数值写入同主名 JSON 的 `coordinates.dim`。这个注释记录单位，修改注释本身不会缩放几何。
+三个主程序静态集成编译器运行库和内部 MATDB 0.1.0；构建依赖为 Clipper2 2.0.1、CLI11 2.6.2、nlohmann/json 3.12.0。生成几何不调用 Gmsh；网格化和编辑通过外置 `gmsh.exe` 工作。`mshcheck` 不依赖 Gmsh，`mshfix` **直接导入 `gmsh-4.11.dll`**，包括查询版本、帮助和 capabilities 时也须先让 Windows 找到 DLL。
 
-| 读取对象 | 长度约定 |
-| --- | --- |
-| GDS 与工艺输入 | 版图按 GDS 自身 DBU；CSV 的 Height、Thickness 以 mm 输入，XTF 按 `Config.LengthUnit`。默认 XY 轮廓近似容差为 50 nm。 |
-| 目标 GEO 与配套 JSON | 正式 GEO 的长度乘以 `dim` 得米。目标 JSON 为 schema 3，`coordinates.outputUnit` 描述 GEO 单位，`coordinates.modelUnit` 描述内部模型的 mm 单位。读取 `model.z` 等模型字段时使用后者。 |
-| 网格与材料 | MSH 4.1 ASCII 的节点坐标为 **mm**，换算成米乘以 `1e-3`。MATDB schema 3 的材料厚度、宽度和物性按各自字段声明的单位读取。 |
+两个依赖路径需分别配置：
 
-例如 `UNITS = (0.001, 1e-9)` 时，GEO 的 `dim = 1e-6`。10 µm 的边长在 GEO 中是 `10`，CSV 的 0.002 mm 层厚在 GEO 中是 `2`；同一段 10 µm 距离在最终 MSH 中是 `0.01` mm。
+- `GDS2GEO_GMSH_EXECUTABLE`：指向 `tools/gmsh/gmsh.exe` 的**绝对路径**，供 GEO2MSH/GEOEDIT 使用。程序仍按“EXE 同目录的旧 Gmsh → 此环境变量 → PATH”解析，因此新模块目录不要混放其他版本 `gmsh.exe`。
+- 子进程 `PATH`：**启动 mshfix 之前**，前置平台 `tools/gmsh/` 的绝对目录。仅设置 `GDS2GEO_GMSH_EXECUTABLE` 不能帮助 Windows 加载 DLL；无需修改系统全局 PATH，也不要依靠当前工作目录找 DLL。
 
-**部署时成对替换两个程序。** 早期同样显示 `1.2.0` 的网格程序仅支持旧版目标几何包，读取本包新生成的 schema 3 几何会退出 2。安装前可用 `Get-FileHash -Algorithm SHA256` 将两个 EXE 分别与 `module.manifest.json` 中登记的摘要核对。
-
-## 安装与自测准备
-
-打开交付文件夹 `GDS2GEO-V1.2-20261107-r2/`，其中的 `gds2geo/` 模块目录包含 `gds2geo.exe`、`geo2msh.exe`、本 README、`ERROR_CODES.md` 和 `module.manifest.json`。将该目录放在平台部署根目录下，将 Gmsh 放在同一部署根的 `tools/gmsh/gmsh.exe`。程序只需读取安装目录。准备一个可写的算例目录，将版图和叠层放在 `Model/model.gds` 和 `Model/model_info.csv`。使用 XTF 时，把下方 `$tech` 指向对应的 `.xtf`。
-
-以下 PowerShell 命令在**算例目录**执行。先替换部署位置，再任选第 1 节中的一个调用；如需网格，接着执行第 2 节的对应调用。
+PowerShell 配置示例，后文命令共用这些变量；将前三个路径改为实际位置：
 
 ```powershell
-$moduleRoot = 'C:\PEEC\modules'  # 改为平台的实际部署根目录
-$geo = Join-Path $moduleRoot 'gds2geo\gds2geo.exe'
-$mesh = Join-Path $moduleRoot 'gds2geo\geo2msh.exe'
-$env:GDS2GEO_GMSH_EXECUTABLE = Join-Path $moduleRoot 'tools\gmsh\gmsh.exe'
-$gds = '.\Model\model.gds'
-$tech = '.\Model\model_info.csv'
-$result = '.\Result\gds2geo'
-$logs = '.\Result\logs\gds2geo'
-
+$moduleRoot = 'D:/PEEC_Studio'
+$dataRoot = 'D:/Cases/demo1'
+$gmshDir = Join-Path $moduleRoot 'tools/gmsh'
+$moduleDir = Join-Path $moduleRoot 'gds2geo'
+$geo = Join-Path $moduleDir 'gds2geo.exe'
+$mesh = Join-Path $moduleDir 'geo2msh.exe'
+$editor = Join-Path $moduleDir 'geoedit.exe'
+$detector = Join-Path $moduleDir 'mshcheck.exe'
+$healer = Join-Path $moduleDir 'mshfix.exe'
+$result = Join-Path $dataRoot 'Result/gds2geo'
+$runtime = Join-Path $dataRoot 'Result/logs/gds2geo'
+$gds = Join-Path $dataRoot 'Model/model.gds'
+$tech = Join-Path $dataRoot 'Model/model_info.csv'
+$env:GDS2GEO_GMSH_EXECUTABLE = Join-Path $gmshDir 'gmsh.exe'
+$env:PATH = $gmshDir + [IO.Path]::PathSeparator + $env:PATH
 & $geo --version
 & $mesh --version
-& $env:GDS2GEO_GMSH_EXECUTABLE -version 2>&1 | Out-String
+& $editor --version
+& $detector --version
+& $healer --version
 ```
 
-版本检查应分别返回 `gds2geo 1.2.0`、`geo2msh 1.2.0` 和 `4.11.1`。网格程序依次查找 EXE 同目录的历史 Gmsh、环境变量指定的文件和 PATH。按上述五文件布局安装时使用平台设置的路径。若模块目录残留其他版本的 `gmsh.exe`，会优先于环境变量；应使用本包的干净五文件目录。4.15.2 等其他版本不能替代 4.11.1。
+`$moduleRoot`、`$dataRoot` 必须是绝对路径。上述 PATH 变更只影响当前 PowerShell 及其子进程。显式 CLI 的相对路径按工作目录解释，平台接入统一传绝对路径。数据目录需可写，安装目录可以只读。
 
-两份 x64 程序静态集成编译器运行库。构建依赖包括内部 MATDB 0.1.0、Clipper2 2.0.1、CLI11 2.6.2 和 nlohmann/json 3.12.0。平台另行部署的运行工具为 Gmsh 4.11.1。
+Qt 原生桌面程序使用参数数组，并在启动前设置子进程环境，例如：
 
-## 物理模型解析
+```cpp
+// moduleRoot 和 dataRoot 是宿主已确认的绝对路径。
+const QString gmshDir = QDir(moduleRoot).filePath("tools/gmsh");
+const QString moduleDir = QDir(moduleRoot).filePath("gds2geo");
+QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+env.insert("PATH", QDir::toNativeSeparators(gmshDir) + QDir::listSeparator()
+                   + env.value("PATH"));
+env.insert("GDS2GEO_GMSH_EXECUTABLE", QDir(gmshDir).filePath("gmsh.exe"));
+QProcess process;
+process.setProcessEnvironment(env);
+process.setWorkingDirectory(dataRoot);
+process.setProgram(QDir(moduleDir).filePath("mshfix.exe"));
+process.setArguments({"capabilities", "--json"});
+process.start();
+// 通过 readyReadStandardOutput / readyReadStandardError 持续读取输出；
+// 通过 errorOccurred / finished 检查启动状态、exitStatus 与 exitCode。
+```
 
-几何阶段和网格阶段分别列出电磁、电热、双目标三种调用。下列示例沿用上节的 PowerShell 变量。目录树均从算例根目录起算，对应 manifest 的 `Result/gds2geo/` 布局。
+不要拼接 `cmd /c` 命令字符串。宿主持续读取 stdout/stderr，记录进程状态及退出码；取消时管理完整子进程树。MSH 修复工具还会启动检测器。
 
-### 1 GDS2GEO
+## 2. 几何和网格主接口
 
-#### 1.1 输出电磁 GEO
+六个请求组合仍由 manifest `capabilities.executionProfiles` 指定。`prepared` 表示停在几何，`mesh` 表示生成几何后继续网格；`both` 调用使用原生双目标入口，不再重复执行两个单目标。已有独立合格几何包可直接网格化。
 
-##### 1.1.1 CLI 传参
+### 2.1 单目标几何
 
 ```powershell
-& $geo `
-  --gds $gds `
-  --tech $tech `
-  --target em `
-  --output-dir "$result/em_geo" `
-  --geo-name model_em.geo
+& $geo --gds $gds --tech $tech --target em --output-dir "$result/em_geo"
+if ($LASTEXITCODE -ne 0) { throw 'EM geometry failed' }
 ```
-
-| 参数 | 含义 |
-| --- | --- |
-| `--gds $gds` | 输入的 GDS 版图文件，示例为 `Model/model.gds`。 |
-| `--tech $tech` | 输入的工艺叠层文件，提供层映射、高度、厚度和材料信息。示例使用 `Model/model_info.csv`。 |
-| `--target em` | 生成电磁几何模型。 |
-| `--output-dir "$result/em_geo"` | 将电磁几何包直接写入该目录。 |
-| `--geo-name model_em.geo` | 可选。指定 GEO 文件名；省略时默认使用 `model_em.geo`。 |
-
-##### 1.1.2 输出文件
-
-```text
-Result/gds2geo/em_geo/
-├── model_em.geo
-├── model_em.json
-└── matdb.json
-```
-
-- **`model_em.geo`** 描述电磁模型的形状、尺寸、位置和材料物理分组，可用 Gmsh 打开查看。头部的 `dim` 给出每个 GEO 坐标单位对应的米数。
-- **`model_em.json`** 是同主名的电磁模型描述文件，记录几何区域与材料编号的对应关系、坐标单位以及 GEO 和材料库的文件摘要。
-- **`matdb.json`** 是本电磁模型的材料库，记录材料编号、名称和物理参数，例如电导率、相对介电常数。
-
-这三个文件放在同一目录。继续生成电磁网格时，将整个目录传给第 2.1 节的 `geo2msh.exe`。
-
-#### 1.2 输出电热 GEO
-
-##### 1.2.1 CLI 传参
 
 ```powershell
-& $geo `
-  --gds $gds `
-  --tech $tech `
-  --target thermal `
-  --output-dir "$result/thermal_geo" `
-  --geo-name model_thermal.geo
+& $geo --gds $gds --tech $tech --target thermal --output-dir "$result/thermal_geo"
+if ($LASTEXITCODE -ne 0) { throw 'Thermal geometry failed' }
 ```
 
-| 参数 | 含义 |
-| --- | --- |
-| `--gds $gds` | 输入的 GDS 版图文件。 |
-| `--tech $tech` | 输入的工艺叠层文件，用于确定版图层对应的材料、层高和厚度。 |
-| `--target thermal` | 生成电热几何模型。 |
-| `--output-dir "$result/thermal_geo"` | 将电热几何包直接写入该目录。 |
-| `--geo-name model_thermal.geo` | 可选。指定 GEO 文件名；省略时默认使用 `model_thermal.geo`。 |
+两者必填 `--gds FILE --tech FILE --target em|thermal --output-dir DIR`。可用 `--geo-name NAME.geo` 改主名，默认分别为 `model_em.geo`、`model_thermal.geo`，JSON 自动同主名。单目录只放一套独立几何包；文件名需以小写 `.geo` 结尾，不使用 `matdb.geo` 或 Windows 设备名。
 
-电热直出还支持 `--top-cell NAME` 选择顶层单元、`--matdb FILE` 指定原生材料库种子、`--stack-mode strict-slots|embedded-top` 选择叠层方式。CSV 使用 `strict-slots`。默认要求 GDS 有唯一顶层单元。电磁与双目标直出使用默认源模型选项。
+本平台 profile 使用 CSV：`Height/Thickness` 按 mm 输入。原生 CLI 还支持既有 XTF 子集，长度按 XTF 声明；需要使用时应由宿主显式更改输入合同。热直出可选 `--top-cell NAME`、`--matdb FILE`、`--stack-mode strict-slots|embedded-top`；CSV 要求 `strict-slots`。EM 和 both 使用默认源模型选项。直出几何**不接受 `--runtime-dir`**，内部工作使用系统临时目录，诊断由进程输出提供。
 
-##### 1.2.2 输出文件
-
-```text
-Result/gds2geo/thermal_geo/
-├── model_thermal.geo
-├── model_thermal.json
-└── matdb.json
-```
-
-- **`model_thermal.geo`** 描述电热模型的形状、尺寸和位置，可用 Gmsh 打开查看。文件头同样记录本版图的 `dim`。
-- **`model_thermal.json`** 是与 GEO 同主名的电热模型描述文件，记录几何区域与材料编号的对应关系、坐标单位及配套文件摘要。
-- **`matdb.json`** 是本电热模型的材料库，保存材料编号、名称和输入中已有的热导率、密度、比热容等热物性。程序报告材料缺项时，可按后续求解所需补齐输入属性。
-
-这三个文件放在同一目录。继续生成电热网格时，将整个目录传给第 2.2 节的 `geo2msh.exe`。
-
-#### 1.3 同时输出电磁和电热 GEO
-
-##### 1.3.1 CLI 传参
+### 2.2 双目标几何
 
 ```powershell
-& $geo `
-  --gds $gds `
-  --tech $tech `
-  --target both `
-  --em-output-dir "$result/em_geo" `
-  --thermal-output-dir "$result/thermal_geo" `
-  --em-geo-name model_em.geo `
-  --thermal-geo-name model_thermal.geo
+& $geo --gds $gds --tech $tech --target both --em-output-dir "$result/em_geo" --thermal-output-dir "$result/thermal_geo"
+if ($LASTEXITCODE -ne 0) { throw 'Both geometries failed' }
 ```
 
-| 参数 | 含义 |
-| --- | --- |
-| `--gds $gds` | 两个目标共用的输入 GDS。 |
-| `--tech $tech` | 两个目标共用的工艺叠层，提供层映射、厚度和材料信息。 |
-| `--target both` | 一次生成一份源模型，再从同一份模型生成电磁和电热几何。此接口已通过 V1.2 双目标实测。 |
-| `--em-output-dir "$result/em_geo"` | 必填。电磁几何三件的最终目录。 |
-| `--thermal-output-dir "$result/thermal_geo"` | 必填。电热几何三件的最终目录，须与电磁目录分开。 |
-| `--em-geo-name model_em.geo` | 可选。指定电磁 GEO 名，默认值如示例所示。 |
-| `--thermal-geo-name model_thermal.geo` | 可选。指定电热 GEO 名，两侧可独立命名。 |
+两侧输出目录均必填且须分开，不与单目标 `--output-dir` 混用。可分别指定 `--em-geo-name NAME.geo`、`--thermal-geo-name NAME.geo`；双目标不使用 `--geo-name`。源模型只建立一次，两个几何包完整核验后成组发布。
 
-##### 1.3.2 输出文件
-
-```text
-Result/gds2geo/
-├── em_geo/
-│   ├── model_em.geo
-│   ├── model_em.json
-│   └── matdb.json
-└── thermal_geo/
-    ├── model_thermal.geo
-    ├── model_thermal.json
-    └── matdb.json
-```
-
-`em_geo/` 保存第 1.1.2 节列出的电磁三件，`thermal_geo/` 保存第 1.2.2 节列出的电热三件。两份 `matdb.json` 各自与所在目录的模型配套。进程返回 0 后，两套几何即可独立使用。
-
-三个几何入口都支持用以小写 `.geo` 结尾的普通文件名。自定义 GEO 名时，配套 JSON 自动采用相同主名；搬迁时按原名一起复制三件。直出过程使用系统临时目录，诊断写到 stdout/stderr。桌面程序调用本节的命令时请省略 `--runtime-dir`。
-
-### 2 GEO2MSH
-
-#### 2.1 输出电磁 MSH
-
-##### 2.1.1 CLI 传参
+### 2.3 单目标网格
 
 ```powershell
-& $mesh `
-  --runtime-dir $logs `
-  --target em `
-  --input-dir "$result/em_geo" `
-  --output-dir "$result/em_msh"
+& $mesh --runtime-dir $runtime --target em --input-dir "$result/em_geo" --output-dir "$result/em_msh"
+if ($LASTEXITCODE -ne 0) { throw 'EM mesh failed' }
 ```
-
-| 参数 | 含义 |
-| --- | --- |
-| `--runtime-dir $logs` | 将网格阶段日志和临时文件放在可写的 `Result/logs/gds2geo/`。 |
-| `--target em` | 生成电磁网格。 |
-| `--input-dir "$result/em_geo"` | 指向完整的电磁几何包。程序读取 GEO、同主名 JSON 及本目标的 `matdb.json`。原始 GDS 和工艺文件可留在建模端。 |
-| `--output-dir "$result/em_msh"` | 电磁网格输出目录，成功后包含 MSH 和配套材料库。 |
-
-如果把电热几何包传给 `--target em`，程序在网格划分前返回退出码 `2`（输入或参数错误），保留已有网格。
-
-##### 2.1.2 输出文件
-
-```text
-Result/gds2geo/em_msh/
-├── model_em.msh
-└── matdb.json
-```
-
-- **`model_em.msh`** 记录电磁网格节点、网格单元和物理分组，可用 Gmsh 打开查看。本版输出的节点坐标以 mm 表示。
-- **`matdb.json`** 是随电磁网格发布的材料库，给出网格物理分组对应的材料编号、名称和物理参数。
-
-#### 2.2 输出电热 MSH
-
-##### 2.2.1 CLI 传参
 
 ```powershell
-& $mesh `
-  --runtime-dir $logs `
-  --target thermal `
-  --input-dir "$result/thermal_geo" `
-  --output-dir "$result/thermal_msh"
+& $mesh --runtime-dir $runtime --target thermal --input-dir "$result/thermal_geo" --output-dir "$result/thermal_msh"
+if ($LASTEXITCODE -ne 0) { throw 'Thermal mesh failed' }
 ```
 
-| 参数 | 含义 |
-| --- | --- |
-| `--runtime-dir $logs` | 指定本次网格调用的日志和暂存目录。 |
-| `--target thermal` | 生成电热网格。 |
-| `--input-dir "$result/thermal_geo"` | 指向完整的电热几何包。程序读取 GEO、同主名 JSON 和该目标的 `matdb.json`。 |
-| `--output-dir "$result/thermal_msh"` | 电热网格输出目录，成功后包含 MSH 和配套材料库。 |
+必填 `--target em|thermal --input-dir DIR --output-dir DIR`；平台应同时指定 `--runtime-dir`，将日志与工作暂存写入可写的 `Result/logs/gds2geo/`，避免使用 EXE 旁的旧默认目录。源模型 GDS/CSV 不参与这一步；GEO、同主名 JSON 和 MATDB 必须一起交接。目标身份、文件摘要、单位与材料不匹配时拒绝。
 
-如果把电磁几何包传给 `--target thermal`，程序在网格划分前返回退出码 `2`，保留已有网格。输入缺件、文件摘要与几何包记录不一致，也会在划分前被拒绝。
-
-##### 2.2.2 输出文件
-
-```text
-Result/gds2geo/thermal_msh/
-├── model_thermal.msh
-└── matdb.json
-```
-
-- **`model_thermal.msh`** 记录电热网格节点、网格单元和物理分组，可用 Gmsh 打开查看。节点坐标同样以 mm 表示。
-- **`matdb.json`** 是随电热网格发布的材料库，包含材料编号、名称以及输入中已有的热导率、密度和比热容等参数。
-
-#### 2.3 同时输出电磁和电热 MSH
-
-##### 2.3.1 CLI 传参
+### 2.4 双目标网格
 
 ```powershell
-& $mesh `
-  --runtime-dir $logs `
-  --target both `
-  --em-input-dir "$result/em_geo" `
-  --thermal-input-dir "$result/thermal_geo" `
-  --em-output-dir "$result/em_msh" `
-  --thermal-output-dir "$result/thermal_msh"
+& $mesh --runtime-dir $runtime --target both --em-input-dir "$result/em_geo" --thermal-input-dir "$result/thermal_geo" --em-output-dir "$result/em_msh" --thermal-output-dir "$result/thermal_msh"
+if ($LASTEXITCODE -ne 0) { throw 'Both meshes failed' }
 ```
 
-| 参数 | 含义 |
+四个目录参数都必填，不与 `--input-dir/--output-dir` 混用。两套输入先同时核验，再执行网格化并成组发布。各输出目录与任一输入、另一输出不得重合或互为父子目录。
+
+| 阶段目录 | 默认正式文件 |
 | --- | --- |
-| `--runtime-dir $logs` | 指定本次双目标网格调用共用的日志和暂存目录。 |
-| `--target both` | 在一次调用中分别生成电磁网格和电热网格，两个输入包均通过校验后才开始划分。 |
-| `--em-input-dir "$result/em_geo"` | 输入电磁几何包目录。 |
-| `--thermal-input-dir "$result/thermal_geo"` | 输入电热几何包目录。 |
-| `--em-output-dir "$result/em_msh"` | 输出电磁网格和配套材料库。 |
-| `--thermal-output-dir "$result/thermal_msh"` | 输出电热网格和配套材料库。 |
+| `Result/gds2geo/em_geo/` | `model_em.geo`、`model_em.json`、`matdb.json` |
+| `Result/gds2geo/thermal_geo/` | `model_thermal.geo`、`model_thermal.json`、`matdb.json` |
+| `Result/gds2geo/em_msh/` | `model_em.msh`、`matdb.json` |
+| `Result/gds2geo/thermal_msh/` | `model_thermal.msh`、`matdb.json` |
 
-四个专用目录参数均为必填。两份输入和两份输出分别使用独立目录，避开重合和父子路径。目标错配会在划分前返回退出码 `2`，保留两侧已有结果。
+每目标材料库只与本目标、本次成功输出配套；不存在强制 `.msh.json` 回执。正常退出 0 后才读取全部正式件。含旧回执或残缺正式件的输出目录应保留，另选空目录。失败时保留原包及恢复证据，不预删旧结果强行重试。
 
-##### 2.3.2 输出文件
-
-```text
-Result/gds2geo/
-├── em_msh/
-│   ├── model_em.msh
-│   └── matdb.json
-└── thermal_msh/
-    ├── model_thermal.msh
-    └── matdb.json
-```
-
-`em_msh/` 保存第 2.1.2 节列出的电磁网格及其材料库，`thermal_msh/` 保存第 2.2.2 节列出的电热网格及其材料库。等待进程正常退出且返回 0，再取两个目录中的四件结果。重跑可使用本目标已有的完整结果目录；含旧网格回执或残缺文件时，请指定新目录。
-
-## 随附案例
-
-案例单独交付为 `gds2geo_cases_20261107.zip`，不放入五文件模块目录。解压后阅读案例 README，使用自带 `Model/` 输入，按本 README 的 1.3 → 2.3 重现。案例带有本批次的几何、网格和配套材料基准结果；外置 Gmsh 4.11.1 由平台提供。验收范围是本模块的几何与网格，不代表 EM/热求解器或平台全链联调完成。
-
-## 本地验收与 Qt 集成
-
-1. 在新的算例目录运行 **1.3 → 2.3**。用 `$LASTEXITCODE` 检查每个外部进程，任一步非零就停。两份 GEO 可分别用 Gmsh 打开。两个几何目录各有三件；两个网格目录各有两件。
-2. 核对同一目标几何目录与网格目录的 `matdb.json` 的 SHA-256。可用 PowerShell 的 `Get-FileHash`。下游读取 MSH 时同时传入该目标的材料文件。
-3. Qt 桌面程序用 `QProcess` 设置 EXE 绝对路径、算例工作目录和网格进程的 Gmsh 环境变量。通过参数列表逐项传值，路径中含空格时仍作为单个参数。检查 `NormalExit` 和 `exitCode() == 0`，保留 stdout/stderr。网格调用的 `--runtime-dir` 指向可写日志目录。
-4. `module.manifest.json` 使用平台清单格式 `manifestVersion: 1`，产品为 `V1.2`，本次完整实体交付合同为 `apiVersion: 4`。单目标调用见 `stages`，原生双目标调用见 `capabilities.nativeBothCalls`。按 `capabilities.executionProfiles` 选择目标与终点（GEO 或 MSH），依次执行该组合列出的调用。模板使用 CSV 和默认文件名。对接旧四阶段调度时，需按本包入口和工件映射更新平台路由；平台若发布到 `Model/`，将目标 MSH 与其 MATDB 配对发布。
-5. 常用退出码为 `0`（成功）、`2`（参数或输入）、`5`（生成、校验或发布失败）、`6`（未分类异常）。按程序和失败阶段的具体处置见 `ERROR_CODES.md`。运行 `gds2geo.exe --help`、`geo2msh.exe --help` 可查看原生程序的完整帮助。省略目标的历史兼容调用与本包的显式目标流程分别处理。
-
-需要从热网格导出边界或热源选区时，使用独立子命令 `export-thermal-entities`，调用时省略网格阶段的 `--runtime-dir`。下列命令导出上下边界并列出可选实体。用可重复的 `--source-entity ID` 选体，`--source-surface-entity ID` 选材料薄面；`--matdb FILE` 和 `--unit nm|um|mm|m` 可显式指定材料库和网格单位。本版网格采用默认的 mm。
+### 2.5 热边界/源选区导出
 
 ```powershell
 & $mesh export-thermal-entities --mesh "$result/thermal_msh/model_thermal.msh" --out "$result/thermal_selection.json"
+if ($LASTEXITCODE -ne 0) { throw 'Thermal selection export failed' }
 ```
 
-## 参数与兼容入口说明
+必填 `--mesh FILE --out FILE`；可重复 `--source-entity ID` 选择材料体，`--source-surface-entity ID` 选择真实材料薄面。可选 `--matdb FILE`，默认读取网格同目录材料库；`--unit nm|um|mm|m` 是显式单位断言，有 dim 时必须一致，无声明的历史网格按既有 mm 默认或显式单位处理。此子命令不传网格阶段的 `--runtime-dir`。自动读取 dim；选区 JSON `mesh.dim` 保留比例，`planeZMm` 仍以 mm 表示。
 
-以上 1.1–2.3 列出本包正式目标流程的全部业务参数；`-h`/`--help`、`--version` 用于查询。热直出的 `--top-cell`、`--matdb`、`--stack-mode` 见 1.2。热选区子命令的 `--mesh`、`--out`、`--source-entity`、`--source-surface-entity`、`--matdb`、`--unit` 见上节，其 `--help` 可独立查询。
+## 3. GEOEDIT 编辑接口
 
-帮助文本还列出历史兼容入口：无参数启动使用 EXE 旁设置及 input/output 默认目录；`gds2geo` 省略 `--target` 只生成源包，并允许 `--runtime-dir`；`geo2msh` 省略 `--target` 接受旧双网格 bundle。这些已在 manifest 的 `cli.deprecatedModes` 登记，不属于本包平台调用模板。平台应始终显式传目标和数据路径，几何直出不传 `--runtime-dir`。几何直出的临时工作区使用系统 TEMP/TMP，可由宿主为子进程指定可写位置，stdout/stderr 由宿主保存。
+```powershell
+& $editor --input-dir "$result/em_geo" --output-dir "$result/em_geo_edited" --request "$dataRoot/Model/add_point.json"
+if ($LASTEXITCODE -ne 0) { throw 'Geometry edit failed' }
+& $mesh --runtime-dir $runtime --target em --input-dir "$result/em_geo_edited" --output-dir "$result/em_msh_edited"
+if ($LASTEXITCODE -ne 0) { throw 'Edited geometry meshing failed' }
+```
+
+只有三个业务参数且均必填：`--input-dir DIR --output-dir DIR --request FILE`。输出目录同输入表示原位更新，不同表示另存。累计编辑时读取上次保存的输出三件。新增点、线、面的请求格式分别为：
+
+```json
+{"requestVersion":1,"operation":"add-point","point":{"x":10,"y":20,"z":0}}
+```
+
+```json
+{"requestVersion":1,"operation":"add-line","start":{"x":0,"y":0,"z":0},"end":{"x":10,"y":0,"z":0}}
+```
+
+```json
+{"requestVersion":1,"operation":"add-surface","vertices":[{"x":0,"y":0,"z":0},{"x":10,"y":0,"z":0},{"x":10,"y":20,"z":0},{"x":0,"y":20,"z":0}]}
+```
+
+这些是格式示例，坐标须换成实际目标位置；全部沿用输入 GEO 的尺度。请求上限 1 MiB，拒绝未知字段、重复键、非有限坐标和非法类型；不传额外 `unit`、`target`、实体 ID 或吸附参数。点自动判断已有点/边/面/体/自由位置；线端点必须不同，不吸附、不延伸；新增面必须是非退化、无自交、单外环无孔的平面多边形，可为倾斜面，末点自动连首点。
+
+真正切断面/体时产生独立实体；否则按实际拓扑嵌入。跨界、交点、重叠及自由部分按几何关系保留。普通新增几何不自动赋材料；原材料面/体分割后的子实体继承归属，MATDB 原字节保持。实体编号可能变化，应从结果重新读取绑定。
+
+输入仅限本模块完整配套 schema 2/3/4 模型，不是任意第三方 GEO/STEP 导入。输出仍为同名 GEO、同主名 JSON、MATDB 三件；编辑模型为 schema 4，含新增面时 `geometryEdits.version=3`。GEO2MSH 直接剖分实际保存的 GEO，配套 JSON/MATDB 仍不可省略。GEOEDIT 没有 `--runtime-dir` 参数，私有工作目录位于系统临时目录；保存过程在指定输出目录可能暂存 `.geoedit-transaction.json` 及备份，均不写安装目录。成功会清理，异常时保留并在下次相同输出目录调用时恢复，不要手动删除。数值关系无法可靠判定时会拒绝编辑并保留原包。
+
+## 4. MSH 检测和修复
+
+### 4.1 检测
+
+```powershell
+$checkDir = Join-Path $result 'mesh_check'
+New-Item -ItemType Directory -Force -Path $checkDir | Out-Null
+& $detector "$result/em_msh/model_em.msh" --output "$checkDir/detection.json" --compact
+if ($LASTEXITCODE -ne 0) { throw 'Mesh detection failed' }
+$check = Get-Content -LiteralPath "$checkDir/detection.json" -Raw | ConvertFrom-Json
+if (-not $check.success) { throw 'Detection JSON is not successful' }
+$check.summary | Select-Object issueCount, topologyIssueCount
+```
+
+必填位置参数 `<input.msh>`。全部可选参数：`-o/--output FILE`（默认 JSON 到 stdout）、`--annotated-msh FILE`（另生成 MSH/OPT 高亮副本）、`--abs-tol NUMBER`（默认 `1e-12`，有限正数）、`--rel-tol NUMBER`（默认 `1e-9`，有限非负数乘模型对角线）、`--compact`、`-h/--help`、`--version`。
+
+输入支持 MSH 2.2/4.1 ASCII，检测对象是 Tri3 表面。**退出 0 只表示检测完成**，还须读取 `summary.issueCount` 和 `summary.topologyIssueCount`。成功检测 JSON schema 为 `1.5`；NodeTag/ElementTag 使用十进制字符串，避免经过浮点数丢失精度。高亮文件只是辅助显示副本，不是修复结果。
+
+### 4.2 修复的独立调用
+
+当前修复输入须是配对的 GEO、受支持 MSH 和检测报告；MSH 只能含 Point1/Line2/Tri3，不能含 Tet4 或 `$GDS2GEOUnits`。不要删除新网格的单位声明来绕过限制。使用随交付的受支持修复案例验证接入，不能把前节新输出直接接入以下流程。
+
+```text
+mshfix plan --geo FILE --source-msh FILE --detection FILE --output PLAN --detector EXE
+mshfix heal --geo FILE --source-msh FILE --detection FILE --plan PLAN --output MSH --report REPORT --detector EXE
+mshfix verify --source-msh FILE --healed-msh MSH --detection FILE --plan PLAN --healing-report REPORT --report VERIFICATION --detector EXE
+mshfix capabilities --json
+```
+
+`FILE/PLAN/MSH/REPORT/VERIFICATION/EXE` 替换为绝对路径；`--detector` 显式指向本包 `mshcheck.exe`。输出使用 `Result/gds2geo/` 下每轮独立的可写目录，预先创建目录，不覆盖输入。
+
+| 命令 | 必填业务参数 | 可选业务参数 |
+| --- | --- | --- |
+| `plan` | `--geo --source-msh --detection --output` | `--detector`、`--keep-temp` |
+| `heal` | `--geo --source-msh --detection --plan --output --report` | `--detector`、`--keep-temp`、`--mesh-size-factor NUMBER`（默认 1，有限正数）、可重复 `--set-number NAME=VALUE` |
+| `verify` | `--source-msh --healed-msh --detection --plan --healing-report --report` | `--detector` |
+| `capabilities` | `--json` | 无 |
+
+先检测，再生成计划。计划 schema `1.5`；若 `cadNormalization.status` 或任一 action 的 `repairability` 为 `unsupported`，停止并显示原因。原样传递计划，不删除问题项、篡改 hash 或自行指定策略绕过检查。若没有待连接 action、`cadNormalization.hasChanges=false` 且 `meshRegeneration.required=false`，报告无需修复并保留原网格；此时显式调用 heal 返回 `2 / no_connect_actions`。
+
+修复成功输出 MSH **2.2 ASCII**，节点和单元编号各连续为 `1..count`；修复报告 schema `1.4`。随后独立 verify 必须退出 0，验证 JSON `success=true`、两个问题计数为 0 且验证门通过，宿主才登记修复结果有效。verify 失败不会回滚已经发布的 mesh/report。无操作分支保留原格式，不代表完成 MSH 2.2 转换。
+
+`heal` 正常 stdout 是 schema `1.0` JSON，完整报告另存；verify 报告 schema `1.4`，capabilities schema `1.4`。统一错误处理可输出 schema `1.0` 的 `success:false` 及 `error.code/message/exitCode`，但这不是 QS stderr 协议。缺 DLL、启动失败或崩溃时不保证产生 JSON。保持输入、检测器及所有报告原样，搬动源文件或更换检测器后重新检测和计划。
+
+## 5. dim、实体与下游接入
+
+`dim` 是每个坐标单位对应的米数，有限且为正。**物理长度（米）= 坐标长度 × dim**。GDS `UNITS=(a,b)` 得 `dim=b/a`；GEO 头部为 `// dim = ...`，模型 JSON 为 `coordinates.dim`。例如 `dim=1e-6` 表示坐标按 μm 解释。新 MSH 4.1 的节点、实体和包围盒保持对应 GEO 尺度，写入：
+
+```text
+$GDS2GEOUnits
+version = 1
+dim = 1e-6
+$EndGDS2GEOUnits
+```
+
+该段正常在 `$EndMeshFormat` 后，Gmsh 另存可能移到文件末尾；消费者需支持两种位置。版本号只属于单位扩展段，不是 MSH/schema 版本。拒绝重复、非法、未知版本及不一致的声明。Gmsh 不自动按 dim 缩放；使用 Gmsh 另存时以 `-save_all` 保留未分组低维单元。历史 schema 2 几何仍为 mm，新网格声明 `dim=0.001`；无声明的历史 MSH 只能按其明确合同解释，不从坐标大小猜测单位。
+
+MSH 保留 dimensions 0/1/2/3、Point1/Line2/Tri3/Tet4、带方向直接边界及原生节点分类。允许未分组 CAD 实体和未被单元引用的原生节点；所有单元引用必须有效。**CAD Line2 不是激励线或端口**：求解器按维度和 Physical/MATDB 选取求解单元；端口由宿主的 `source_em.json` 明确定义并绑定具体网格，不能把所有一维单元自动当成激励，也不能仅因存在 CAD Line2 拒绝整个模型。不得通过删除线单元或补假材料代替正确的消费端适配。
+
+编辑/重新剖分后，实体、节点、单元 ID 不保证稳定。`source_em.json` 的 meshFile、meshSha256、端口 triangleIds，以及热边界的 surface_ids，必须针对新网格重建。普通编辑面不天然具有唯一材料，也不自动成为热边界条件。
+
+平台导入、显示、编辑和求解模块应读取 dim，并在自己的单位边界只换算一次。既有端口请求/绑定接口及 `planeZMm` 保持 mm 语义。MSH 的单位扩展不改变 MATDB 厚度/物性的各自单位。API 5 本身不保证阻断旧消费者，宿主应更新接受条件并验证消费逻辑后启用新单位合同。
+
+## 6. 平台路由、验证与边界
+
+主 manifest 保留四阶段、六 profiles 和两个 nativeBothCalls；GEOEDIT/MSH 工具在 `capabilities.auxiliaryCommands` 描述，属于扩展合同，平台不会仅靠出现该字段自动调度。宿主用原生 QProcess 按用户动作独立调用，并将编辑、检测、修复的输出放入自身管理的 `Result/gds2geo/` 子目录。
+
+模块只写阶段结果，不写 `Model/`、`Setting/` 或平台 `Result/tasks/`。正式件发布沿用平台 `pipelines.json` 的 `publishes`；manifest 不添加 `publishTo`。发布时网格和 MATDB 必须属于同目标、同次成功生成。设置默认件、源/边界定义由平台和接收方维护，不由本模块凭空生成。
+
+本次随附独立案例包 `gds2geo_cases_20261112.zip` 与包外 `validation/` 验证材料；另按既有催收要求原字节附上冻结基线 `gds2geo_cases_20261107.zip`，该旧案例不代表 1.3.0 的单位协议。案例不放入模块安装目录。按新案例 README 运行，在可写 dataRoot 中复现几何、网格、编辑、检测及受支持修复路径，并检查对应预期工件/摘要。验证包含 manifest schema 校验、最终 ZIP 白名单/逐文件 SHA 核对、只读安装调用及依赖路径检查；具体完成项与结果以本次 validation 记录为准。
+
+模块级成功不等于接收平台或求解器全链验收。r2 接入发现的 CAD Line2 消费问题按本 README 提供消费端适配合同；本包不新增 `--no-1d`，不宣称 compact_em/thermal 已适配新 dim 或完成全链联调。
+
+所有五个程序支持 `--help`、`--version`。GDS2GEO 的无参/无 target 源包入口、GEO2MSH 的无参/无 target 旧双包入口、MSH 工具的无参便携 DATA 模式均保留在代码中，但不作为本平台交付接口；不要双击 EXE 代替显式调用。常规和辅助命令的退出码、失败恢复见 [ERROR_CODES.md](ERROR_CODES.md)。

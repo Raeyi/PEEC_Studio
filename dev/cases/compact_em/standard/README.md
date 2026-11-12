@@ -1,17 +1,18 @@
-# standard — compact_em 案例（20261104 v1.3 交付案例，2026-11-05 平台归档）
+# Compact_EM v1.4 R2_PEC_Standard输入
 
-独立算例（无需 gds_full）：Model/（model_em.msh 主网格 + matdb.json + source_em.json）
-+ Setting/set_em.json（compact_em v1.3 唯一 JSON 设置，schemaVersion 1）。
+这是提供的FreeSpace包中的纯金属标准案例。Model和Setting文件保持原始字节；请复制到安装树之外运行。提取后生成PEECFS02/version2模型，结果写Result/compact_em。
 
-## 基线（2026-11-05，PEEC_Studio v2.0 平台全链 task_layer run peec_basic）
+```powershell
+$releaseRoot = 'E:\PEEC\Code\05_Custom_Release\Compact_EM'
+$module = Join-Path $releaseRoot 'compact_em'
+$caseParent = 'E:\PEEC\Runs'
+$case = Join-Path $caseParent 'R2_PEC_Standard_v1_4'
+if (Test-Path -LiteralPath $case) { throw '请为本次运行指定一个新的案例目录' }
+New-Item -ItemType Directory -Path $caseParent -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $releaseRoot 'cases\R2_PEC_Standard') -Destination $case -Recurse
+& (Join-Path $module 'PEEC_Model_Extractor.exe') --data-root $case
+& (Join-Path $module 'PEEC_Solver.exe') --data-root $case
+& (Join-Path $module 'PEEC_Post_Processing.exe') --data-root $case
+```
 
-- 3 阶段 extract→solve→post 全部 done（~2.5s）
-- S_parameter.csv = 表头 + 100 频点 = 101 行（N_FP=100，1–10 GHz 线性）
-- 与 11-02 v1.2 基线对照：maxRel 7.1e-12（数值一致）
-- 运行窗口 WER 干净（无 0xC0000005 等崩溃记录）
-
-## 注意
-
-- 设置文件名必须是 set_em.json（compact_em v1.3 起；旧 set.json 不再读取）；
-- 网格固定名 model_em.msh（平台落位名）；
-- 本案例不生成 Touchstone / S 参数 SVG（v1.3 起绘图程序取消）。
+本次同版修订标识：`merged-post-20261111`。按用户要求，软件 v1.4、Compact API 4、FreeSpace API 2、模型格式 2、平台契约 1.6、layoutRevision 2 均保持原值。合并输出和实/虚/幅值命名保留；使用修订标识和包 SHA-256 区分交付内容。
