@@ -1,0 +1,88 @@
+{
+  "manifestVersion": 1,
+  "id": "alpsrunner",
+  "name": "ALPSRunner 网表远程仿真与结果回传",
+  "version": "1.1.2",
+  "apiVersion": 1,
+  "cli": {
+    "executables": ["ALPSRunner.exe"],
+    "deprecatedModes": []
+  },
+  "stages": [
+    {
+      "id": "simulate",
+      "executable": "ALPSRunner.exe",
+      "argsTemplate": [
+        "--input", "{dataRoot}/Model/ThermalNetList.sp",
+        "--output-dir", "{dataRoot}/Result/alpsrunner/simulate",
+        "--config", "{dataRoot}/Setting/ALPSRunner.json",
+        "--runtime-dir", "{runtimeDir}",
+        "--threads", "{override:--threads}"
+      ],
+      "allowedArgs": ["--threads"],
+      "optional": false,
+      "exitCodes": {
+        "0": "ok",
+        "2": "input_or_configuration",
+        "3": "transport_or_preflight",
+        "4": "simulation",
+        "5": "download_or_integrity",
+        "124": "timeout",
+        "130": "cancelled"
+      },
+      "errorContract": {"type": "none"},
+      "producesInternal": ["alpsrunner/run.bundle"]
+    }
+  ],
+  "artifacts": {
+    "produced": [],
+    "consumed": [
+      {
+        "ref": "user/alpsrunner.netlist",
+        "path": "Model/ThermalNetList.sp",
+        "maintainedBy": ["ui"],
+        "accept": {"extensions": [".sp"]}
+      },
+      {
+        "ref": "user/alpsrunner.config",
+        "path": "Setting/ALPSRunner.json",
+        "maintainedBy": ["ui"],
+        "accept": {"extensions": [".json"]}
+      },
+      {
+        "ref": "user/alpsrunner.key",
+        "path": "Setting/alpsrunner.key",
+        "maintainedBy": ["ui"],
+        "accept": {"extensions": [".key"]}
+      }
+    ]
+  },
+  "dependsOn": {
+    "modules": [],
+    "artifacts": [
+      "user/alpsrunner.netlist",
+      "user/alpsrunner.config",
+      "user/alpsrunner.key"
+    ],
+    "environment": {
+      "alpsrunner_host": {
+        "version": "1.1.0",
+        "protocol": 1,
+        "bundled": false,
+        "requiredBy": ["simulate"],
+        "requirements": [
+          "Configured Windows SSH server is reachable and its pinned RSA host fingerprint matches",
+          "The client public key is authorized for the fixed ALPSRunnerHost command",
+          "IC618 is running with VMware Tools, ALPS and its license available"
+        ]
+      }
+    }
+  },
+  "capabilities": {
+    "dataLayout": "peec-data/v1",
+    "runtimePolicy": "This delivery profile requires output and runtime directories on the same actual volume under one dataRoot, without junctions or symbolic links. The native cross-volume compatibility fallback is outside this profile.",
+    "resultPolicy": "Each invocation creates a new timestamp-and-ID directory inside Result/alpsrunner/simulate. alpsrunner/run.bundle is an internal result set, not a fixed external artifact path.",
+    "publicationPolicy": "No fixed OP0 artifact, publishTo or automatic publication into Model/Setting is declared.",
+    "platformIntegration": "Register this provider and its user input refs in the host configuration, validate template expansion and run the platform acceptance case. Actual task_layer registration and downstream integration are not implied by schema validation."
+  }
+}
