@@ -145,8 +145,8 @@ def main():
                        if s.get("ref"))
             nref1 = sum(1 for p in p1r.values() for s in p.get("stages", [])
                         if s.get("ref"))
-            check("① v2 载荷带 ref 溯源（9 阶段全 ref，v1 无）",
-                  nref == 9 and nref1 == 0, "v2=%s v1=%s" % (nref, nref1))
+            check("① v2 载荷带 ref 溯源（10 阶段全 ref，v1 无）",
+                  nref == 10 and nref1 == 0, "v2=%s v1=%s" % (nref, nref1))
             s2.proc.stdin.close()
             s2.proc.wait(timeout=10)
         finally:
