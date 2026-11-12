@@ -1,7 +1,7 @@
 # 打包交付规范（DELIVERY_PACKAGE_SPEC）
 
-版本：v1.2（2026-11-11）｜维护方：平台集成侧｜UI 模块组可对照 §二/§四 审查交付包
-基线：PEEC_Studio_20261111_v2.5.0（2026-11-11，37 条目，仓库基线 0ccbdc0）+ docs_1.6.zip（9 条目）
+版本：v1.3（2026-11-12）｜维护方：平台集成侧｜UI 模块组可对照 §二/§四 审查交付包
+基线：PEEC_Studio_20261112_v2.5.0_rc（2026-11-12，42 条目，主包内容基线 2e4f146 + 本文件 v1.3 提交；task_layer exe 取 build 目录 2026-11-12 构建件）+ docs_1.6.zip（9 条目）
 
 ## 一、目的与范围
 
@@ -11,20 +11,20 @@
 
 **核心原则——白名单制：包内只允许出现 §二 所列文件；不在表内 = 不打包。**
 
-## 二、包内结构白名单（当前 37 条目）
+## 二、包内结构白名单（当前 42 条目）
 
 包根 = MODULE_ROOT。
 
 | 区域 | 文件 | 数量 |
 |---|---|---|
 | 包根 | 给UI负责人的交付说明.md（唯一根文档；变更说明权威件，见 §五） | 1 |
-| compact_em/ | module.manifest.json / README.md / ERROR_CODES.md / PEEC_Model_Extractor.exe / PEEC_Solver.exe / PEEC_Post_Processing.exe | 6 |
-| gds2geo/ | module.manifest.json / README.md / ERROR_CODES.md / gds2geo.exe / geo2msh.exe（V1.2 r2，2026-11-09 起） | 5 |
+| compact_em/ | module.manifest.json / README.md / ERROR_CODES.md / PEEC_Model_Extractor.exe / PEEC_Solver.exe / PEEC_Post_Processing.exe / libiomp5md.dll（v1.4 起运行依赖，须与 EXE 同目录） | 7 |
+| gds2geo/ | module.manifest.json / README.md / ERROR_CODES.md / gds2geo.exe / geo2msh.exe / geoedit.exe / mshcheck.exe / mshfix.exe（1.3.0，2026-11-12 起；后三件为辅助命令，不接入平台流水线） | 8 |
 | thermal/ | module.manifest.json / README.md / ERROR_CODES.md / ThermalExtract.exe / TemperatureProcess.exe | 5 |
-| tools/gmsh/ | gmsh.exe（平台共享工具区；模块包不含 gmsh） | 1 |
+| tools/gmsh/ | gmsh.exe / gmsh-4.11.dll（平台共享工具区；模块包不含 gmsh；1.3.0 起 gmsh 4.11.1 精确匹配，gds 子进程 PATH 前置 tools/gmsh/） | 2 |
 | task_layer/dist/ | task_layer.exe / README.md / UI_API.md / ERROR_CODES.md / Qt6Core.dll / libgcc_s_seh-1.dll / libstdc++-6.dll / libwinpthread-1.dll / bin/Qt6Core.dll / bin/worker_host.exe / config/modules.json / config/pipelines.json | 12 |
 | templates/ | README.md / Model/source_thermal.json / Model/boundary_thermal.json / Model/thermal.op0 / Model/source_em.json / Setting/set_thermal.json / Setting/set_em.json | 7 |
-| **合计** | | **37** |
+| **合计** | | **42** |
 
 注：
 - 模块 EXE 清单以该模块当前版 module.manifest.json 为准（如 compact_em v1.3 起不含绘图 EXE）；构成变化时同步更新本表与 §六 验证计数；
@@ -67,7 +67,7 @@ Staging 目录 `E:\code\PEEC_Studio_YYYYMMDD`（日期 = 交付批次日），�
 
 Python `zipfile`（in-memory 读取 + SHA256；pwsh Compress-Archive 仅用于切包，验证必须走 Python）：
 
-1. 条目数 = §二 白名单计数（当前 **37**）；
+1. 条目数 = §二 白名单计数（当前 **42**）；
 2. §四 负面清单零命中（*.bak / __pycache__ / .git / Result / cases / .locks 等逐一检查）；
 3. 关键件 SHA256 与源文件（repo 或 staging）一致——至少含：各模块双 EXE + manifest、templates 7 件、config 2 件、UI_API.md、task_layer/dist/README.md、PEEC_Solver.exe、geo2msh.exe、交付说明（≥13 件）；
 4. in-zip 交付说明 == staging 文件（逐字节一致）；
@@ -78,12 +78,13 @@ Python `zipfile`（in-memory 读取 + SHA256；pwsh Compress-Archive 仅用于�
 ## 七、版本与重切规则
 
 - 命名 `PEEC_Studio_YYYYMMDD_vX.Y.Z.zip`：日期 = 该版本最终构建日；**X.Y.Z = 三段版本号（2026-11-11 起，v2.5 线生效）**——X = 平台大能力 / 契约大版本，Y = 功能线 / 里程碑，Z = 线内重切序号（每次重切 Z+1，不再每次重切消耗 Y）；「定版 / 正式发布」= 当时的最高 Z，交付时显式宣告（如「v2.5 线定版 = v2.5.3」）。v2.1–v2.4 为旧规则（重打 +0.1）编号，历史件不改名；
+- **开发验证版（feature 分支未合 main、供 UI 验证窗口）**：记法 `vX.Y.Z_rc`（例：v2.5.0_rc，2026-11-12）——版本号 = 所基于正式版号段 + `_rc` 后缀，日期 = 构建日；验证通过合入 main 后按本节规则定版（正式版号另行宣告，不与 _rc 同号）；
 - **同版重切**（当日修正）：zip 同名覆盖，**交付说明头部追加一个重切块**（编号条目），并明示旧版"已被本版替代，如已获取请作废"；
 - 跨版本：新 zip 新名，交付说明头部"上一版"指向前版；
 - **交付版本被替代后，旧件必须显式作废（交付说明注明或口头交接），防止 UI 侧误用旧版。**
 
 ## 八、交付清单（给 UI 模块组的完整集合）
 
-1. `PEEC_Studio_YYYYMMDD_vX.Y.Z.zip`——主包（37 条目，§二）；
+1. `PEEC_Studio_YYYYMMDD_vX.Y.Z.zip`——主包（42 条目，§二）；
 2. `docs_X.Y.zip`——平台文档包（当前 docs_1.6.zip，9 条目）：DATA_LAYOUT.md（**UI 必读**）/ MODULE_MANIFEST_SPEC.md / MODULE_ONBOARDING.md / DELIVERY_PACKAGE_SPEC.md / README.md / module.manifest.schema.json / REPACK×3（其余为参考）；
 3. `UI_HANDOFF_YYYYMMDD_vX.Y.md`——包外交接说明。

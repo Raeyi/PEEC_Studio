@@ -35,7 +35,7 @@
 ## 四、对外发布（zip 命名）
 
 - **契约包** `docs_<DATA_LAYOUT 版本>.zip`（如 docs_1.4.zip）：内容 = 活契约文档 + docs/README.md + REPACK/*.md；版本跟契约走，**契约升版才重打**，不带日期；
-- **主交付包** `PEEC_Studio_YYYYMMDD_vX.Y.Z.zip`：交付快照 + 交付包版本号（2026-11-03 起启用；当前最新 **v2.5.0** = 2026-11-11 构建：仓库基线 0ccbdc0（DATA_LAYOUT v1.6 / thermal 1.0.7 / compact_em v1.3 / gds2geo V1.2 r2 / task_layer P1→P3），37 条目；v2.5 功能线在三段版本号规则下的首个包；打包按 DELIVERY_PACKAGE_SPEC.md 执行）；
+- **主交付包** `PEEC_Studio_YYYYMMDD_vX.Y.Z.zip`：交付快照 + 交付包版本号（2026-11-03 起启用；开发验证版记法 vX.Y.Z_rc（feature 分支未合 main，供 UI 验证窗口）；当前最新 **v2.5.0_rc**（开发验证版）= 2026-11-12 构建：仓库基线 feature/vendor-r3-20261112（DATA_LAYOUT v1.6 / thermal 1.0.7 / compact_em **v1.4** / gds2geo **1.3.0** / task_layer 源码零改动），42 条目，供 2026-11-13 UI 验证窗口；最新正式版 **v2.5.0** = 2026-11-11 构建：仓库基线 0ccbdc0（DATA_LAYOUT v1.6 / thermal 1.0.7 / compact_em v1.3 / gds2geo V1.2 r2 / task_layer P1→P3），37 条目；v2.5 功能线在三段版本号规则下的首个包；打包按 DELIVERY_PACKAGE_SPEC.md 执行）；
   升版规则（2026-11-11 起三段 x.y.z）：X = 平台大能力 / 契约大版本，Y = 功能线 / 里程碑，Z = 线内重切序号（每次重切 Z+1，不再每次重切消耗 Y）；「定版 / 正式发布」= 当时的最高 Z，交付时显式宣告（如「v2.5 线定版 = v2.5.3」）；v2.1–v2.4 为旧规则（重打 +0.1）编号；
   **日期 = 该版本的构建日期（此版本最终重打包的日期）**，版本变化则日期与版本号同时更新；版本对应内容记在 git 提交与《给UI负责人的交付说明.md》修订行；
 - 案例包 / 模块包：按 vendor 交付命名；平台归档到 dev/cases/<模块>/，不作为契约件。
