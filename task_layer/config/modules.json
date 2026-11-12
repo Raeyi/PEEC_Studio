@@ -30,7 +30,7 @@
       ]
     },
     "gds.geo_em": {
-      "displayName": "电磁几何生成（GDS2GEO r2）",
+      "displayName": "电磁几何生成",
       "kind": "external",
       "provider": "gds2geo",
       "stage": "em_geo",
@@ -39,7 +39,7 @@
       ]
     },
     "gds.geo_thermal": {
-      "displayName": "热学几何生成（GDS2GEO r2）",
+      "displayName": "热学几何生成",
       "kind": "external",
       "provider": "gds2geo",
       "stage": "thermal_geo",
@@ -48,7 +48,7 @@
       ]
     },
     "gds.mesh_em": {
-      "displayName": "电磁网格生成（GDS2GEO r2）",
+      "displayName": "电磁网格生成",
       "kind": "external",
       "provider": "gds2geo",
       "stage": "em_msh",
@@ -60,7 +60,7 @@
       ]
     },
     "gds.mesh_thermal": {
-      "displayName": "热网格生成（1102 起必需）",
+      "displayName": "热网格生成",
       "kind": "external",
       "provider": "gds2geo",
       "stage": "thermal_msh",
@@ -72,7 +72,7 @@
       ]
     },
     "thermal.extract": {
-      "displayName": "热路提取（薄层/四面体混合）",
+      "displayName": "热路提取",
       "kind": "external",
       "provider": "thermal",
       "stage": "extract",
@@ -81,7 +81,7 @@
       ]
     },
     "thermal.post": {
-      "displayName": "温度后处理（OP0 映射，可选）",
+      "displayName": "温度后处理",
       "kind": "external",
       "provider": "thermal",
       "stage": "post",
@@ -90,7 +90,7 @@
       ]
     },
     "sim.solver": {
-      "displayName": "仿真求解（MNA/ALPS，待接入）",
+      "displayName": "仿真求解",
       "kind": "dll",
       "provider": "sim_solver",
       "stage": "solve",
@@ -100,7 +100,7 @@
       "workerHost": "{BIN}/worker_host.exe"
     },
     "opt.optimizer": {
-      "displayName": "优化计算（伴随灵敏度，待接入）",
+      "displayName": "优化计算",
       "kind": "dll",
       "provider": "opt_optimizer",
       "stage": "optimize",
@@ -110,7 +110,7 @@
       "workerHost": "{BIN}/worker_host.exe"
     },
     "post.engine": {
-      "displayName": "后处理（场计算/反演导出，待接入）",
+      "displayName": "后处理",
       "kind": "dll",
       "provider": "post_engine",
       "stage": "process",

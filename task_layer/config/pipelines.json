@@ -24,15 +24,15 @@
     },
     "gds.geo_em": {
       "module": "gds.geo_em",
-      "name": "电磁几何生成（GDS→EM 几何包）"
+      "name": "电磁几何生成"
     },
     "gds.geo_thermal": {
       "module": "gds.geo_thermal",
-      "name": "热学几何生成（GDS→热几何包）"
+      "name": "热学几何生成"
     },
     "em.mesh": {
       "module": "gds.mesh_em",
-      "name": "电磁网格（GEO→MSH+MATDB）",
+      "name": "电磁网格",
       "requires": [
         "Result/gds2geo/em_geo/model_em.geo"
       ],
@@ -43,7 +43,7 @@
     },
     "em.mesh_thermal": {
       "module": "gds.mesh_thermal",
-      "name": "热网格（GEO→MSH+MATDB，1102 起必需）",
+      "name": "热网格",
       "requires": [
         "Result/gds2geo/thermal_geo/model_thermal.geo"
       ]
@@ -57,7 +57,7 @@
     },
     "thermal.post": {
       "module": "thermal.post",
-      "name": "温度后处理（OP0 映射）",
+      "name": "温度后处理",
       "optional": true,
       "artifacts": {
         "user/thermal.mesh": "Result/gds2geo/thermal_msh/model_thermal.msh"
@@ -70,7 +70,7 @@
   },
   "pipelines": {
     "peec_basic": {
-      "displayName": "电磁基本链路（PEEC 三段）",
+      "displayName": "电磁基本链路",
       "description": "网格/材料/端口校验 → P/L 提取 → 频域求解 → 源/场后处理（S 参数绘图由前端完成；plot 阶段 2026-11-04 起移除，绘图程序与 Touchstone 导出随 compact_em v1.3 一并取消，2026-11-05 起生效）",
       "maxParallel": 1,
       "stages": [
@@ -96,7 +96,7 @@
       ]
     },
     "gds_full": {
-      "displayName": "建模与网格（GDS2GEO 四阶段）",
+      "displayName": "建模与网格",
       "description": "电磁/热几何生成（互不依赖）→ 电磁网格 → 热网格（gds2geo r2：4 EXE 收敛为 2 EXE，几何阶段内部合并旧 source/prepared）；正式件（Model/ 主网格 + matdb.json 配对）由 publisher 按阶段库 publishes 声明落位（r2 manifest 不再携带 publishTo，README §4 将该发布委托平台）",
       "maxParallel": 1,
       "stages": [
@@ -127,7 +127,7 @@
       ]
     },
     "thermal_basic": {
-      "displayName": "热基本链路（thermal 两段）",
+      "displayName": "热基本链路",
       "description": "热路提取 → 温度后处理（可选）。热网格经 stage artifacts 路由到 gds2geo 热链产物（Result/gds2geo/thermal_msh/，r2 起按目标分目录），材料用 publisher 落位的 Model/matdb.json；UI 提供 Model/source_thermal.json（thermal 1.0.7 起支持简化 schemaVersion 3（仅 sources：volume_ids 上 total_power，允许空数组，体材料按 mesh Physical 标签 + matdb 自动装配，无需 thermal 提取对象）与原 schemaVersion 2（含 thermal 提取对象：体域/薄层/材料关联）；1.0.5 时代独立控制件已取消）+ Model/boundary_thermal.json（必需；1.0.7 起支持 schemaVersion 2（default adiabatic + boundaries：fixed_temperature（任意面，含内部面）/ convection）与原 schemaVersion 1）+ Setting/set_thermal.json（SPICE 仿真设置：analysis/probe）；程序按成对版本解析（source 2 配 boundary 1、3 配 2；错配 → 模块 exit 2）；最简单算例（无热源、两个固定温度面）= dev/cases/thermal/heater（schema 3 空 sources + schema 2 边界）；post 依赖 Model/thermal.op0（ALPS 结果，1.0.6 起标准位置，1.0.5 时代的 Result/thermal/ 独立控制件已取消）",
       "maxParallel": 1,
       "stages": [
