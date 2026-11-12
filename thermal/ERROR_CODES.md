@@ -24,3 +24,5 @@
 1.0.3取消用户结果绑定文件；缺少OP0仍为exit3 QS-TH-IO-FILE，OP0节点缺失/格式不符为exit2 QS-TH-FMT-INPUT；--result-binding为已移除参数，传入会报未知参数。
 
 1.0.7：支持source_thermal.json schemaVersion=3的简化体功率源及原schemaVersion=2；对应boundary schemaVersion分别为2/1。网格Physical材料标签缺失或与matdb无法匹配、源体域不存在、非正表面薄膜厚度均为exit2；退化材料三角形为exit4 QS-TH-NUM-GEOMETRY。OP0缺失为exit3 QS-TH-IO-FILE，默认位置为实际source的同目录/thermal.op0。post不检查网表来源，但严格要求映射表所需的全部T节点温度；缺失温度仍为exit2，不自动补值。提取输入或映射变化使旧绑定失效(exit2 QS-TH-CFG-BINDING)。
+
+1.0.8：OP0缺少映射所需T节点时，post用最近的完整已知温度网格节点替代，并在CSV和报告中标记；OP0原文件不修改。无可用已知温度、重复映射、无效节点或权重仍为exit2。1.0.7行描述的是旧版行为。

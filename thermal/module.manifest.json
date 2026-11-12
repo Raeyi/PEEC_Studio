@@ -2,8 +2,8 @@
   "manifestVersion": 1,
   "id": "thermal",
   "name": "热路提取及温度后处理",
-  "version": "2026.11.06-native-1.0.7",
-  "apiVersion": 7,
+  "version": "2026.11.12-native-1.0.9",
+  "apiVersion": 8,
   "minApiVersion": 1,
   "cli": {
     "executables": [
@@ -74,7 +74,7 @@
         "--source",
         "{artifact:thermal/source.def}",
         "--op0",
-        "{dataRoot}/Model/thermal.op0",
+        "{dataRoot}/Result/thermal/alps/thermal.op0",
         "--boundary",
         "{artifact:thermal/boundary.def}",
         "--simulation-settings",
@@ -251,6 +251,14 @@
       {
         "version": "2026.11.06-native-1.0.7",
         "note": "Accept simplified source schema 3 and boundary schema 2 in addition to legacy 2/1; volume total power, arbitrary surface Dirichlet and convection; post accepts matching new source and preserves strict mapped-node checks."
+      },
+      {
+        "version": "2026.11.09-native-1.0.8",
+        "note": "Post uses the nearest mesh vertex with a complete OP0-mapped temperature when a T-node value is absent; output CSV and report identify substituted mesh vertices. Structural map validation remains strict."
+      },
+      {
+        "version": "2026.11.12-native-1.0.9",
+        "note": "Delivery override: post OP0 moves to Result/thermal/alps/thermal.op0. Both stages read optional mesh_length_unit from Setting/set_thermal.json. Source schema 3 accepts optional Model/thinfilm_thermal.json."
       }
     ],
     "dataLayoutRevision": "1.5"
