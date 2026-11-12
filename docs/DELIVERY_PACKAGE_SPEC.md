@@ -1,7 +1,8 @@
 # 打包交付规范（DELIVERY_PACKAGE_SPEC）
 
 版本：v1.4（2026-11-12）｜维护方：平台集成侧｜UI 模块组可对照 §二/§四 审查交付包
-基线：PEEC_Studio_20261112_v2.5.0_rc（2026-11-12，42 条目，主包内容基线 2e4f146，v1.4 提交不动主包内容；task_layer exe 取 build 目录 2026-11-12 构建件）+ docs_1.6.zip（5 条目，v1.4 共享面收窄）
+修订（2026-11-12，用户确认）：§八 共享面修正 5→7 条目——REPACK 三模块轮次记录（compact_em / gds2geo / thermal）全保留入包；内务文档收窄为 DELIVERY_PACKAGE_SPEC.md + README.md 2 件。
+基线：PEEC_Studio_20261112_v2.5.0_rc（2026-11-12，42 条目，主包内容基线 2e4f146，v1.4 提交不动主包内容；task_layer exe 取 build 目录 2026-11-12 构建件）+ docs_1.6.zip（7 条目，v1.4 共享面 = 4 契约 + REPACK×3）
 
 ## 一、目的与范围
 
@@ -86,11 +87,11 @@ Python `zipfile`（in-memory 读取 + SHA256；pwsh Compress-Archive 仅用于�
 ## 八、交付清单（给 UI 模块组的完整集合）
 
 1. `PEEC_Studio_YYYYMMDD_vX.Y.Z.zip`——主包（42 条目，§二）；
-2. `docs_X.Y.zip`——平台契约文档包（当前 docs_1.6.zip，**5 条目**，2026-11-12 v1.4 收窄）：DATA_LAYOUT.md（**UI 必读**）/ MODULE_MANIFEST_SPEC.md / MODULE_ONBOARDING.md / module.manifest.schema.json / REPACK/thermal.md（thermal 集成轮次，UI 侧参照）；
+2. `docs_X.Y.zip`——平台契约文档包（当前 docs_1.6.zip，**7 条目**，2026-11-12 v1.4 收窄）：DATA_LAYOUT.md（**UI 必读**）/ MODULE_MANIFEST_SPEC.md / MODULE_ONBOARDING.md / module.manifest.schema.json / REPACK/compact_em.md / REPACK/gds2geo.md / REPACK/thermal.md（三模块重打包轮次记录，UI 侧参照）；
 3. `UI_HANDOFF_YYYYMMDD_vX.Y.md`——包外交接说明。
 
 **共享面收窄与版本/指纹规则（v1.4，2026-11-12，用户确认）：**
-- 共享包只收**纯契约**文档（UI / 平台两侧实际以代码实现的：DATA_LAYOUT / MODULE_MANIFEST_SPEC / MODULE_ONBOARDING / module.manifest.schema.json）+ REPACK/thermal.md（用户确认保留）；
-- **平台内务文档**（不再随共享包交付，留存仓库 docs/，经主包交付说明 / UI_HANDOFF 承载）：DELIVERY_PACKAGE_SPEC.md（本文件）、README.md（文档索引与「当前最新」行）、REPACK/compact_em.md、REPACK/gds2geo.md（平台↔vendor 集成轮次）；
+- 共享包只收**纯契约**文档（UI / 平台两侧实际以代码实现的：DATA_LAYOUT / MODULE_MANIFEST_SPEC / MODULE_ONBOARDING / module.manifest.schema.json）+ REPACK×3（compact_em / gds2geo / thermal 三模块重打包轮次记录，同类件全保留，用户确认）；
+- **平台内务文档**（不再随共享包交付，留存仓库 docs/，经主包交付说明 / UI_HANDOFF 承载）：DELIVERY_PACKAGE_SPEC.md（本文件）、README.md（文档索引与「当前最新」行）；
 - **版本号规则**：包名 `docs_X.Y.zip` 的 X.Y = **DATA_LAYOUT 版本**；仅当共享面契约变化（DATA_LAYOUT / MODULE_MANIFEST_SPEC / MODULE_ONBOARDING / module.manifest.schema.json 任一内容变化）才重切共享包，DATA_LAYOUT 升版时包名同步变更；SPEC 升版、REPACK 轮次收口、README 当前行等内务变化**不触发共享包重切、不升版本**；
 - **指纹规则**：每次共享包重切记录 **SHA256 指纹**（整包 + 逐件）三处——切包 manifest（`docs_X.Y_YYYYMMDD_sha256.txt`）、UI_HANDOFF、交付说明（行式「docs 包：不变 / 重切（zip sha16，变化项）」）；消费方按指纹对账判新旧：**指纹不变 = 无需动作，变了 = 读变化项**，不以包名/版本号猜新旧。
