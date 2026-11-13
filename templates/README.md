@@ -33,9 +33,9 @@ max 500 K、min 293.145 K）。OP0 后处理仍严格校验映射节点温度齐
 extract →（可选）alps → post——alps 阶段 optional（缺 Setting/ALPSRunner.json 等输入 → `QS-TL-SKIP-NOINPUT`
 Skipped；可选上游 Skipped 不阻断下游，预置 OP0 时 post 直接运行）；extract 新发布公开网表 `Model/ThermalNetList.sp`
 （ALPS 输入，copy 语义）。全流量算例的 ALPS 运行配置 = `Setting/ALPSRunner.json` + `Setting/alpsrunner.key`
-（远端 SSH 配置，案例专属；本目录不含初值，demo1_4.1 案例包内含标准件）。
+（远端 SSH 配置；**2026-11-13 起本目录含该两件初值**——ALPS 算例可直接使用，host_key_sha256 / private_key_file 等须按实际服务器与授权替换）。
 
-ALPS 远端验收算例（v2.5.0_rc2，2026-11-13）：包内 `cases/alps_remote_20261113/` 为 thermal_basic ALPS 远端验收算例（含 ALPSRunner.json + alpsrunner.key（真实授权私钥，随验收算例入包）+ 参考 OP0；双模式验收：离线 alps 缺件 Skipped / 远端全链）。本目录初值不含 ALPS 私钥（案例专属授权件，随验收算例提供，勿外泄）。
+ALPS 运行配置初值（v2.5.0_rc2 重切，2026-11-13）：包内 `cases/` 目录**已废除**，ALPS 运行配置改为**随本目录初值提供**——`Setting/ALPSRunner.json`（远端 SSH 配置：host / port / user / host_key_sha256 / publickey / private_key_file，指向 alpsrunner.key；执行超时 3600 s / 轮询 2 s / 连接 15 s）+ `Setting/alpsrunner.key`（**真实授权私钥，勿外泄、勿入 git**，服务器或授权变更须替换）+ `Model/thinfilm_thermal.json`（薄膜层配置：thinfilm1 surface 3 / mat3 / 1e-7 m、thinfilm2 surface 9 / mat4 / 1e-7 m，供全流量 source_thermal.json schemaVersion 2 薄层对象引用）。双模式验收：离线 alps 缺件 Skipped（`QS-TL-SKIP-NOINPUT`，不阻断 post）/ 远端全链（192.168.136.172:22 + 授权 + license）。
 
 ## 文件清单
 
@@ -43,11 +43,14 @@ ALPS 远端验收算例（v2.5.0_rc2，2026-11-13）：包内 `cases/alps_remote
 |---|---|---|---|
 | Setting/set_em.json | **现行**（compact_em v1.4.3 起生效，2026-11-13；schemaVersion 1 已废） | UI | EM 求解设置（平铺字段，**schemaVersion 2 only**，1.4.3 起；EM 链唯一 JSON 设置；初值含 SAVE_SP=0 / POST_FIELD=0 / GROUND_PLANE_ENABLED=0 / POST_FIELD_ER=1）；纯热算例不需要 |
 | Setting/set_thermal.json | thermal 1.0.5 起（2026-11-06 与 vendor 案例包字节同步） | UI | SPICE 仿真设置（analysis/probe；当前仅支持 op、瞬态未支持；**1.0.9 起可选字段 `mesh_length_unit`（m/mm/um，须与网格坐标单位一致，extract/post 两阶段共读）**，初值 = mm）；程序不覆写；纯 EM 算例不需要 |
+| Setting/ALPSRunner.json | **新增（v2.5.0_rc2 重切，2026-11-13，自 cases 移入）** | UI / 平台 | ALPS 远端运行配置（schemaVersion 2）：ssh host / port / user / host_key_sha256（`SHA256:` 前缀，仅 rsa-sha2-* / kex ed25519）/ publickey / private_key_file（指向 alpsrunner.key）+ 执行超时 3600 s / 轮询 2 s / 连接 15 s；初值 = 验收算例标准，正式使用须按实际服务器与授权替换；纯热 / 纯 EM 算例不需要 |
+| Setting/alpsrunner.key | **新增（v2.5.0_rc2 重切，2026-11-13，自 cases 移入）** | 平台 | ALPS 授权私钥（PEM RSA PRIVATE KEY，**勿外泄、勿入 git**）；初值 = 验收所用真实授权私钥，服务器或授权变更须整件替换；公钥侧配于 ALPSRunner.json 的 publickey |
 | ~~Result/thermal/thermal_extract_control.json~~ | ~~thermal 1.0.5 时代~~ | — | **已取消（thermal 1.0.6，2026-11-04 集成）**：提取控制（thermal 对象）改内嵌于 Model/source_thermal.json（schemaVersion 2），本目录不再提供该初值 |
 | ~~Setting/set.json~~ | ~~v1.2 时代~~ | — | **已废止（2026-11-05，compact_em v1.3 集成）**：EM 链只读 set_em.json，合并件不再被任何模块读取；初值件已从本目录删除 |
 | Model/source_em.json | 全时代 | UI | EM 源定义（meshFile/meshSha256 + 端口 triangleIds） |
 | Model/source_thermal.json | 全时代（**初值 = 简化 schemaVersion 3，2026-11-06 vendor 标准**） | UI | 3 = 仅 sources（volume_ids 上 total_power，允许空数组 = 无热源；体材料按 mesh Physical 标签 + matdb.json 自动装配；无 thermal 提取对象、无 meshFile 绑定）；2 = 热源定义 + **thermal 提取对象**（四面体域/薄层/材料关联）+ meshFile（指向落位路径）+ SHA——全流量算例用，初值件已不再随包（格式见仓库 dev/cases/thermal/demo1_4.1 与 git 历史）；不含边界条件 |
 | Model/boundary_thermal.json | thermal 1.0.5 起（**初值 = schemaVersion 2，2026-11-06 vendor 标准**） | UI | 热边界条件，**必需输入**（经 --boundary 传入，SHA 入内部绑定）；schemaVersion 2 = default adiabatic + boundaries（fixed_temperature（任意面，含内部面；初值为 heater 面 3=500 K / 14=293.15 K）/ convection（h_W_m2K + ambient_temperature_K））；原 schemaVersion 1（default_external_boundary）仍可用；1.0.1 时代内嵌于 source_thermal.json |
+| Model/thinfilm_thermal.json | **新增（v2.5.0_rc2 重切，2026-11-13，自 cases 移入）** | UI / 平台 | ALPS 薄膜层配置（films：thinfilm1 reference_surfaces [3] / material 3 / 厚度 1e-7 m；thinfilm2 reference_surfaces [9] / material 4 / 厚度 1e-7 m）；供全流量算例 source_thermal.json schemaVersion 2 的薄层对象引用；初值 = 验收算例标准，新模型须换实际面 ID / 材料 / 厚度；无薄膜层的全流量算例不需要 |
 | Result/thermal/alps/thermal.op0 | **初值改址（2026-11-12，v1.7 / 1.0.9）** | UI / 平台导入步骤 | OP0 初值（heater 标准，vendor 独立稀疏求解合成补齐的完整件；post 严格校验映射节点温度齐备，不自动补全）；全流量/新案例自己的 OP0 由平台导入步骤导入（目标 = 本文件，覆写初值：流水线 alps 阶段 / 独立通道 `alps.importOp0` / CLI `alps-import-op0`）；1.0.6-1.0.8 时代初值在 `Model/thermal.op0`，2026-11-12 起重切包起改址本位置（1.0.9 无旧路径回退） |
 | ~~Model/thermal.op0~~ | ~~thermal 1.0.6-1.0.8 时代~~ | — | **已废止（v1.7，2026-11-12）**：OP0 标准位置改 `Result/thermal/alps/thermal.op0`（见上件）；本目录不再提供该位置初值 |
 

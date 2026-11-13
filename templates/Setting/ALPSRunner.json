@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "ssh": {
+    "host": "192.168.136.172",
+    "port": 22,
+    "username": "2208",
+    "host_key_sha256": "SHA256:rTaJqy2IpnFv0GpHZYWaQxzDyhF38AI34Vca6UbkWwg",
+    "auth_method": "publickey",
+    "private_key_file": "alpsrunner.key"
+  },
+  "execution": {
+    "timeout_seconds": 3600,
+    "poll_interval_seconds": 2,
+    "connect_timeout_seconds": 15
+  }
+}
