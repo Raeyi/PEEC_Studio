@@ -3,6 +3,23 @@
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
 > 关联活契约：`DATA_LAYOUT.md`（v1.7）/ `MODULE_MANIFEST_SPEC.md`（v1.4）；包内模块当前版本：**1.0.9（2026.11.12-native-1.0.9，apiVersion 8）**。ALPS 联动（工作点动态获取）见下第 4 轮与 `REPACK/alpsrunner.md`。
 
+## 第 5 轮（2026-11-13，rc2 平台侧打包动作，已收口）
+
+状态：**已收口（2026-11-13 平台侧）** —— 本轮**无新 vendor 版本**（thermal 仍 1.0.9，apiVersion 8，模块目录不变）；记录 rc2 交付中 thermal 相关的平台侧打包动作与 ALPS 远端验收算例入包（补 rc1 缺陷：ALPS 私钥/配置未随包）。task_layer.exe 未重建（1,120,622 B `9f1e8ae5…be76` 不变）。
+
+### 平台侧动作（rc2）
+
+- **模板维护**：`templates/Setting/set_thermal.json` 补 1.0.9 可选字段 `mesh_length_unit`（本包用 `mm`）；`Model/thinfilm_thermal.json` 为 1.0.9 可选输入（`{films:[{name, surface_ids, material_id, thickness_m}]}`，厚度以 SI 米填写），提取/后处理两阶段共读 `set_thermal.json` 的 `mesh_length_unit`（m/mm/um，与网格坐标单位一致）。
+- **ALPS 远端验收算例入包**：`cases/alps_remote_20261113/`（10 件）随包交付 —— Model×5（model_thermal.msh 1,262,725 / matdb.json 2,663 / source_thermal.json 43 / boundary_thermal.json 389 / thinfilm_thermal.json 252）+ Setting×3（set_thermal.json 95 / ALPSRunner.json 396 / **alpsrunner.key 2,455 = 真实授权私钥**）+ 参考工作点 `Result/thermal/alps/thermal.op0` 5,278,434 + 验收 README（双模式）。
+- **两种验收模式**：① 离线（删 ALPS 配置+私钥 → alps 缺件跳过 `QS-TL-SKIP-NOINPUT`，post 读预置 OP0）；② 远端全链（保留配置+私钥 + 远端 192.168.136.172:22 / IC618 VM / ALPS 许可证 + 3600 s）。
+- **预期红线**：extract 6094 热节点 / 4230 薄膜三角 / 2570 定温节点；OP0 6091 已知温度映射至 6094 网格节点，293.15–500 K，最高 500 K（节点 1）；T65/T68/T3790 缺值由最近网格节点填补（见 post/TemperatureProcessReport.txt）。
+- **关键告警（写入验收 README）**：配置+私钥在位但远端不可达 → alps 阶段 **FAILED**（非 Skipped）并**阻断** post；Skipped 仅在「三输入件缺件」时发生。
+
+### 收口状态
+
+thermal 侧 rc2 打包动作收口；真远端 ALPS 链路（模式 2）留待远端条件齐备时执行（离线模式 1 已可离线验收）。
+
+
 ## 第 4 轮（2026-11-12 请求 → 回执同日）
 
 状态：**已收口（2026-11-12 同日）** —— 1.0.9 已收到并集成（模块目录替换 + 平台契约变化：OP0 动态获取与 alpsrunner 1.1.2 联动 + 平台导入双通道 + 文档同步；DATA_LAYOUT v1.7 / MODULE_MANIFEST_SPEC v1.4 / REPACK/alpsrunner.md 三件活契约更新）。

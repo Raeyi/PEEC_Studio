@@ -35,12 +35,14 @@ Skipped；可选上游 Skipped 不阻断下游，预置 OP0 时 post 直接运�
 （ALPS 输入，copy 语义）。全流量算例的 ALPS 运行配置 = `Setting/ALPSRunner.json` + `Setting/alpsrunner.key`
 （远端 SSH 配置，案例专属；本目录不含初值，demo1_4.1 案例包内含标准件）。
 
+ALPS 远端验收算例（v2.5.0_rc2，2026-11-13）：包内 `cases/alps_remote_20261113/` 为 thermal_basic ALPS 远端验收算例（含 ALPSRunner.json + alpsrunner.key（真实授权私钥，随验收算例入包）+ 参考 OP0；双模式验收：离线 alps 缺件 Skipped / 远端全链）。本目录初值不含 ALPS 私钥（案例专属授权件，随验收算例提供，勿外泄）。
+
 ## 文件清单
 
 | 文件 | 时代 | 写者 | 说明 |
 |---|---|---|---|
-| Setting/set_em.json | **现行**（compact_em v1.3 起生效，2026-11-05） | UI | EM 求解设置（平铺字段，schemaVersion 1；EM 链唯一 JSON 设置）；纯热算例不需要 |
-| Setting/set_thermal.json | thermal 1.0.5 起（2026-11-06 与 vendor 案例包字节同步） | UI | SPICE 仿真设置（analysis/probe；当前仅支持 op、瞬态未支持）；程序不覆写；纯 EM 算例不需要 |
+| Setting/set_em.json | **现行**（compact_em v1.4.3 起生效，2026-11-13；schemaVersion 1 已废） | UI | EM 求解设置（平铺字段，**schemaVersion 2 only**，1.4.3 起；EM 链唯一 JSON 设置；初值含 SAVE_SP=0 / POST_FIELD=0 / GROUND_PLANE_ENABLED=0 / POST_FIELD_ER=1）；纯热算例不需要 |
+| Setting/set_thermal.json | thermal 1.0.5 起（2026-11-06 与 vendor 案例包字节同步） | UI | SPICE 仿真设置（analysis/probe；当前仅支持 op、瞬态未支持；**1.0.9 起可选字段 `mesh_length_unit`（m/mm/um，须与网格坐标单位一致，extract/post 两阶段共读）**，初值 = mm）；程序不覆写；纯 EM 算例不需要 |
 | ~~Result/thermal/thermal_extract_control.json~~ | ~~thermal 1.0.5 时代~~ | — | **已取消（thermal 1.0.6，2026-11-04 集成）**：提取控制（thermal 对象）改内嵌于 Model/source_thermal.json（schemaVersion 2），本目录不再提供该初值 |
 | ~~Setting/set.json~~ | ~~v1.2 时代~~ | — | **已废止（2026-11-05，compact_em v1.3 集成）**：EM 链只读 set_em.json，合并件不再被任何模块读取；初值件已从本目录删除 |
 | Model/source_em.json | 全时代 | UI | EM 源定义（meshFile/meshSha256 + 端口 triangleIds） |
@@ -92,5 +94,5 @@ Skipped；可选上游 Skipped 不阻断下游，预置 OP0 时 post 直接运�
 - 初值的面 ID（3/14）/ SHA / 端口 / 薄层参数等为 heater 标准（最简单算例）或取自 demo1_4.1 与
   compact_em standard 两个真实案例，仅示范格式；新模型必须全部替换为实际值；
 - 实体选择一律 Elementary ID（不是 Physical ID）；网格坐标 mm（DIM=1000）；
-- 字段规范以 DATA_LAYOUT §六/§八 为准（模板当前版对应 DATA_LAYOUT v1.7 / thermal 1.0.9，2026-11-12）；
+- 字段规范以 DATA_LAYOUT §六/§八 为准（模板当前版对应 DATA_LAYOUT v1.7 / thermal 1.0.9 / compact_em v1.4.3，2026-11-13）；
   模板与契约版本对应关系见包内交付说明。

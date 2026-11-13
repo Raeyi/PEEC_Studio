@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "DIM": 1000,
   "FS": 1000000000,
   "FE": 10000000000,
@@ -17,5 +17,7 @@
   "POST_PLOT_M": 1,
   "POST_PLOT_QM": 1,
   "POST_PLOT_VM": 1,
-  "POST_FIELD": 0
+  "POST_FIELD": 0,
+  "GROUND_PLANE_ENABLED": 0,
+  "POST_FIELD_ER": 1
 }

@@ -1,7 +1,38 @@
 # compact_em 模块重打包请求日志（REPACK/compact_em）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.6）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**v1.4（2026.11.10-v1.4，API 4，2026-11-12 集成，revisionId merged-post-20261111）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.6）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**v1.4.3（2026-11-13 交付，API 7，2026-11-13 集成，revisionId docs16-contract-fix-20261113，releaseBatch 2026-11-13）**。
+
+## 第 3 轮（2026-11-13，compact_em 1.4.3 集成，已收口）
+
+状态：**已收口** —— v1.4.3（2026-11-13）交付并集成（平台 peec_basic 全流 E2E + R2_PEC_Standard 100 频点 + 红线回归全绿）。v1.4（2026.11.10-v1.4，API 4，2026-11-12 集成，revisionId merged-post-20261111）被 v1.4.3（apiVersion 7，revisionId docs16-contract-fix-20261113，releaseBatch 2026-11-13）取代。
+
+**交付接收（vendor 包 Compact_EM_Delivery_Bundle_20261113_1.4.3_release1.zip）**：模块 6 件 SHA256 全对、三 EXE 与 vendor 映像逐字节一致；libiomp5md.dll 1,614,184 B 不变（运行依赖）。
+
+| 文件 | 尺寸（B） |
+| --- | --- |
+| PEEC_Model_Extractor.exe | 9,680,384 |
+| PEEC_Solver.exe | 16,871,424 |
+| PEEC_Post_Processing.exe | 838,144 |
+| module.manifest.json | 8,332 |
+| README.md | 8,432 |
+| ERROR_CODES.md | 18,088 |
+
+**契约变化（API7 / breakingChanges `1.4.3 / docs16-contract-fix-20261113`）**：
+- 公开 flat 设置 **schemaVersion 2 only**（schemaVersion 1 拒绝）；未知可选键忽略，已知不支持键拒绝（SAVE_BIN/SAVE_TXT/Taylor/MNA_WEIGHT/SOLVER_MEMORY_MB/SOLVER_THREADS/accuracy/workers/mklThreads）。
+- 新增 `GROUND_PLANE_ENABLED`（=1 → 需 `GROUND_PLANE_Z_METERS`（SI m）+ Solver_SET=0 + POST_FIELD_ER=1）；默认 `SAVE_SP`=0、`POST_FIELD`=0、`POST_FIELD_ER`=1。
+- `Swap_Log=1` → 需 N_FP + PRECISION=0 + Solver_SET=0；`PRECISION>1` → 需 N_FP。
+- **移除隐式 Touchstone 写**（s2p 不再自动生成）。
+- 旧文件名（set.txt/set.json/SET_EM.json/port.json）→ `QS-FMT-INPUT-LEGACY_NAME_REJECTED`。
+- **新增 runLock**：三阶段写业务前取 `.locks/compact_em.run.lock`（busy → `QS-COMM-MODULE-BUSY`/exit 1，stale 经 OS 字节锁复用，scope 覆盖全阶段）。
+- extract/solve/post 的 CLI 与产物**不变**（exe 名/argsTemplate/produces/consumes 与 v1.4 一致）；solve 产 S/Y/Z 参数 CSV；errorContract 仍 none。
+
+**平台侧集成（2026-11-13，分支 feature/rc2-compact-em-20261113，基线 f20aa88）**：
+- 模块目录替换（6 件，与 vendor 字节一致）；`templates/Setting/set_em.json` 升级 schemaVersion 2（450 B，新增 GROUND_PLANE_ENABLED=0 / POST_FIELD_ER=1）；`task_layer/config/modules.json` `_comment` 更新 1.4.3/apiVersion 7（仅注释，路由不变）；`task_layer.exe` 未重建（1,120,622 B `9f1e8ae5…be76` 不变）。
+- **R2_PEC_Standard 100 频点 E2E（全绿）**：extract→solve→post 全 done；model.peec 19,419,844 B（PEECFS02/version2）；S_parameter.csv 12,282 B / Y 7,434 B / Z 7,434 B（各 100 数据行，1.09–10 GHz）；Source.msh 358,047 B（14 视图；POST_FIELD=0 无 Field.msh）。
+- **数值一致性（红线，已实测）**：1.4.3 与 v1.4 基线（同输入 mesh/source/matdb 三件 SHA 一致）**S/Y/Z 参数 CSV 与 post/Source.msh 逐字节一致**（S `a7c4b93e…`/Y `8a250814…`/Z `32861db1…`/Source.msh `abe39dd9…`）⇒ 物理行为不变；model.peec（同尺寸 19,419,844 B）、Solver_Diagnostics.csv、post_source.json 随 EXE 版本序列化变化（非物理量，回归不对其做字节比对）。
+- **收口**：1.4.3 为 stage-compatible 升级（无 C++/流水线改动，task_layer.exe 哈希不变）；公开设置转 schemaVersion 2，平台模板已同步。本轮收口。
+
 
 ## 第 2 轮（2026-11-09 请求 → 2026-11-12 已收口）
 

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "DIM": 1000,
   "FS": 1000000000,
   "FE": 10000000000,

@@ -1,65 +1,94 @@
-# Compact_EM FreeSpace计算模块（v1.4）
+# Compact_EM 1.4.3 模块使用说明
+
+软件版本1.4.3，API7，manifest格式版本1；本次交付重切标识release1（2026-11-13）。模型PEECFS02/version2，数据布局peec-data/v1 revision1.6。模块提供extract→solve→post三个阶段。
+
+## 安装与运行依赖
+
+将模块ZIP完整解压，保留compact_em目录中的7个文件：三个EXE、libiomp5md.dll、module.manifest.json、README.md、ERROR_CODES.md。DLL须与PEEC_Solver.exe同目录，程序与已经验收的1.4.3候选逐字节一致。
+
+运行环境为Windows x64；libiomp5md.dll还需要系统UCRT和x64 VC运行库提供的VCRUNTIME140.dll。无需安装Visual Studio或Intel oneAPI SDK。缺少加载依赖时进程可能无法进入main，不会产生模块QS错误。请在部署时检查依赖齐全。
+
+内部数值库为Intel oneMKL2025.0.0（静态链接），线程运行库为Intel OpenMP libiomp5md.dll（ProductVersion5.0，FileVersion20250910）。本批按用户明确要求保留该DLL；不宣称为全静态/零依赖模块。案例、技术文档、源码及验证工件不装入模块目录。
 
 ## 适用范围
 
-本模块计算均匀真空中的无损表面PEC金属结构，支持可选的水平无限PEC参考地（默认关闭）。不支持有限电导率地面、分层介质、材料损耗、线激励、体单元或高阶物理；MATDB中导体的电导率/厚度仅作元数据校验，不进入矩阵。开启PEC地时要求频域求解，且所有金属三角形须位于平面上方并满足逐片间隙比≥1e-3。
+均匀真空中的无损表面PEC金属，可选水平无限PEC参考地（默认关闭）。不提供材料损耗、分层介质、线激励、体或高阶物理。MATDB导体电导率/厚度仅作元数据校验，不进入PEC矩阵。开启PEC地要求所有金属三角形位于平面上方并满足逐片间隙比≥1e-3。
 
 ## 输入
 
-标准输入共四个文件，均相对dataRoot：
+所有路径相对显式--data-root指定的案例目录，模块安装目录只读使用。
 
-- `Model/model_em.msh`：Gmsh MSH 2.2或4.1（ASCII/二进制），一阶Tri3为导体；Point1/Line2仅作几何元数据，不产生支路或激励。坐标按`x_m = x_mesh/DIM`换算为米。
-- `Model/matdb.json`：schemaVersion 3。每个Tri3物理标签必须解析到一个surface C材料；无需额外真空材料记录。
-- `Model/source_em.json`：含`meshFile`、`meshSha256`（原始网格的64位十六进制SHA-256）与有序`ports`数组。端口端点为正Gmsh element tag（uint64精确读取），两端顺序定义V0-V1，`direction`为单位向量元数据，`impedanceOhm`必须正且有限；支持每侧多三角形的等电位端子及`negative:{groundPlane:true}`引用PEC地。端口顺序即网络端口顺序。
-- `Setting/set_em.json`：schemaVersion 1扁平设置。必填`DIM`（正整数）、`FS`/`FE`（Hz正整数，FS≤FE）；计数模式需`N_FP`。`Swap_Log=1`时为对数扫频（N_FP为含端点总点数，PRECISION须为0）。标准平台仅公开频域`Solver_SET=0`；`SAVE_BIN`/`SAVE_TXT`出现即拒绝（零也拒绝）；`Taylor`、`MNA_WEIGHT`、`SOLVER_MEMORY_MB`、`SOLVER_THREADS`一律拒绝。`GROUND_PLANE_ENABLED=1`时必须给出SI米的`GROUND_PLANE_Z_METERS`（不再除DIM）。后处理开关`POST_PROCESSING`、`POST_FREQ_INDEX`（-1取最后点）、`POST_PORT`、`POST_PLOT_*`、`POST_FIELD`、`POST_FIELD_ER`（自由空间用1）。完整字段见[设置schema](../technical/schemas/set_em.schema.json)。
+- Model/model_em.msh：Gmsh MSH2.2或4.1（ASCII/二进制）。Tri3作为导体；CAD Point1/Line2仅作几何元数据。坐标换算为SI米：x_m=x_mesh/DIM。
+- Model/matdb.json：schemaVersion3，Tri3物理标签须对应surface C材料；nextId为大于全部材料id的整数。
+- Model/source_em.json：meshFile=model_em.msh，meshSha256为该原始网格的64位十六进制SHA256，ports为非空有序数组。端子使用正Gmsh triangle tag，端点顺序定义V0-V1；direction为单位向量元数据，impedanceOhm为正有限值。支持每侧多个三角形及negative:{groundPlane:true}。不接受nextId/nextID。
+- Setting/set_em.json：平铺JSON，schemaVersion=2。设置及源定义仅接受这两个标准文件名和位置。
 
-## 三阶段标准CLI
+旧Setting/set.txt、Setting/set.json、root SET_EM.json/set.txt/set.json，以及Model或root中的port.json/port_em.json均拒绝；新旧并存也拒绝，不回退。请按新结构迁移，完整错误码见[ERROR_CODES.md](ERROR_CODES.md)。仍必须提供上述网格与材料文件。
 
-示例中`$case`必须是安装树之外的复制案例（安装目录保持只读）：
+## 设置字段
+
+schemaVersion、DIM、FS、FE必填；DIM为正整数，FS/FE为正整数Hz（允许精确数字字符串），FS≤FE。计数扫频提供N_FP；0≤PRECISION≤1时按N_FP计数，PRECISION>1时按Hz步长。Swap_Log=1使用对数扫频，N_FP为含端点总数、PRECISION必须为0。
+
+其他公开字段：SAVE_SP；Solver_SET（标准流程仅0=频域）；POST_PROCESSING；POST_FREQ_INDEX（1起，-1为最后点）；POST_PORT（1起）；POST_PLOT_J/QE/VE/M/QM/VM；POST_FIELD；POST_FIELD_ER（自由空间为1）；GROUND_PLANE_ENABLED（默认0）；GROUND_PLANE_Z_METERS（启用地面时必填，单位SI米，不再除DIM）。
+
+SAVE_BIN、SAVE_TXT出现即拒绝（零也拒绝）；Taylor、MNA_WEIGHT、SOLVER_MEMORY_MB、SOLVER_THREADS仍拒绝；未知可选键忽略。设置格式或默认配置的变化需要平台同步其模板。本模块不携带默认设置文件。
+
+## 三阶段调用
+
+案例另见compact_em_cases_20261113_1.4.3_release1.zip，解压后使用compact_em_cases_20261113/R2_PEC_Standard。将它复制到安装树外新的可写位置后调用：
 
 ```powershell
-$releaseRoot = 'E:\PEEC\Code\05_Custom_Release\Compact_EM'
-$module = Join-Path $releaseRoot 'compact_em'
-$caseParent = 'E:\PEEC\Runs'
-$case = Join-Path $caseParent 'R2_PEC_Standard_v1_4'
-if (Test-Path -LiteralPath $case) { throw '请为本次运行指定一个新的案例目录' }
-New-Item -ItemType Directory -Path $caseParent -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $releaseRoot 'cases\R2_PEC_Standard') -Destination $case -Recurse
+$module = 'C:\PEEC\modules\compact_em'
+$case = 'D:\PEEC_Runs\R2_PEC_Standard_1_4_3'
 & (Join-Path $module 'PEEC_Model_Extractor.exe') --data-root $case
 & (Join-Path $module 'PEEC_Solver.exe') --data-root $case
 & (Join-Path $module 'PEEC_Post_Processing.exe') --data-root $case
 ```
 
-- 提取器：`--data-root`（另有调试用`--pause`）。原子发布`Result/compact_em/extract/model.peec`（PEECFS02/version2，包含几何/拓扑和P/L矩阵；完整文件SHA-256记录于阶段回执，容器尾部校验不覆盖矩阵载荷）。不写任何.bin/.txt矩阵、拓扑或临时网表；`SAVE_SP=1`时直接生成`.sp`。同时产出`Port_Mapping.csv`、`Port_Terminals.csv`、`model_state.json`、`stage_receipt.json`。
-- 求解器：`--data-root`、`--accuracy strict|fast`（缺省strict；fast减少残差复核与精度回退，仅限频域）、`--workers N`、`--mkl-threads N`（正整数，缺省自动策略）。输出`Result/compact_em/solve/S_parameter.csv`、`Y_parameter.csv`、`Z_parameter.csv`（标准CSV结果）与`Solver_Diagnostics.csv`。模型在solve/post期间逐字节不变。
-- 后处理器：`--data-root`（另有`--self-test`、`--pause`）。读取model.peec与求解结果，按配置在`Result/compact_em/post`下生成源图/场图；可选空间场采样网格`Model/Space_Mesh.msh`（一阶三角形，不在提取指纹内，可单独更换）。无端口频域求解会被明确拒绝。
+同一dataRoot的阶段串行调用。三个计算入口均必须提供--data-root，不搜索EXE旁Data/Input。
 
-退出码：提取0成功/1诊断失败/2未知异常；求解0/1；后处理0/1/2（无效CLI）。各阶段输出best-effort v1 `stage_receipt.json`，写失败仅警告，不改变计算退出码。
+| 程序 | 参数 |
+|---|---|
+| PEEC_Model_Extractor.exe | --data-root <case>；--runtime-dir <dir>；--export model（省略等价；native为历史兼容值）；--pause |
+| PEEC_Solver.exe | --data-root <case>；--runtime-dir <dir>；--export csv；--accuracy strict\|fast（默认strict）；--workers N；--mkl-threads N；--pause |
+| PEEC_Post_Processing.exe | --data-root <case>；--runtime-dir <dir>；--export post；--self-test；--pause |
 
-## 格式迁移与重新提取
+--runtime-dir省略时为Result/logs/compact_em，显式指定须位于该目录或其子目录，相对路径以dataRoot解析。N为正整数；workers和mkl-threads都是上限，实际按CPU、内存、频点和MKL限制裁剪。保留原Intel OpenMP线程后端和频点间并行，没有改用sequential MKL。
 
-容器PEECFS02/version2与Compact PEECPK01不二进制兼容；旧松散文件仅保留读取兼容，损坏的新包不得回退到历史文件。整个设置JSON按字节指纹绑定：改动任何设置（包括空白）、端口定义、网格或材料后，必须重新提取并重新求解；修改场采样网格只需重跑后处理。旧root布局的时域入口仍保留但不属于本发布能力。
+fast减少残差复核/精度回退，仅用于频域。--help、--s-columns、--post-freq-index、--post-port、--source-plots、--field-plots、--format、--parts不属于本版公开CLI；后处理选择在set_em.json中配置。
 
-## 构建与使用方式
+## 输出、日志和退出码
 
-本版冻结源码快照位于`../source/01_Mainline/Quasi_Static_PEEC_Tool_Free_Space`（含.slnx与build_pipeline.ps1），要求Visual Studio 2022、MSVC v143与Intel oneMKL：先设置`MKLROOT`，再打开slnx或运行`.\build_pipeline.ps1 -Rebuild`。oneMKL路径也可经`ONEAPI_ROOT`或MSBuild属性`PeecMklRoot`提供；求解线程库`libiomp5md.dll`由工程验证并复制到EXE旁（可用`PeecOpenMpRoot`/`PEEC_OPENMP_ROOT`指定）。`../source/tests/free_space_ground_kernel`为独立内核参考测试，构建产物、夹具与日志一律放入独立输出目录。定版根`E:\PEEC\Code\05_Custom_Release\Compact_EM`按冻结manifest与SHA256SUMS只读分发；本地开发根`E:\PEEC\Code\01_Mainline`用于后续迭代。
+- extract：Result/compact_em/extract/model.peec、model_state.json、阶段回执及端口映射；SAVE_SP=1时生成SPICE网表。不生成bin/txt松散矩阵。
+- solve：Result/compact_em/solve/S_parameter.csv、Y_parameter.csv、Z_parameter.csv、Solver_Diagnostics.csv与后处理源快照。
+- post：按配置生成Result/compact_em/post/Source.msh和Field.msh；全部关闭时写post_status.json。可选空间场采样网格为Model/Space_Mesh.msh，不在提取指纹中，可单独更换后重跑post。
 
-## 限制
+Source.msh全部源量开启时含14个_real/_imag/_mag视图；Field.msh含E/H的6个视图。只导出设置选定的一个频点及一个激励端口，越界明确报错。源图和场图文件列于回执，不自动注册宿主UI路由。
 
-研究性建议、宿主GDS集成与UI端到端流程尚未验收，不属于本模块交付任务，不构成阻断；源图/场图文件列于receipt但不自动注册宿主artifact/UI路由。Release x64构建、26项原生测试和10项设置schema测试已通过。三阶段解包运行及与FreeSpace基线的独立对照见[运行验收记录](../validation/runtime-verification.json)。
+| 程序 | 退出码 |
+|---|---|
+| extract | 0成功；1诊断失败；2未知非标准异常 |
+| solve | 0成功；1失败 |
+| post | 0成功；1运行/平台参数失败；2UsageError（未知选项或缺data-root参数值） |
 
-平台适配层还支持`--runtime-dir`（位于dataRoot的`Result/logs/compact_em`下）以及`--export`：提取为`model`、求解为`csv`、后处理为`post`。`--help`和`--source-plots`不属于本实现的CLI。旧Compact的组合导出参数不适用。
+失败stderr输出9字段UTF8 JSON（code/severity/message_dev/message_user_zh/user_action/module/trace_id/file_refs/recoverable），详情见ERROR_CODES.md。同次调用trace一致；合法日志目录已知时追加jsonl，日志失败只warning，不覆盖主错。各阶段stage_receipt.json为可选v1自证，写失败不改变计算退出码；必需内部完整性状态仍严格校验。模块不读写Result/tasks。
 
-## 合并后处理与视图命名
+旧名、缺文件或缺显式dataRoot在业务Result及阶段marker修改前拒绝，诊断日志可以追加。OOM保留完整应急JSON。设置整体按字节、网格、材料或源定义变化后应重新extract/solve；损坏的新包不回退到历史松散结果。
 
-按设置输出 `Result/compact_em/post/Source.msh` 和 `Result/compact_em/post/Field.msh`，每个文件只保存一套网格，包含多个命名 NodeData 视图。源量与空间场使用不同网格，同时启用时为两个文件。
+## 本地自测与验收
 
-- 实部统一后缀 `_real`，虚部 `_imag`，幅值 `_mag`。
-- 全部源量开启时：`J_real/J_imag`、`Qe_mag/Qe_real/Qe_imag`、`Ve_real/Ve_imag`、`M_real/M_imag`、`Qm_mag/Qm_real/Qm_imag`、`Vm_real/Vm_imag`，共 14 视图。
-- 空间场开启时：`E_real/E_imag/E_mag`、`H_real/H_imag/H_mag`，共 6 视图。
-- 仍只保存 POST_FREQ_INDEX、POST_PORT 选定的一个实际频点和一个激励端口。原开关、单位和数值恢复语义不变。
-- 不再生成拆分 `.msh_Re/.msh_Im/.msh_Mag`；历史拆分结果保留但不作为本次产物重新发布。标准布局全部关闭时输出 post_status.json。
+```powershell
+.\PEEC_Post_Processing.exe --self-test
+```
 
-新输出契约为 API 4，计算来源为 FreeSpace API 2；模型仍为 PEECFS02/version2，平台契约仍为 1.6。详情及真实验收记录见 validation/runtime-verification.json。
+不读取用户输入，预期退出0并报告20个命名视图。完整案例按上文三阶段执行；R2案例预期S/Y/Z各100数据行、实际频点1.09–10GHz，POST_FIELD=0时不要求Field.msh。
 
-本次同版修订标识：`merged-post-20261111`。按用户要求，软件 v1.4、Compact API 4、FreeSpace API 2、模型格式 2、平台契约 1.6、layoutRevision 2 均保持原值。合并输出和实/虚/幅值命名保留；使用修订标识和包 SHA-256 区分交付内容。
+本版正式定版复用已验收1.4.3候选的三个EXE，保留原Intel OpenMP DLL；没有修改已验证程序。回归与docs1.6核对记录随本地冻结归档保留。平台GDS/task_layer/UI全流仍须联调。
+
+## schema2迁移与同根互斥
+
+旧受限FreeSpace设置错误沿用了schema1；当前accept为2..2。现有受支持案例只改schemaVersion为2，随后重新提取/求解；其他数值字段、单位和采样定义保持。已知不支持的物理/输出字段必须人工核对，迁移工具不会静默删除；JSON合法的未知可选键忽略但仍纳入全文指纹。accuracy/workers/mklThreads只允许通过CLI。设置schema及迁移工具在模块ZIP外的technical目录提供；平台模板需同步改成schema2。
+
+extract/solve/post共同持有.locks/compact_em.run.lock的独占Windows字节锁。忙碌返回QS-COMM-MODULE-BUSY（exit1）且不改业务结果或marker；锁文件保留、陈旧文件可复用，正常/异常进程退出释放OS锁。不要删除运行中的锁文件。
+
+求解器不再生成Touchstone文件，包括native私有目录中的sNp。历史结果不自动清理。DLL与标准文件名策略保留。本版已正式定版为当前Compact_EM发行，固定入口及CURRENT以本次1.4.3记录为准。

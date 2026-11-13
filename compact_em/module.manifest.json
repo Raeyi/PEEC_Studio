@@ -2,8 +2,8 @@
   "manifestVersion": 1,
   "id": "compact_em",
   "name": "Compact_EM",
-  "version": "2026.11.10-v1.4",
-  "apiVersion": 4,
+  "version": "1.4.3",
+  "apiVersion": 7,
   "cli": {
     "executables": [
       "PEEC_Model_Extractor.exe",
@@ -33,7 +33,7 @@
         "2": "unhandled_exception"
       },
       "errorContract": {
-        "type": "none"
+        "type": "qs-json-stderr"
       },
       "consumesInternal": [],
       "producesInternal": [
@@ -62,7 +62,7 @@
         "1": "failure"
       },
       "errorContract": {
-        "type": "none"
+        "type": "qs-json-stderr"
       },
       "consumesInternal": [
         "compact_em/extract.model"
@@ -93,7 +93,7 @@
         "2": "invalid_cli"
       },
       "errorContract": {
-        "type": "none"
+        "type": "qs-json-stderr"
       },
       "consumesInternal": [
         "compact_em/extract.model",
@@ -161,8 +161,8 @@
         "path": "Setting/set_em.json",
         "accept": {
           "schemaVersion": {
-            "min": 1,
-            "max": 1
+            "min": 2,
+            "max": 2
           }
         }
       }
@@ -204,7 +204,41 @@
         "version": "2026.11.10-v1.4",
         "revisionId": "merged-post-20261111",
         "note": "Same-version revision requested by the user: retain Compact_EM v1.4/API4. Post outputs are Source.msh and Field.msh with _real/_imag/_mag views. Split paths are no longer produced; use revisionId and package SHA-256 to identify this output arrangement. Numerical code, executable bytes, model PEECFS02/version2 and public model/S/Y/Z artifacts are unchanged."
+      },
+      {
+        "version": "1.4.1",
+        "revisionId": "error-contract-20261112",
+        "note": "API 5 declares qs-json-stderr for extract/solve/post. MODULE_MANIFEST_SPEC B5 and C4 conflict on this transition; this release follows B5 and increments the API. Software version uses x.y.z; the release batch is separate. Model PEECFS02/version2, data layout 1.6, supported physics and successful artifact routes retain their contracts. Invalid post frequency/port selections are rejected instead of silently clamped."
+      },
+      {
+        "version": "1.4.2",
+        "revisionId": "canonical-input-names-20261113",
+        "note": "Public compute entry points require explicit --data-root and only Setting/set_em.json plus Model/source_em.json for settings/source definitions. Deprecated set.txt/set.json/root SET_EM.json and port.json/port_em.json names are rejected even when canonical files coexist, using QS-FMT-INPUT-LEGACY_NAME_REJECTED before business outputs or stage markers change. Required model_em.msh/matdb.json inputs and PEECFS02/version2 remain unchanged. This intentionally ends the set.txt transition by user instruction dated2026-11-13. API increments because the previously optional data-root entry is now required (B1)."
+      },
+      {
+        "version": "1.4.3",
+        "revisionId": "docs16-contract-fix-20261113",
+        "note": "API7/B4: public flat settings use schema2 only; schema1 no longer incorrectly describes the FreeSpace field set. Unknown optional keys are ignored; known unsupported physics/output/CLI keys reject. Private modular format remains schema1. All three stages acquire .locks/compact_em.run.lock before business writes; busy returns QS-COMM-MODULE-BUSY/exit1; stale files are reusable and OS locks release on termination. Implicit Touchstone writes are removed. DLL and canonical input-name policies remain unchanged."
       }
-    ]
-  }
+    ],
+    "publicInputNames": {
+      "settings": "Setting/set_em.json",
+      "source": "Model/source_em.json",
+      "requiresExplicitDataRoot": true,
+      "legacyNames": "reject",
+      "legacyNameError": "QS-FMT-INPUT-LEGACY_NAME_REJECTED"
+    },
+    "runLock": {
+      "path": ".locks/compact_em.run.lock",
+      "policy": "fail-fast",
+      "scope": "all stages sharing dataRoot/provider",
+      "staleFiles": "reused via OS byte lock"
+    },
+    "settings": {
+      "schemaVersion": 2,
+      "unknownOptionalKeys": "ignored",
+      "internalModularSchemaVersion": 1
+    }
+  },
+  "releaseBatch": "2026-11-13"
 }
