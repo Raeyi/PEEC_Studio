@@ -26,6 +26,10 @@ switch_scratch/
 # ===== 算例运行产物 =====
 # 每次运行生成，单个 model.peec 可达 GB 级，且会被下一轮覆盖
 **/DATA/Result/
+# dev/cases 下的测试运行产物（compact_em/thermal 等算例的 Result 输出）。
+# 已入库的验收产物（如 thermal/*/Result 的 op0/netlist/msh）已跟踪，不受影响；
+# 新产生的未跟踪文件不再出现在 git status。
+dev/cases/**/Result/
 **/DATA/runtime/
 **/.peec-data.lock
 **/*.lock
