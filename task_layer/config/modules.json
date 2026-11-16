@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "_comment": "v2 = 路由表：契约来自各包 module.manifest.json（docs/MODULE_MANIFEST_SPEC.md）。kind: external/dll；provider = manifest id = 模块包目录名；stage = manifest stages[].id。gds2geo r2（V1.2-20261107-r2，2026-11-09 集成）：4 EXE → 2 EXE（gds2geo.exe / geo2msh.exe），stage 集 = em_geo / thermal_geo / em_msh / thermal_msh；compact_em 1.4.3（apiVersion 7，2026-11-13 集成）：公开设置转 schemaVersion 2（新增 GROUND_PLANE_ENABLED/GROUND_PLANE_Z_METERS/POST_FIELD_ER；未知可选键忽略、已知不支持键拒绝）；三阶段写业务前取 .locks/compact_em.run.lock（busy → QS-COMM-MODULE-BUSY/exit1，stale 经 OS 字节锁复用）；移除隐式 Touchstone 写；extract/solve/post 的 CLI 与产物不变（exe 名/argsTemplate/produces/consumes 与 v1.4 一致），solve 产 S/Y/Z 参数 CSV；errorContract 仍 none。gds2geo 1.3.0（apiVersion 5，2026-11-12 集成）：4 主阶段与 CLI/产物路径不变；新增辅助 EXE geoedit/mshcheck/mshfix（不在流水线 DAG，见 manifest capabilities.auxiliaryCommands）；gmsh 4.11.1 共享：GDS2GEO_GMSH_EXECUTABLE 指 gmsh.exe，gmsh-4.11.dll 为 mshfix 直接 PE 依赖（tools/gmsh/）。alpsrunner 1.1.2（apiVersion 1，2026-11-12 集成）：热网表经 SSH 在远端 IC618 Linux 虚拟机求解（ALPS 2025）并回传结果集；模块包置于 tools/alpsrunner（与 gmsh 同处共享工具目录）；artifacts.produced=[]、无固定 OP0、无 publishTo（OP0 导入由平台承担，见 task_layer/ERROR_CODES.md §2.8）；环境依赖 alpsrunner_host 为 bundled=false 远端主机（不随包分发）；--threads 用 {override:--threads} 令牌（平台 rebind 语义，见 docs/MODULE_MANIFEST_SPEC.md）。",
+  "_comment": "v2 = 路由表：契约来自各包 module.manifest.json（docs/MODULE_MANIFEST_SPEC.md）。kind: external/dll；provider = manifest id = 模块包目录名；stage = manifest stages[].id。gds2geo r2（V1.2-20261107-r2，2026-11-09 集成）：4 EXE → 2 EXE（gds2geo.exe / geo2msh.exe），stage 集 = em_geo / thermal_geo / em_msh / thermal_msh；compact_em 1.4.3（apiVersion 7，2026-11-13 集成）：公开设置转 schemaVersion 2（新增 GROUND_PLANE_ENABLED/GROUND_PLANE_Z_METERS/POST_FIELD_ER；未知可选键忽略、已知不支持键拒绝）；三阶段写业务前取 .locks/compact_em.run.lock（busy → QS-COMM-MODULE-BUSY/exit1，stale 经 OS 字节锁复用）；移除隐式 Touchstone 写；extract/solve/post 的 CLI 与产物不变（exe 名/argsTemplate/produces/consumes 与 v1.4 一致），solve 产 S/Y/Z 参数 CSV；errorContract 仍 none。gds2geo 1.3.0_fix（apiVersion 5，2026-11-16 hotfix）：4 主阶段与 CLI/产物路径不变；辅助 EXE geoedit/mshcheck/mshfix 升级为 5 个声明 stage（geoedit/mshcheck/mshfix_plan/mshfix_heal/mshfix_verify，见 manifest capabilities.stageInvocation），新增按需流水线 gds_geoedit/gds_repair（optional stage 输入缺失 → 跳过 QS-TL-SKIP-NOINPUT，不阻断）；gmsh 4.11.1 共享：GDS2GEO_GMSH_EXECUTABLE 指 gmsh.exe（em_msh/thermal_msh/geoedit 使用），mshfix.exe 直接 PE 依赖 gmsh-4.11.dll（tools/gmsh/，mshfix 三 stage 经 pathPrepend 前置子进程 PATH）。alpsrunner 1.1.2（apiVersion 1，2026-11-12 集成）：热网表经 SSH 在远端 IC618 Linux 虚拟机求解（ALPS 2025）并回传结果集；模块包置于 tools/alpsrunner（与 gmsh 同处共享工具目录）；artifacts.produced=[]、无固定 OP0、无 publishTo（OP0 导入由平台承担，见 task_layer/ERROR_CODES.md §2.8）；环境依赖 alpsrunner_host 为 bundled=false 远端主机（不随包分发）；--threads 用 {override:--threads} 令牌（平台 rebind 语义，见 docs/MODULE_MANIFEST_SPEC.md）。",
   "modules": {
     "peec.model_extract": {
       "displayName": "等效电路模型 · PEEC 提取",
@@ -67,6 +67,81 @@
       "env": {
         "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
       },
+      "searchDirs": [
+        "{MODULE_ROOT}/gds2geo"
+      ]
+    },
+    "gds.geoedit": {
+      "displayName": "几何编辑",
+      "kind": "external",
+      "provider": "gds2geo",
+      "stage": "geoedit",
+      "env": {
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
+      },
+      "pathPrepend": [
+        "{MODULE_ROOT}/tools/gmsh"
+      ],
+      "searchDirs": [
+        "{MODULE_ROOT}/gds2geo"
+      ]
+    },
+    "gds.mesh_check": {
+      "displayName": "网格体检",
+      "kind": "external",
+      "provider": "gds2geo",
+      "stage": "mshcheck",
+      "env": {
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
+      },
+      "pathPrepend": [
+        "{MODULE_ROOT}/tools/gmsh"
+      ],
+      "searchDirs": [
+        "{MODULE_ROOT}/gds2geo"
+      ]
+    },
+    "gds.mshfix_plan": {
+      "displayName": "网格修复计划",
+      "kind": "external",
+      "provider": "gds2geo",
+      "stage": "mshfix_plan",
+      "env": {
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
+      },
+      "pathPrepend": [
+        "{MODULE_ROOT}/tools/gmsh"
+      ],
+      "searchDirs": [
+        "{MODULE_ROOT}/gds2geo"
+      ]
+    },
+    "gds.mshfix_heal": {
+      "displayName": "网格修复",
+      "kind": "external",
+      "provider": "gds2geo",
+      "stage": "mshfix_heal",
+      "env": {
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
+      },
+      "pathPrepend": [
+        "{MODULE_ROOT}/tools/gmsh"
+      ],
+      "searchDirs": [
+        "{MODULE_ROOT}/gds2geo"
+      ]
+    },
+    "gds.mshfix_verify": {
+      "displayName": "修复验证",
+      "kind": "external",
+      "provider": "gds2geo",
+      "stage": "mshfix_verify",
+      "env": {
+        "GDS2GEO_GMSH_EXECUTABLE": "{MODULE_ROOT}/tools/gmsh/gmsh.exe"
+      },
+      "pathPrepend": [
+        "{MODULE_ROOT}/tools/gmsh"
+      ],
       "searchDirs": [
         "{MODULE_ROOT}/gds2geo"
       ]

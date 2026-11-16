@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "gds2geo",
   "name": "GDS2GEO",
-  "version": "1.3.0",
+  "version": "1.3.0_fix",
   "apiVersion": 5,
   "cli": {
     "executables": [
@@ -144,6 +144,186 @@
         "gds2geo/mesh.thermal",
         "gds2geo/matdb.thermal"
       ]
+    },
+    {
+      "id": "geoedit",
+      "executable": "geoedit.exe",
+      "argsTemplate": [
+        "--input-dir",
+        "{dataRoot}/Model/geoedit",
+        "--output-dir",
+        "{dataRoot}/Result/gds2geo/geoedit",
+        "--request",
+        "{dataRoot}/Model/geoedit_request.json"
+      ],
+      "allowedArgs": [],
+      "optional": true,
+      "exitCodes": {
+        "0": "ok",
+        "2": "input_or_request",
+        "5": "geometry_execution_or_recoverable_publication"
+      },
+      "errorContract": {
+        "type": "none"
+      },
+      "consumesInternal": [],
+      "producesInternal": [
+        "gds2geo/edited.geo",
+        "gds2geo/edited.json",
+        "gds2geo/edited.matdb"
+      ]
+    },
+    {
+      "id": "mshcheck",
+      "executable": "mshcheck.exe",
+      "argsTemplate": [
+        "{dataRoot}/Model/mshfix/input.msh",
+        "--output",
+        "{dataRoot}/Result/gds2geo/mshcheck/detection.json",
+        "--compact"
+      ],
+      "allowedArgs": [],
+      "optional": true,
+      "exitCodes": {
+        "0": "detection_completed_including_issues",
+        "2": "argument_or_path",
+        "3": "read_or_detection",
+        "4": "output"
+      },
+      "errorContract": {
+        "type": "none"
+      },
+      "consumesInternal": [],
+      "producesInternal": [
+        "gds2geo/msh.detection"
+      ]
+    },
+    {
+      "id": "mshfix_plan",
+      "executable": "mshfix.exe",
+      "argsTemplate": [
+        "plan",
+        "--geo",
+        "{dataRoot}/Model/mshfix/input.geo",
+        "--source-msh",
+        "{dataRoot}/Model/mshfix/input.msh",
+        "--detection",
+        "{dataRoot}/Result/gds2geo/mshcheck/detection.json",
+        "--detector",
+        "{moduleDir}/mshcheck.exe",
+        "--output",
+        "{dataRoot}/Result/gds2geo/mshfix_plan/plan.json"
+      ],
+      "allowedArgs": [],
+      "optional": true,
+      "exitCodes": {
+        "0": "ok",
+        "2": "argument_plan_or_no_connect_actions",
+        "3": "input_schema_or_binding",
+        "4": "gmsh_execution",
+        "5": "unsupported_safe_repair",
+        "6": "verification",
+        "7": "output_transaction_or_recovery",
+        "8": "detector_invocation"
+      },
+      "errorContract": {
+        "type": "none"
+      },
+      "consumesInternal": [
+        "gds2geo/msh.detection"
+      ],
+      "producesInternal": [
+        "gds2geo/mshfix.plan"
+      ]
+    },
+    {
+      "id": "mshfix_heal",
+      "executable": "mshfix.exe",
+      "argsTemplate": [
+        "heal",
+        "--geo",
+        "{dataRoot}/Model/mshfix/input.geo",
+        "--source-msh",
+        "{dataRoot}/Model/mshfix/input.msh",
+        "--detection",
+        "{dataRoot}/Result/gds2geo/mshcheck/detection.json",
+        "--detector",
+        "{moduleDir}/mshcheck.exe",
+        "--plan",
+        "{dataRoot}/Result/gds2geo/mshfix_plan/plan.json",
+        "--output",
+        "{dataRoot}/Result/gds2geo/mshfix_heal/healed.msh",
+        "--report",
+        "{dataRoot}/Result/gds2geo/mshfix_heal/healing_report.json"
+      ],
+      "allowedArgs": [],
+      "optional": true,
+      "exitCodes": {
+        "0": "ok",
+        "2": "argument_plan_or_no_connect_actions",
+        "3": "input_schema_or_binding",
+        "4": "gmsh_execution",
+        "5": "unsupported_safe_repair",
+        "6": "verification",
+        "7": "output_transaction_or_recovery",
+        "8": "detector_invocation"
+      },
+      "errorContract": {
+        "type": "none"
+      },
+      "consumesInternal": [
+        "gds2geo/msh.detection",
+        "gds2geo/mshfix.plan"
+      ],
+      "producesInternal": [
+        "gds2geo/mshfix.healed",
+        "gds2geo/mshfix.healing_report"
+      ]
+    },
+    {
+      "id": "mshfix_verify",
+      "executable": "mshfix.exe",
+      "argsTemplate": [
+        "verify",
+        "--source-msh",
+        "{dataRoot}/Model/mshfix/input.msh",
+        "--healed-msh",
+        "{dataRoot}/Result/gds2geo/mshfix_heal/healed.msh",
+        "--detection",
+        "{dataRoot}/Result/gds2geo/mshcheck/detection.json",
+        "--plan",
+        "{dataRoot}/Result/gds2geo/mshfix_plan/plan.json",
+        "--healing-report",
+        "{dataRoot}/Result/gds2geo/mshfix_heal/healing_report.json",
+        "--detector",
+        "{moduleDir}/mshcheck.exe",
+        "--report",
+        "{dataRoot}/Result/gds2geo/mshfix_verify/verification.json"
+      ],
+      "allowedArgs": [],
+      "optional": true,
+      "exitCodes": {
+        "0": "ok",
+        "2": "argument_plan_or_no_connect_actions",
+        "3": "input_schema_or_binding",
+        "4": "gmsh_execution",
+        "5": "unsupported_safe_repair",
+        "6": "verification",
+        "7": "output_transaction_or_recovery",
+        "8": "detector_invocation"
+      },
+      "errorContract": {
+        "type": "none"
+      },
+      "consumesInternal": [
+        "gds2geo/msh.detection",
+        "gds2geo/mshfix.plan",
+        "gds2geo/mshfix.healed",
+        "gds2geo/mshfix.healing_report"
+      ],
+      "producesInternal": [
+        "gds2geo/mshfix.verification"
+      ]
     }
   ],
   "artifacts": {
@@ -241,6 +421,54 @@
         "stage": "thermal_msh",
         "path": "Result/gds2geo/thermal_msh/matdb.json",
         "schemaVersion": "3"
+      },
+      {
+        "ref": "gds2geo/edited.geo",
+        "stage": "geoedit",
+        "path": "Result/gds2geo/geoedit/model.geo",
+        "schemaVersion": "4"
+      },
+      {
+        "ref": "gds2geo/edited.json",
+        "stage": "geoedit",
+        "path": "Result/gds2geo/geoedit/model.json",
+        "schemaVersion": "4"
+      },
+      {
+        "ref": "gds2geo/edited.matdb",
+        "stage": "geoedit",
+        "path": "Result/gds2geo/geoedit/matdb.json",
+        "schemaVersion": "3"
+      },
+      {
+        "ref": "gds2geo/msh.detection",
+        "stage": "mshcheck",
+        "path": "Result/gds2geo/mshcheck/detection.json",
+        "schemaVersion": "1.5"
+      },
+      {
+        "ref": "gds2geo/mshfix.plan",
+        "stage": "mshfix_plan",
+        "path": "Result/gds2geo/mshfix_plan/plan.json",
+        "schemaVersion": "1.5"
+      },
+      {
+        "ref": "gds2geo/mshfix.healed",
+        "stage": "mshfix_heal",
+        "path": "Result/gds2geo/mshfix_heal/healed.msh",
+        "schemaVersion": "2.2"
+      },
+      {
+        "ref": "gds2geo/mshfix.healing_report",
+        "stage": "mshfix_heal",
+        "path": "Result/gds2geo/mshfix_heal/healing_report.json",
+        "schemaVersion": "1.4"
+      },
+      {
+        "ref": "gds2geo/mshfix.verification",
+        "stage": "mshfix_verify",
+        "path": "Result/gds2geo/mshfix_verify/verification.json",
+        "schemaVersion": "1.4"
       }
     ],
     "consumed": [
@@ -277,7 +505,7 @@
         "requiredBy": [
           "em_msh",
           "thermal_msh",
-          "geoedit (auxiliary command)"
+          "geoedit"
         ],
         "environmentVariable": "GDS2GEO_GMSH_EXECUTABLE",
         "platformTool": "tools/gmsh/gmsh.exe",
@@ -292,7 +520,9 @@
         "version": "4.11.1",
         "bundled": true,
         "requiredBy": [
-          "mshfix (auxiliary commands, including help and version)"
+          "mshfix_plan",
+          "mshfix_heal",
+          "mshfix_verify"
         ],
         "platformTool": "tools/gmsh/gmsh-4.11.dll",
         "environmentVariable": "PATH",
@@ -606,8 +836,8 @@
       }
     ],
     "publicationPolicy": "Stage outputs stay in Result/gds2geo. If publication is configured by the host, use the mesh and MATDB from the same target and successful generation.",
-    "platformIntegration": "Four main stages and six execution profiles remain the automated contract. GEOEDIT and MSH tools are explicit auxiliary commands; host registration, child-process environment, source/boundary rebinding and downstream solver unit adaptation require integration. No platform solver end-to-end qualification is claimed.",
-    "deliveryBatch": "GDS2GEO-1.3.0-20261112",
+    "platformIntegration": "Nine stages are declared for host registration. The original four stages and six execution profiles are unchanged. The host explicitly selects the five auxiliary stages, validates only the selected branch inputs, creates stage output directories and applies plan/result acceptance gates. Stage declarations and local template execution are not actual platform registration or solver end-to-end qualification.",
+    "deliveryBatch": "GDS2GEO-1.3.0_fix-20261116",
     "externalCasePackage": "gds2geo_cases_20261112.zip",
     "supplementalDeliveryFiles": [
       {
@@ -652,7 +882,10 @@
         },
         "errorContract": {
           "type": "none"
-        }
+        },
+        "registeredStages": [
+          "geoedit"
+        ]
       },
       {
         "id": "mshcheck",
@@ -682,7 +915,10 @@
         "errorContract": {
           "type": "none"
         },
-        "successPolicy": "Require normal exit 0 and valid success JSON, then inspect both summary.issueCount and summary.topologyIssueCount."
+        "successPolicy": "Require normal exit 0 and valid success JSON, then inspect both summary.issueCount and summary.topologyIssueCount.",
+        "registeredStages": [
+          "mshcheck"
+        ]
       },
       {
         "id": "mshfix",
@@ -762,9 +998,68 @@
         },
         "errorOutput": "When unified error handling is reached, stdout contains schema 1.0 success:false with error.code/message/exitCode; this is not qs-json-stderr.",
         "successPolicy": "Accept a repaired mesh only after successful independent verify, success=true, zero geometric/topological issue counts and all validation gates. A no-changes plan retains the original mesh; do not call heal for a no-op.",
-        "detectorPolicy": "Explicitly pass the absolute path to the bundled mshcheck.exe for plan/heal/verify."
+        "detectorPolicy": "Explicitly pass the absolute path to the bundled mshcheck.exe for plan/heal/verify.",
+        "registeredStages": [
+          "mshfix_plan",
+          "mshfix_heal",
+          "mshfix_verify"
+        ]
       }
     ],
-    "validationDelivery": "Separate validation/ delivery; not stored in the runtime module directory."
+    "validationDelivery": "Separate validation/ delivery; not stored in the runtime module directory.",
+    "stageInvocation": {
+      "selection": "Only host-selected stages run. optional:true is not an auto-skip or UI-registration mechanism. The original six executionProfiles do not select auxiliary stages.",
+      "inputPolicy": "requiredInputs below is supplementary host guidance, not a new task_layer schema or a verified scheduler feature. The CLI performs deep validation. Do not make all auxiliary inputs global prerequisites of the original profiles. Platform routes must validate the selected branch; module-level consumed refs retain the original GDS/CSV generation contract.",
+      "requiredInputs": {
+        "geoedit": [
+          "Model/geoedit/model.geo",
+          "Model/geoedit/model.json",
+          "Model/geoedit/matdb.json",
+          "Model/geoedit_request.json"
+        ],
+        "mshcheck": [
+          "Model/mshfix/input.msh"
+        ],
+        "mshfix_plan": [
+          "Model/mshfix/input.geo",
+          "Model/mshfix/input.msh",
+          "Result/gds2geo/mshcheck/detection.json"
+        ],
+        "mshfix_heal": [
+          "Model/mshfix/input.geo",
+          "Model/mshfix/input.msh",
+          "Result/gds2geo/mshcheck/detection.json",
+          "Result/gds2geo/mshfix_plan/plan.json"
+        ],
+        "mshfix_verify": [
+          "Model/mshfix/input.msh",
+          "Result/gds2geo/mshcheck/detection.json",
+          "Result/gds2geo/mshfix_plan/plan.json",
+          "Result/gds2geo/mshfix_heal/healed.msh",
+          "Result/gds2geo/mshfix_heal/healing_report.json"
+        ]
+      },
+      "repairSequence": [
+        "mshcheck",
+        "mshfix_plan",
+        "mshfix_heal",
+        "mshfix_verify"
+      ],
+      "hostPreparation": "Create output parent directories under Result/gds2geo/<stageId>/. Prepare the GEOEDIT package with --geo-name model.geo or re-export it with that name; do not rename signed package members. Keep all source paths/bytes and detector version fixed throughout one repair run.",
+      "acceptance": {
+        "geoedit": "Require normal exit 0 and the complete GEO/JSON/MATDB package. Coordinates follow input dim. Rebuild bindings after editing/remeshing.",
+        "mshcheck": "Require normal exit 0 and success=true schema 1.5 JSON. issueCount/topologyIssueCount may be nonzero; completion does not mean a clean mesh. Surface checks do not qualify Tet4 interiors.",
+        "mshfix_plan": "Require normal exit 0, fresh source/detector bindings and a supported actionable plan. Inspect unsupported items before heal. For a no-changes/no-connect plan retain the original mesh and do not invoke heal.",
+        "mshfix_heal": "Only invoke after host plan acceptance. Require normal exit 0 and both outputs. Do not publish healed.msh until independent mshfix_verify passes.",
+        "mshfix_verify": "Require normal exit 0, success=true, zero detectorIssueCount and detectorTopologyIssueCount, and all validationGates passed. Publisher and material/source/boundary rebinding belong to the host."
+      },
+      "compatibility": "This delivery reuses mshfix 1.5.0 unchanged. Source MSH with $GDS2GEOUnits or Tet4 is unsupported. Do not wire the ordinary dim-bearing GEO2MSH output directly into the repair branch and do not strip units or elements to bypass validation."
+    },
+    "manifestFix": {
+      "baseDelivery": "GDS2GEO-1.3.0-20261112",
+      "documentationBatch": "docs_1.8",
+      "scope": "Stage registration, input/output/dependency declarations and integration documentation only. All five EXEs and the DLL retain the frozen bytes and their original executable versions.",
+      "apiPolicy": "apiVersion remains 5: existing required CLI arguments, exit meanings, artifact locations/schemas and dataLayout are unchanged; the added optional branches have new unique refs."
+    }
   }
 }

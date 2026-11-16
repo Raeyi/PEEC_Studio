@@ -60,6 +60,8 @@ bool ModuleRegistry::parseRouting(const QJsonObject& obj, QString* error)
         const QJsonObject envObj = o.value("env").toObject();
         for (auto eit = envObj.constBegin(); eit != envObj.constEnd(); ++eit)
             r.env.insert(eit.key(), eit.value().toString());
+        for (const QJsonValue& v : o.value("pathPrepend").toArray())
+            r.pathPrepend << v.toString();
         if (r.provider.isEmpty() || r.stageId.isEmpty()) {
             *error = QString("module '%1': v2 routing requires 'provider' and 'stage'")
                          .arg(it.key());
@@ -157,6 +159,7 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
         def.searchDirs = r.searchDirs;
         def.workerHost = r.workerHost;
         def.env = r.env;
+        def.pathPrepend = r.pathPrepend;
 
         const ModuleManifest* mm = m_manifests.contains(r.provider) ? &m_manifests[r.provider] : nullptr;
         if (!mm) {

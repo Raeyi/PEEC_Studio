@@ -1,7 +1,25 @@
 # gds2geo 模块重打包请求日志（REPACK/gds2geo）
 
 > 本文件为长期滚动日志：每次重打包请求一轮，最新一轮在最上面。每轮固定三段：**问题清单 → 交付要求 → 回执**（E2E 结果 / 偏差 / 收口状态），回执写回即该轮关闭。
-> 关联活契约：`DATA_LAYOUT.md`（v1.6）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.3.0（GDS2GEO-1.3.0-20261112，2026-11-12 集成；5 EXE / 8 文件 / manifest apiVersion 5；gmsh 4.11.1 含 gmsh-4.11.dll 在平台 tools/ 区）**。
+> 关联活契约：`DATA_LAYOUT.md`（v1.6）/ `MODULE_MANIFEST_SPEC.md`；包内模块当前版本：**1.3.0_fix（GDS2GEO-1.3.0_fix-20261116，2026-11-16 hotfix 集成；apiVersion 5；5 EXE 与 1.3.0 逐字节一致、manifest 新增 5 个声明 stage；gmsh 4.11.1 含 gmsh-4.11.dll 在平台 tools/ 区不变）**。
+
+## 第 4 轮（2026-11-16 平台反馈 → 2026-11-16 已收口）
+
+状态：**已收口** —— 1.3.0_fix 已接收并集成（平台 `hotfix/gds2geo-geoedit-20261116` 分支，v2.5.1_hotfix 开发验证包已切，待 UI 侧验证后合入 main）。
+
+**问题清单（平台 2026-11-16 反馈）**：
+- 1.3.0 的 `cli.executables` 已列 geoedit / mshcheck / mshfix（三辅助 EXE），但 manifest 仅声明 4 个主阶段（em_geo / thermal_geo / em_msh / thermal_msh）→ **任务层无法识别三个辅助能力，前端无从经流水线/stage 驱动**（平台交付说明 v2.5.0_rc §十.7 当时记为「不接入平台流水线、UI 后续再增」= 本轮回补缺口）。
+
+**交付要求（2026-11-16）**：
+1. 三辅助 EXE 能力在 manifest 声明为标准 `stages[]`（geoedit / mshcheck / mshfix plan / mshfix heal / mshfix verify 五阶段），每阶段带完整 argsTemplate / allowedArgs / exitCodes / errorContract 与内部工件依赖；
+2. 补逐阶段输入清单、触发边界与验收策略（宿主预检 / 输出父目录预建 / detector 绑定 / 验收门）；
+3. EXE 字节可保持不变，以批次 + manifest + SHA（SHA256SUMS）识别本修订。
+
+**回执（2026-11-16，已收口）**：
+- **1.3.0_fix 交付接收（GDS2GEO-1.3.0_fix-20261116_完整交付）**：manifest version=1.3.0_fix / manifestVersion=1 / apiVersion=5（不变）；`stages[]` 4 → **9**（新增 geoedit / mshcheck / mshfix_plan / mshfix_heal / mshfix_verify，各含完整 argsTemplate / allowedArgs / exitCodes / errorContract(none) / consumesInternal / producesInternal + `optional:true`）；`capabilities.stageInvocation`（selection / inputPolicy / requiredInputs / repairSequence / hostPreparation / acceptance / compatibility）；5 EXE + gmsh-4.11.dll **原字节保持**（平台 SHA256 对账：5 EXE + manifest + DLL 全与 SHA256SUMS 一致，manifest = validation/module.manifest.json `915779c4…d14`）；两份原案例 ZIP + third-party ZIP 原字节随附；validation/ 20 项运行时验证全绿（summary.json / stage-contract-regression.json / original-missing-stages-regression.json / mutation-check.json / 20 条 runtime 日志 + repair-example 四件回执）。
+- **平台集成（`hotfix/gds2geo-geoedit-20261116`，基线 main @ 023888e，未合 main）**：modules.json +5 路由（各带 `GDS2GEO_GMSH_EXECUTABLE` env + 新增声明式 `pathPrepend {MODULE_ROOT}/tools/gmsh`——mshfix.exe 直接 PE 依赖 gmsh-4.11.dll，env 只选 exe、不能解决 DLL 加载）；pipelines.json 阶段库 +5（全 `optional` + `requires`，与 manifest requiredInputs 逐件一致）+ 按需流水线 **gds_geoedit**（1 阶段）/ **gds_repair**（四阶段严格串行）；task_layer.exe 重建（pathPrepend PATH 前置 + stage 输出父目录宿主预建，1,120,622 → 1,124,143 B）；p2 复测 13 PASS + 3 个已记录预期 FAIL（A/B v2.5.1 基线同 FAIL → 内置流水线物化不变）；v2.5.1_hotfix 包（49 条目，39 件与 v2.5.1 逐字节一致、10 件变化）交付 UI 验证。
+- **能力边界（vendor 声明，平台记录）**：mshfix 仍拒绝含 `$GDS2GEOUnits`/Tet4 的源 MSH（勿将普通带 dim 的 GEO2MSH 产出直接串入修复、勿剥离单位/体单元绕过校验）；mshcheck 仅检查 Tri3 表面（检测成功 ≠ 体网格/求解器验收）；原 4 主阶段 CLI / 产物路径 / 6 executionProfiles / 2 nativeBothCalls 不变；`requiredInputs` 为宿主预检参考（非新 task_layer schema）——平台按选中分支实施预检，未将辅助文件变为原六 profiles 统一前提。
+- **本轮收口**。
 
 ## 第 3 轮（2026-11-09 请求 → 2026-11-12 已收口）
 

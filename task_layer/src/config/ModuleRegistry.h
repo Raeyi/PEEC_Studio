@@ -44,6 +44,7 @@ struct ModuleDef {
     QStringList outputChecksTemplate;       // 相对形态 outputChecks 快照（rebind 每次从此展开，不做原地冻结）
     QVector<ModuleContract::PublishRule> publishesTemplate;  // 相对形态 publishes 快照（同上）
     QMap<QString, QString> env;          // 子进程环境变量（modules.json，值支持路径变量）
+    QStringList pathPrepend;      // 子进程 PATH 前置目录（modules.json pathPrepend 字段；展开后以 ';' 拼接前置，未声明时行为不变）
     QStringList allowedArgs;      // UI overrides 白名单（--key 形式）
     ModuleContract contract;
 
@@ -95,6 +96,7 @@ private:
         QStringList searchDirs;
         QString workerHost;
         QMap<QString, QString> env;
+        QStringList pathPrepend;
     };
 
     bool parseRouting(const QJsonObject& obj, QString* error);

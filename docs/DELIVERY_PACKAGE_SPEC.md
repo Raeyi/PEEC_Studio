@@ -5,6 +5,7 @@
 修订（2026-11-12，ALPS 集成轮，用户确认 v2.5.0_rc1）：§二 白名单 42→46 条目——tools/alpsrunner/ 新增 4 件（ALPSRunner 1.1.2）；thermal 1.0.9（EXE 重交付，OP0 默认位置 → `Result/thermal/alps/thermal.op0`，无旧路径回退）；templates/ 初值 thermal.op0 改址 `Result/thermal/alps/thermal.op0`（件数仍 7）；§六/§八 计数同步；docs 共享包 → docs_1.7.zip（8 条目，+REPACK/alpsrunner.md）。
 修订（2026-11-13，用户确认 v2.5.0_rc2）：§二 白名单 46→56 条目——cases/alps_remote_20261113/ 新增 10 件（ALPS 远端验收算例：Model×5 + Setting×3 含 ALPSRunner.json / alpsrunner.key（真实授权私钥）+ 参考 OP0 + 验收 README）；compact_em v1.4 → v1.4.3（API 7，三 EXE 换版）；templates set_em.json 升级 schemaVersion 2 / set_thermal.json 补 mesh_length_unit；§六/§八 计数同步；docs 共享包 → docs_1.8.zip（8 条目，REPACK/compact_em.md 第 3 轮 + REPACK/thermal.md 第 5 轮）。
 修订（2026-11-13，重切，用户确认「ALPS 相关配置文件进 templates / 不需 cases 目录」）：§二 白名单 56→49 条目——cases/alps_remote_20261113/ 10 件全部移除；templates/ 7→10 件（+ALPS 运行配置初值：Model/thinfilm_thermal.json / Setting/ALPSRunner.json / Setting/alpsrunner.key（真实授权私钥，勿外泄））；§六/§八 计数同步。
+修订（2026-11-16，v2.5.1_hotfix hotfix，用户确认）：§二 gds2geo 行注 1.3.0 → **1.3.0_fix**（GDS2GEO-1.3.0_fix-20261116；5 EXE 与 1.3.0 逐字节一致，manifest 新增 5 声明 stage，三辅助 EXE 由「不接入平台流水线」改接为按需流水线 gds_geoedit / gds_repair；task_layer 新增声明式 pathPrepend 字段 + 重建 task_layer.exe）；**白名单计数不变 = 49**（无新增入包件，仅内容更新）。
 基线：PEEC_Studio_20261113_v2.5.0_rc2（2026-11-13，49 条目，主包内容基线 = 分支 feature/rc2-compact-em-20261113 基线 f20aa88 + compact_em 1.4.3 集成 + ALPS 配置入 templates（去 cases），未合 main；task_layer exe 未重建 = build 目录 ③b 终构建件 1,120,622 B）+ docs_1.8.zip（8 条目，v1.8 共享面 = 4 契约 + REPACK×4）
 
 ## 一、目的与范围
@@ -23,7 +24,7 @@
 |---|---|---|
 | 包根 | 给UI负责人的交付说明.md（唯一根文档；变更说明权威件，见 §五） | 1 |
 | compact_em/ | module.manifest.json / README.md / ERROR_CODES.md / PEEC_Model_Extractor.exe / PEEC_Solver.exe / PEEC_Post_Processing.exe / libiomp5md.dll（v1.4.3，2026-11-13 集成，API 7；公开 flat 设置 schemaVersion 2 only；v1.4 起运行依赖 libiomp5md.dll，须与 EXE 同目录） | 7 |
-| gds2geo/ | module.manifest.json / README.md / ERROR_CODES.md / gds2geo.exe / geo2msh.exe / geoedit.exe / mshcheck.exe / mshfix.exe（1.3.0，2026-11-12 起；后三件为辅助命令，不接入平台流水线） | 8 |
+| gds2geo/ | module.manifest.json / README.md / ERROR_CODES.md / gds2geo.exe / geo2msh.exe / geoedit.exe / mshcheck.exe / mshfix.exe（**1.3.0_fix**，2026-11-16 hotfix；5 EXE 与 1.3.0 逐字节一致，manifest 新增 5 个声明 stage geoedit / mshcheck / mshfix_plan / mshfix_heal / mshfix_verify，三辅助 EXE 接为按需流水线 gds_geoedit / gds_repair） | 8 |
 | thermal/ | module.manifest.json / README.md / ERROR_CODES.md / ThermalExtract.exe / TemperatureProcess.exe（1.0.9，2026-11-12 起：apiVersion 8；OP0 默认位置 → `Result/thermal/alps/thermal.op0`（`--op0` 显式可覆盖，无旧路径回退）；post optional） | 5 |
 | tools/gmsh/ | gmsh.exe / gmsh-4.11.dll（平台共享工具区；模块包不含 gmsh；1.3.0 起 gmsh 4.11.1 精确匹配，gds 子进程 PATH 前置 tools/gmsh/） | 2 |
 | tools/alpsrunner/ | ALPSRunner.exe / module.manifest.json / README.md / ERROR_CODES.md（ALPS 远端仿真模块 1.1.2，2026-11-12 起；apiVersion 1，errorContract none → `QS-TL-MOD-EXEC`；`artifacts.produced` 空、无固定公开 OP0 / `publishTo`（§6.7 平台责任）；结果 OP0 由平台导入步骤落位 `Result/thermal/alps/thermal.op0`（流水线 alps 阶段 / 独立通道 `alps.importOp0` / CLI `alps-import-op0`）） | 4 |

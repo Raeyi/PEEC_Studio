@@ -1,4 +1,6 @@
-# GDS2GEO 1.3.0 退出码与恢复
+# GDS2GEO 1.3.0_fix 退出码与恢复
+
+本批只修订 manifest；原可执行版本、退出码与恢复行为保持。mshfix 的 plan/heal/verify 在 manifest 分别为 mshfix_plan/mshfix_heal/mshfix_verify。
 
 记录可执行文件、版本/SHA、参数、工作目录、进程退出状态、实际退出码和完整 stdout/stderr。先判断进程是否成功启动和正常退出，再解释模块退出码；stderr 非空不等于失败。退出码优先于残留文件和 JSON 中的 success 字段。
 
@@ -45,6 +47,6 @@ GDS2GEO 直出使用系统临时目录，GEOEDIT 私有工作暂存也不写安�
 
 ## 平台 QS 归一与验收
 
-manifest 和辅助合同使用 `errorContract.type: "none"`，程序不直接发出 QS stderr JSON。按 docs_1.6，平台可将模块正常启动后的非零退出码归一为 `QS-TL-MOD-EXEC` 并保留原 exitCode、模块诊断和 stdout JSON。启动失败、异常终止、取消及 publisher 失败由平台分别登记。
+manifest 和辅助合同使用 `errorContract.type: "none"`，程序不直接发出 QS stderr JSON。按 docs_1.8，平台可将模块正常启动后的非零退出码归一为 `QS-TL-MOD-EXEC` 并保留原 exitCode、模块诊断和 stdout JSON。启动失败、异常终止、取消及 publisher 失败由平台分别登记。
 
 平台只在各命令成功并满足其结果合同后继续。检测发现问题不自动等于程序失败；修复计划 supported 不保证执行成功；`heal` 成功不等于 `verify` 成功；表面检测/修复成功不证明体网格或求解器全链通过。MSH 网格和报告绑定必须保留，换源文件/检测器或移动导致路径绑定变化时重新生成相应报告。

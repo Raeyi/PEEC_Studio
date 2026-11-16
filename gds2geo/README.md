@@ -1,6 +1,8 @@
-# GDS2GEO 1.3.0 · 几何、网格、编辑与检测修复接口
+# GDS2GEO 1.3.0_fix · 几何、网格、编辑与检测修复接口
 
-交付批次：`GDS2GEO-1.3.0-20261112`，Windows x64。产品及 `gds2geo.exe`、`geo2msh.exe`、`geoedit.exe` 版本为 **1.3.0**；随附独立工具 `mshcheck.exe` 为 **0.23.0**，`mshfix.exe` 为 **1.5.0**。平台 manifest 使用 `manifestVersion: 1`、`apiVersion: 5`，数据布局标识仍为 `peec-data/v1`。文件身份以交付 manifest 中的 SHA-256 为准。
+本次为 manifest 阶段声明修订，交付版本 **1.3.0_fix**；五个 EXE 与 DLL 均沿用 2026-11-12 冻结原件，程序 `--version` 不变。按外部 `docs_1.8/` 规范校验。新材料三件套等后续工作树功能不在本批范围内。
+
+交付批次：`GDS2GEO-1.3.0_fix-20261116`，Windows x64。产品及 `gds2geo.exe`、`geo2msh.exe`、`geoedit.exe` 版本为 **1.3.0**；随附独立工具 `mshcheck.exe` 为 **0.23.0**，`mshfix.exe` 为 **1.5.0**。平台 manifest 使用 `manifestVersion: 1`、`apiVersion: 5`，数据布局标识仍为 `peec-data/v1`。文件身份以交付 manifest 中的 SHA-256 为准。
 
 ## 相对 r2 的四项主要更新
 
@@ -15,10 +17,10 @@ MSH 两个工具是独立调用能力，未自动接入几何/网格主流水线
 
 ## 1. 安装布局和依赖
 
-模块压缩包名为 `GDS2GEO-1.3.0-20261112.zip`，展开后包含：
+模块压缩包名为 `GDS2GEO-1.3.0_fix-20261116.zip`，展开后包含：
 
 ```text
-GDS2GEO-1.3.0-20261112/
+GDS2GEO-1.3.0_fix-20261116/
 ├── gds2geo/
 │   ├── gds2geo.exe
 │   ├── geo2msh.exe
@@ -254,11 +256,27 @@ MSH 保留 dimensions 0/1/2/3、Point1/Line2/Tri3/Tet4、带方向直接边界�
 
 ## 6. 平台路由、验证与边界
 
-主 manifest 保留四阶段、六 profiles 和两个 nativeBothCalls；GEOEDIT/MSH 工具在 `capabilities.auxiliaryCommands` 描述，属于扩展合同，平台不会仅靠出现该字段自动调度。宿主用原生 QProcess 按用户动作独立调用，并将编辑、检测、修复的输出放入自身管理的 `Result/gds2geo/` 子目录。
+manifest 的 `stages[]` 现在注册 **9 个阶段**，五个 EXE 均有正式 stage；原四阶段、六 profiles 和两个 nativeBothCalls 原样保留。新增的五阶段由宿主按需选择，不加入原六 profiles。`optional:true` 不能代替平台注册或输入门控。接收方须把选定 stage 接入平台路由与用户动作，在该分支校验输入并创建输出父目录，再按 `argsTemplate` 展开绝对路径调用。`capabilities.auxiliaryCommands` 保留兼容说明，`registeredStages` 指向正式阶段。
+
+| 新阶段 | 固定输入（相对 dataRoot） | 输出（相对 `Result/gds2geo/`） |
+| --- | --- | --- |
+| `geoedit` | `Model/geoedit/model.geo`、`model.json`、`matdb.json` 和 `Model/geoedit_request.json` | `geoedit/model.geo`、`model.json`、`matdb.json` |
+| `mshcheck` | `Model/mshfix/input.msh` | `mshcheck/detection.json` |
+| `mshfix_plan` | `Model/mshfix/input.geo`、`input.msh` 和前述 detection | `mshfix_plan/plan.json` |
+| `mshfix_heal` | 同一 GEO/MSH、detection、plan | `mshfix_heal/healed.msh`、`healing_report.json` |
+| `mshfix_verify` | 同一源 MSH、detection、plan、healed MSH、healing report | `mshfix_verify/verification.json` |
+
+`geoedit` 输入必须是原生有效的完整同名三件包；准备时用 `gds2geo --target em|thermal --geo-name model.geo` 生成，不要直接重命名受摘要/文件名约束的现有包。点、线、面由 request 的 operation 选择。`mshcheck` 也可单独选用；其固定目录名不意味着一定要修复。
+
+修复依赖由 `consumesInternal` / `producesInternal` 声明：检测 → 计划 → 修复 → 验证。宿主必须在计划后检查 unsupported 和可执行动作；无改动计划保留原网格并跳过 heal。检测退出 0 只代表完成，仍要读取问题计数；heal 成功后仅在 verify 正常退出 0、success=true、两类问题计数为 0 且全部 validationGates 通过后接收结果。检测与修复全过程须使用同一源 MSH **绝对路径及字节**，报告同时绑定路径、哈希和检测器。
+
+`capabilities.stageInvocation.requiredInputs` 列出每阶段所需文件，acceptance 列出验收条件；这是补充接入说明，不是宣称 task_layer 已支持新的门控字段。原全局 GDS/CSV consumed/dependencies 保持兼容，平台须按选中分支检查输入，不把所有辅助输入设成原流程的统一前置条件。产物 ref/path/schema 在标准 `artifacts.produced` 中声明，所有修复子命令均显式指定 `{moduleDir}/mshcheck.exe`。普通带 dim 网格仍不可直接进入原版 mshfix。
+
+实际 task_layer 注册、路由与求解全链需要平台侧验收；本包提供 schema 和本地按模板调用验证，不把它等同于平台联调通过。
 
 模块只写阶段结果，不写 `Model/`、`Setting/` 或平台 `Result/tasks/`。正式件发布沿用平台 `pipelines.json` 的 `publishes`；manifest 不添加 `publishTo`。发布时网格和 MATDB 必须属于同目标、同次成功生成。设置默认件、源/边界定义由平台和接收方维护，不由本模块凭空生成。
 
-本次随附独立案例包 `gds2geo_cases_20261112.zip` 与包外 `validation/` 验证材料；另按既有催收要求原字节附上冻结基线 `gds2geo_cases_20261107.zip`，该旧案例不代表 1.3.0 的单位协议。案例不放入模块安装目录。按新案例 README 运行，在可写 dataRoot 中复现几何、网格、编辑、检测及受支持修复路径，并检查对应预期工件/摘要。验证包含 manifest schema 校验、最终 ZIP 白名单/逐文件 SHA 核对、只读安装调用及依赖路径检查；具体完成项与结果以本次 validation 记录为准。
+本次原字节随附既有独立案例包 `gds2geo_cases_20261112.zip` 与包外 `validation/` 验证材料；另按既有催收要求原字节附上冻结基线 `gds2geo_cases_20261107.zip`，该旧案例不代表 1.3.0 的单位协议。案例不放入模块安装目录。按新案例 README 运行，在可写 dataRoot 中复现几何、网格、编辑、检测及受支持修复路径，并检查对应预期工件/摘要。验证包含 manifest schema 校验、最终 ZIP 白名单/逐文件 SHA 核对、只读安装调用及依赖路径检查；具体完成项与结果以本次 validation 记录为准。
 
 模块级成功不等于接收平台或求解器全链验收。r2 接入发现的 CAD Line2 消费问题按本 README 提供消费端适配合同；本包不新增 `--no-1d`，不宣称 compact_em/thermal 已适配新 dim 或完成全链联调。
 

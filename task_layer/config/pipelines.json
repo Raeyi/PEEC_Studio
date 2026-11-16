@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "_comment": "handoff 阶段已移除（v1.1 布局规范：正式件由 publisher 落位，见 docs/DATA_LAYOUT.md D3）。v2（P2）：顶层 stages = 阶段库（同一模块接线的库级默认：模块/参数/工件路由/前置/可选/闸门），pipeline 阶段经 ref 引用 + 本地覆盖（params/artifacts/publishes 键级合并本地赢；op0Import（2026-11-12 起）库定义为默认、本地有则整对象赢（无按键合并）；requires/optional 本地有则本地赢；userGate 本地只能 extends 新增键）。正式件落位两种声明：① 模块 manifest produced[].publishTo；② 阶段库/pipeline 阶段 publishes（<produced ref> -> Model/|Setting/ 落点，r2 gds2geo 起使用，manifest 未带 publishTo 时由平台侧声明配对发布，见 docs/DATA_LAYOUT.md D7）。物化规则与 v1 等价性见 task_layer/README.md 变更记录（P2）",
+  "_comment": "handoff 阶段已移除（v1.1 布局规范：正式件由 publisher 落位，见 docs/DATA_LAYOUT.md D3）。v2（P2）：顶层 stages = 阶段库（同一模块接线的库级默认：模块/参数/工件路由/前置/可选/闸门），pipeline 阶段经 ref 引用 + 本地覆盖（params/artifacts/publishes 键级合并本地赢；op0Import（2026-11-12 起）库定义为默认、本地有则整对象赢（无按键合并）；requires/optional 本地有则本地赢；userGate 本地只能 extends 新增键）。正式件落位两种声明：① 模块 manifest produced[].publishTo；② 阶段库/pipeline 阶段 publishes（<produced ref> -> Model/|Setting/ 落点，r2 gds2geo 起使用，manifest 未带 publishTo 时由平台侧声明配对发布，见 docs/DATA_LAYOUT.md D7）。物化规则与 v1 等价性见 task_layer/README.md 变更记录（P2）。gds2geo 1.3.0_fix（2026-11-16 hotfix）：stages 库新增 5 个按需 stage（gds.geoedit/gds.mesh_check/gds.mshfix_plan/gds.mshfix_heal/gds.mshfix_verify，均 optional + requires 输入预检，输出父目录由平台预建）+ 按需流水线 gds_geoedit/gds_repair（输入缺失 → 阶段跳过 QS-TL-SKIP-NOINPUT 不阻断）；gds_full/peec_basic/thermal_basic 零改动",
   "stages": {
     "em.model_extract": {
       "module": "peec.model_extract",
@@ -46,6 +46,58 @@
       "name": "热网格",
       "requires": [
         "Result/gds2geo/thermal_geo/model_thermal.geo"
+      ]
+    },
+    "gds.geoedit": {
+      "module": "gds.geoedit",
+      "name": "几何编辑",
+      "optional": true,
+      "requires": [
+        "Model/geoedit_request.json",
+        "Model/geoedit/model.geo",
+        "Model/geoedit/model.json",
+        "Model/geoedit/matdb.json"
+      ]
+    },
+    "gds.mesh_check": {
+      "module": "gds.mesh_check",
+      "name": "网格体检",
+      "optional": true,
+      "requires": [
+        "Model/mshfix/input.msh"
+      ]
+    },
+    "gds.mshfix_plan": {
+      "module": "gds.mshfix_plan",
+      "name": "网格修复计划",
+      "optional": true,
+      "requires": [
+        "Model/mshfix/input.geo",
+        "Model/mshfix/input.msh",
+        "Result/gds2geo/mshcheck/detection.json"
+      ]
+    },
+    "gds.mshfix_heal": {
+      "module": "gds.mshfix_heal",
+      "name": "网格修复",
+      "optional": true,
+      "requires": [
+        "Model/mshfix/input.geo",
+        "Model/mshfix/input.msh",
+        "Result/gds2geo/mshcheck/detection.json",
+        "Result/gds2geo/mshfix_plan/plan.json"
+      ]
+    },
+    "gds.mshfix_verify": {
+      "module": "gds.mshfix_verify",
+      "name": "修复验证",
+      "optional": true,
+      "requires": [
+        "Model/mshfix/input.msh",
+        "Result/gds2geo/mshcheck/detection.json",
+        "Result/gds2geo/mshfix_plan/plan.json",
+        "Result/gds2geo/mshfix_heal/healed.msh",
+        "Result/gds2geo/mshfix_heal/healing_report.json"
       ]
     },
     "thermal.extract": {
@@ -138,6 +190,51 @@
           "ref": "em.mesh_thermal",
           "dependsOn": [
             "geo_thermal"
+          ]
+        }
+      ]
+    },
+    "gds_geoedit": {
+      "displayName": "几何编辑（按需）",
+      "description": "几何编辑（按需）：UI 在 Model/geoedit/ 备妥正式导出三件（model.geo/model.json/matdb.json，由 gds2geo --target em|thermal --geo-name model.geo 正式导出后宿主放入；勿手改签名包成员）+ Model/geoedit_request.json（add-point/add-line/add-surface，坐标按输入 dim）后触发；geoedit stage 将编辑结果产出到 Result/gds2geo/geoedit/（同三件：GEO/JSON schemaVersion 4、MATDB 3，坐标沿用输入 dim）；输入缺失 → 跳过（QS-TL-SKIP-NOINPUT，不阻断）；编辑后须重绑/重网格（供应商 acceptance）。",
+      "maxParallel": 1,
+      "stages": [
+        {
+          "id": "geoedit",
+          "ref": "gds.geoedit",
+          "dependsOn": []
+        }
+      ]
+    },
+    "gds_repair": {
+      "displayName": "网格检测与修复（按需）",
+      "description": "网格检测与修复（按需）：UI 在 Model/mshfix/ 备妥 input.msh（源 MSH；整链固定其绝对路径/字节与 detector 版本，不得换副本沿用旧报告）与 input.geo（与 input.msh 同源配对的正式导出 GEO）后触发；链：检测 mshcheck（仅 Tri3 表面检查；exit 0 表示完成，issue 计数可非零，完成 ≠ 网格干净）→ 计划 mshfix plan（计划后检查 unsupported 与可执行动作；无改动/无 connect 计划保留原网格、不调 heal）→ 修复 mshfix heal（仅计划验收后调用）→ 验证 mshfix verify（--detector 绑定随包 mshcheck.exe）；mshfix 拒绝含 $GDS2GEOUnits/Tet4 的源 MSH（勿将 geo2msh 常规带 dim 产出直接接入、勿剥离单位/体单元绕过校验）；acceptance：verify exit 0 且 success=true、detectorIssueCount 与 detectorTopologyIssueCount 均为 0、validationGates 全过，发布/材料/端口/热边界重绑由平台负责；输入缺失 → 对应阶段跳过（QS-TL-SKIP-NOINPUT，不阻断）。",
+      "maxParallel": 1,
+      "stages": [
+        {
+          "id": "mshcheck",
+          "ref": "gds.mesh_check",
+          "dependsOn": []
+        },
+        {
+          "id": "mshfix_plan",
+          "ref": "gds.mshfix_plan",
+          "dependsOn": [
+            "mshcheck"
+          ]
+        },
+        {
+          "id": "mshfix_heal",
+          "ref": "gds.mshfix_heal",
+          "dependsOn": [
+            "mshfix_plan"
+          ]
+        },
+        {
+          "id": "mshfix_verify",
+          "ref": "gds.mshfix_verify",
+          "dependsOn": [
+            "mshfix_heal"
           ]
         }
       ]

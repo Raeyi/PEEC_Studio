@@ -130,9 +130,21 @@ def main():
             p2r = raw_payloads(s2)
             p2 = list_payloads(s2)
             # ① 物化等价（list_payloads 已归一化：v2 的 ref 溯源字段不入比较集）
-            check("① 三内置 pipeline id 集一致",
-                  set(p1) == set(p2) and len(p1) == 3,
+            # 2026-11-16 hotfix（gds2geo 1.3.0_fix）：现行 5 流水线 = 3 内置（与 v1 逐字段等价）
+            # + 2 按需（gds_geoedit / gds_repair，全 optional 阶段，缺输入跳过）
+            check("① v1 三内置 pipeline ⊆ 现行 5（3 内置 + 2 按需）",
+                  set(p1) <= set(p2) and len(p1) == 3 and len(p2) == 5
+                  and set(p2) - set(p1) == {"gds_geoedit", "gds_repair"},
                   str(sorted(p1)) + " vs " + str(sorted(p2)))
+            ondemand = {pid: p2[pid] for pid in ("gds_geoedit", "gds_repair")}
+            check("① 按需流水线全 optional 阶段（geoedit 1 / repair 4）",
+                  len(ondemand.get("gds_geoedit", {}).get("stages", [])) == 1
+                  and len(ondemand.get("gds_repair", {}).get("stages", [])) == 4
+                  and all(s.get("optional") for s in
+                          ondemand.get("gds_geoedit", {}).get("stages", []) +
+                          ondemand.get("gds_repair", {}).get("stages", [])),
+                  json.dumps({k: [s.get("optional") for s in v.get("stages", [])]
+                              for k, v in ondemand.items()}, ensure_ascii=False))
             eq_detail = []
             for pid in sorted(p1):
                 a, b = json.dumps(p1[pid], ensure_ascii=False, sort_keys=True),                        json.dumps(p2.get(pid, {}), ensure_ascii=False, sort_keys=True)
@@ -145,8 +157,8 @@ def main():
                        if s.get("ref"))
             nref1 = sum(1 for p in p1r.values() for s in p.get("stages", [])
                         if s.get("ref"))
-            check("① v2 载荷带 ref 溯源（10 阶段全 ref，v1 无）",
-                  nref == 10 and nref1 == 0, "v2=%s v1=%s" % (nref, nref1))
+            check("① v2 载荷带 ref 溯源（15 阶段全 ref：3 内置 10 + 2 按需 5，v1 无）",
+                  nref == 15 and nref1 == 0, "v2=%s v1=%s" % (nref, nref1))
             s2.proc.stdin.close()
             s2.proc.wait(timeout=10)
         finally:

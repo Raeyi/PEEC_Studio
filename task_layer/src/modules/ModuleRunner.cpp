@@ -317,12 +317,38 @@ void ModuleRunner::launch(const ModuleDef& def, const QStringList& args,
             this, &ModuleRunner::onProcessError);
 
     // 环境变量注入（modules.json 的 env 字段；值支持 {MODULE_ROOT} 等路径变量展开）
-    if (!def.env.isEmpty()) {
+    // pathPrepend（v2.5.1 hotfix 2026-11-16）：声明式前置子进程 PATH —— mshfix.exe 直接 PE 依赖
+    // tools/gmsh/gmsh-4.11.dll（供应商 dependsOn.environment.gmshLibrary：启动前须将该目录绝对路径
+    // 前置到子进程 PATH；GDS2GEO_GMSH_EXECUTABLE 只选择 gmsh.exe，不能解决 DLL 加载）。既有路由未
+    // 声明该字段时行为与 v2.5.1 完全一致。
+    if (!def.env.isEmpty() || !def.pathPrepend.isEmpty()) {
         QProcessEnvironment e = QProcessEnvironment::systemEnvironment();
         for (auto eit = def.env.constBegin(); eit != def.env.constEnd(); ++eit)
             e.insert(eit.key(), m_resolver.resolve(eit.value()));
+        if (!def.pathPrepend.isEmpty()) {
+            QStringList prep;
+            for (const QString& p : def.pathPrepend) {
+                const QString rp = m_resolver.resolve(p);
+                if (!rp.isEmpty())
+                    prep << rp;
+            }
+            if (!prep.isEmpty()) {
+                QString cur;
+                for (const QString& k : e.keys()) {
+                    if (k.compare("PATH", Qt::CaseInsensitive) == 0) {
+                        cur = e.value(k);
+                        break;
+                    }
+                }
+                e.insert("PATH", prep.join(';') + (cur.isEmpty() ? QString() : ';' + cur));
+            }
+        }
         m_proc->setProcessEnvironment(e);
     }
+    // 阶段输出父目录宿主预建（供应商 hostPreparation：宿主创建 stage 输出父目录，如
+    // Result/gds2geo/mshcheck/；已存在时 no-op）
+    for (const QString& oc : def.contract.outputChecks)
+        QDir().mkpath(QFileInfo(oc).path());
 
     emit stageOutput(stageId, QString("[launch] %1 %2").arg(exe, realArgs.join(' ')));
     m_proc->start(exe, realArgs);
