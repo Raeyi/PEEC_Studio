@@ -39,6 +39,7 @@
 | `rel/20261110_v2.3` | f8408ea | PEEC_Studio_20261110_v2.3.zip（主线包） |
 | `rel/20261110_v2.1fix` | 85ae1a1 | PEEC_Studio_20261106_v2.1_fix.zip（v2.1 基线 + 切换工程修复） |
 | `rel/20261113_v2.5.1` | 5a9bee6 | PEEC_Studio_20261113_v2.5.1.zip（v2.5 线定版；2026-11-16 补充发版，日期回填 20261113） |
+| `rel/20261117_v2.5.2` | b6241c4 | PEEC_Studio_20261117_v2.5.2.zip（v2.5 线定版；2026-11-17；hotfix/gds2geo-geoedit-20261116 整体合入 + 按需 stage 输入浅检修复；v2.5.1_hotfix 显式作废） |
 
 **修复线收口记录（2026-11-10）**：`fix/project-switch-v2.1fix` @ 85ae1a1 已合入 main（合并提交 5daff0e，UI 侧验收通过）。主线此前已含同一修复（59072c7 rebindDataRoot 重建 + f8408ea toNative 归一），本合并为收口记录，**零代码变化**（合并前后树逐字节一致，已验证）。分支指针已删除；标签 `rel/20261110_v2.1fix` 保留为 v2.1_fix 包的出包源。
 
