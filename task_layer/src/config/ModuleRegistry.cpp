@@ -162,10 +162,11 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
         def.pathPrepend = r.pathPrepend;
 
         const ModuleManifest* mm = m_manifests.contains(r.provider) ? &m_manifests[r.provider] : nullptr;
+        // st 解析上提（2026-11-17）：下方契约派生亦需该 stage 的显式输入声明（按需 stage 输入浅检修正）
+        const ManifestStage* st = (mm ? mm->stage(r.stageId) : nullptr);
         if (!mm) {
             def.command = QString();      // 不可用：无 manifest
         } else {
-            const ManifestStage* st = mm->stage(r.stageId);
             if (!st) {
                 missing << QString("%1: stage '%2' not in manifest of %3")
                             .arg(moduleId, r.stageId, r.provider);
@@ -195,12 +196,45 @@ bool ModuleRegistry::loadManifests(const QString& moduleRoot,
                 for (const QString& x : ms.consumesInternal) internal.insert(x);
                 for (const QString& x : ms.producesInternal) internal.insert(x);
             }
+            // 2026-11-17（v2.5.2 合入轮）：optional（按需）stage 输入浅检修正——保守策略将模块
+            // 全部对外 consumed（如 gds2geo 的 Model/model.gds / model_info.csv）挂到每个 stage，
+            // 使纯按需工程（无 model.gds）中 geoedit / mshcheck / mshfix_* 被误判缺失而跳过
+            // （QS-TL-SKIP-NOINPUT）。规则：optional stage 的 argsTemplate 显式声明输入文件
+            // （{dataRoot}/Model/ 字面 token 或 {artifact:<ref>} 命中 consumed ref）→ 仅浅检
+            // 显式声明件；无显式声明（--data-root 约定，如 compact_em post）→ 保守全量集不变；
+            // 非 optional stage 与 v2.5.1 行为完全一致。
+            bool explicitInputs = false;
+            QSet<QString> explicitRefs;       // consumed refs explicitly referenced via {artifact:<ref}>
+            QStringList explicitModelFiles;   // literal {dataRoot}/Model/... tokens (dataRoot-relative)
+            if (st && st->optional) {
+                for (const QString& tok : st->argsTemplate) {
+                    if (tok.startsWith("{artifact:")) {
+                        explicitRefs.insert(tok.mid(10, tok.length() - 11));
+                        explicitInputs = true;
+                    } else if (tok.startsWith("{dataRoot}/Model/")) {
+                        explicitModelFiles << tok.mid(10);
+                        explicitInputs = true;
+                    }
+                }
+            }
             for (const ManifestArtifact& a : mm->consumed) {
                 if (internal.contains(a.ref)) continue;  // 内部自产自用不进浅检
-                // 全部对外 consumed 挂到本 stage（保守策略：入口阶段校验由 App 按
-                // pipeline 入口过滤；stage 内深检由模块自身完成）
+                // 对外 consumed：非 optional stage 保持保守全量挂接（入口阶段校验由 App 按
+                // pipeline 入口过滤；stage 内深检由模块自身完成）；optional stage 仅挂
+                // argsTemplate 显式声明者（见上）。
+                if (st && st->optional && explicitInputs
+                        && !explicitRefs.contains(a.ref)
+                        && !explicitModelFiles.contains(a.path))
+                    continue;
                 def.contract.requiredInputs << a.path;   // 暂存 POSIX 相对路径
                 def.consumedRefs.insert(a.ref, a.path);
+            }
+            if (st && st->optional && explicitInputs) {
+                // 按需 stage 自身输入文件（manifest consumed 未声明，如 Model/mshfix/input.msh）
+                // 亦入浅检集（dataRoot 相对 POSIX）
+                for (const QString& mf : explicitModelFiles)
+                    if (!def.contract.requiredInputs.contains(mf))
+                        def.contract.requiredInputs << mf;
             }
             // produced → 本 stage 的 outputChecks + publishes：
             // 按 DATA_LAYOUT D2（Result/<providerId>/<stageId>/ 与 stage 一一对应）
