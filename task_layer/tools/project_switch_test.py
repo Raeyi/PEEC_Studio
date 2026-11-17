@@ -45,8 +45,9 @@ P1B = os.path.join(WORK, "旧版复现 B", "DATA")
 GMSH = os.path.join(ROOT, "tools", "gmsh", "gmsh.exe")
 TASK_TIMEOUT = 900
 
-EM_MESH = "Result/gds2geo/em/model_em.msh"
-EM_MATDB = "Result/gds2geo/em/matdb.json"
+# 2026-11-17（合入轮）：r2 布局同步——em 网格产物目录 em/ -> em_msh/（gds2geo r2 起四段布局）
+EM_MESH = "Result/gds2geo/em_msh/model_em.msh"
+EM_MATDB = "Result/gds2geo/em_msh/matdb.json"
 PUB_MESH = "Model/model_em.msh"
 PUB_MATDB = "Model/matdb.json"
 
@@ -339,7 +340,7 @@ def main():
             p = os.path.join(A_ROOT, rel)
             if os.path.isfile(p):
                 os.remove(p)
-        emdir = os.path.join(A_ROOT, "Result", "gds2geo", "em")
+        emdir = os.path.join(A_ROOT, "Result", "gds2geo", "em_msh")
         if os.path.isdir(emdir):
             shutil.rmtree(emdir, ignore_errors=True)
         check("P2-A2 旧产物已删除",
