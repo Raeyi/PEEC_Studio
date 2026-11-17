@@ -8,6 +8,42 @@
 
 ---
 
+## v2.5.2 — PEEC_Studio_20261117_v2.5.2（hotfix 合入主线 + 按需 stage 输入浅检修复）
+
+- **定版**：2026-11-17。hotfix 分支 hotfix/gds2geo-geoedit-20261116（v2.5.1_hotfix）经 UI 侧验证（2026-11-17 用户确认）与合入轮回归全绿后，整体 fast-forward 合入 main。
+- **上一版**：PEEC_Studio_20261116_v2.5.1_hotfix（2026-11-16 开发验证包，**自本版起显式作废**）；上一正式版 v2.5.1（PEEC_Studio_20261113_v2.5.1）。
+- **标签**：`rel/20261117_v2.5.2`；**基线**：main @ 标签提交（hotfix 分支 22ae27f/3ee9199/ba70add 三提交 fast-forward 合入 + 本版登记提交）。
+- **包规模**：49 条目（vs hotfix 包 46 件逐字节一致 + 3 件变化：task_layer.exe / worker_host.exe / 交付说明；vs v2.5.1 39 件逐字节一致 + 10 件变化）。
+
+### 大改动
+
+1. **gds2geo 1.3.0 → 1.3.0_fix**（vendor 2026-11-16 交付，hotfix 轮集成）
+   - 5 EXE + gmsh-4.11.dll 与 1.3.0 逐字节一致（SHA256 对账全过）；module.manifest.json stages 4→9：新增 geoedit / mshcheck / mshfix_plan / mshfix_heal / mshfix_verify 5 个声明 stage + capabilities.stageInvocation 逐阶段输入/边界/验收。
+   - 新增 2 条按需流水线 gds_geoedit / gds_repair（optional stage 输入缺失 → QS-TL-SKIP-NOINPUT 跳过、不阻断主链）。
+   - 闭环「三辅助 EXE 未在 manifest 声明 stage、任务层不识别、前端无从驱动」缺口。
+2. **task_layer 重建**（1,126,626 B `94CC9D13…0446`，含两轮源码变更）
+   - 声明式 pathPrepend（launch 子进程 PATH 前置——mshfix.exe 直接 PE 依赖 tools/gmsh/gmsh-4.11.dll；未声明路由行为与 v2.5.1 一致）+ launch 宿主预建 stage 输出父目录（vendor hostPreparation）。
+   - **按需 stage 输入浅检修复**：ModuleRegistry synthesize 保守策略把模块级 consumed（gds2geo 的 Model/model.gds / model_info.csv）挂到每个 stage，使纯按需工程（无 model.gds）中 geoedit / mshcheck 等按需 stage 被误判输入缺失而跳过；optional stage 若 argsTemplate 显式声明输入令牌（{dataRoot}/Model/... 字面量或 {artifact:<ref>}）则仅附加其显式引用件；无显式声明的 optional stage（compact_em.post 的 --data-root 约定）保留保守集合；非 optional stage 行为逐字节不变。
+3. **配置**：modules.json +5 路由（gds.geoedit / gds.mesh_check / gds.mshfix_plan / gds.mshfix_heal / gds.mshfix_verify，env GDS2GEO_GMSH_EXECUTABLE + pathPrepend + searchDirs）；pipelines.json 阶段库 +5（全 optional）+ 按需流水线 gds_geoedit / gds_repair；gds_full / peec_basic / thermal_basic 零改动。
+
+### 小改动
+
+1. **文档同步**：UI_API.md 流水线表 +2 行；REPACK/gds2geo.md 第 4 轮收口；DELIVERY_PACKAGE_SPEC §二 gds2geo 行注（白名单 49 不变）；task_layer README hotfix 轮记录。
+2. **测试**：p2_stage_lib_test.py 更新 5 流水线断言（16 PASS + 3 已记录预期物化 FAIL——v1 算例 fixture 漂移 cc24e18，A/B v2.5.1 同 FAIL 证明内置物化不变）；project_switch_test.py r2 输出布局常量同步（Result/gds2geo/em → em_msh + matdb.json，r2 集成后首跑暴露 6 项假 FAIL）；**p1_selection_test.py 残留产物剥离加固**（11-13 在场地跑 standard 算例在算例目录残留 Result/ + .locks/，copy_case 使 T3 的 fresh 工程误含未选中上游产物 → 创建期 QS-TL-SEL-DEP-MISSING 拒绝被翻转为任务创建成功；A/B 两版 exe 复现证明与代码版本无关；剥离后 22/22 PASS）。
+3. **算例目录清理**：dev/cases/compact_em/standard 的 Result/ + .locks/ 残留（11-13 运行产物，未跟踪）移除；tracked 5 件输入件不受影响。
+
+### 验证
+
+- 2026-11-17 合入轮回归（staging 全量，6 腿 + vendor E2E）：baseline ✅（MaximumTemperature=344.1037 K / 9564 行 / 12750 节点红线逐字节一致；gds_full 4 阶段 + 宿主发布 model_em.msh 66,834 B / matdb.json 878 B）/ p-switch ✅（A→B→A 核心验收全 PASS）/ **p1 22/22** / p3 ✅（module.run thermal.extract 真实运行，库级路由位）/ gate ✅（15 项含闸门 CLI 注入 + 断连语义）/ p2 16 PASS + 3 预期 FAIL（已记录绿色）/ vendor-e2e 22/22。
+- hotfix 轮（2026-11-16）：vendor fixture 真跑全链；UI 验收 2026-11-17 用户确认（gds_geoedit / gds_repair 按需链路可用）。
+- 未决（自 v2.5.1 承继）：ALPS 模式② remote 端到端（192.168.136.172 + IC618 VM + license）；数值回归 vs vendor validation/；UI_API v1.2 遗留条款清理。
+
+### 发版记录
+
+- （发版登记提交回填：标签提交哈希、推送状态、交付包名）
+
+---
+
 ## v2.5.1 — PEEC_Studio_20261113_v2.5.1（v2.5 线定版）
 
 - **定版**：2026-11-16。上周五（2026-11-13）因部分模块测试未通过未发版；2026-11-16 补齐测试后补充发版——用户确认（原文见交付说明「补充发版说明」条）。
