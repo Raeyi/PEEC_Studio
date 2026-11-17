@@ -224,6 +224,15 @@ def main():
     fresh = os.path.join(work, "fresh")
     copy_case(args.cases, os.path.join("compact_em", "standard"), std)
     copy_case(args.cases, os.path.join("compact_em", "standard"), fresh)
+    # 2026-11-17 (v2.5.2 merge round): strip case-dir run residue (Result/ + .locks/, untracked outputs).
+    # An in-place run (p-switch A leg, 11-13 15:42) left Result artifacts + a 0B lock inside the case dir;
+    # copy_case carried them into T3 fresh, flipping the creation-time QS-TL-SEL-DEP-MISSING rejection
+    # into task-created. T3 rejection semantics require inputs-only.
+    for _d in (std, fresh):
+        for _sub in ("Result", ".locks"):
+            _p = os.path.join(_d, _sub)
+            if os.path.isdir(_p):
+                shutil.rmtree(_p)
 
     rpc = Rpc(exe, cwd=os.path.dirname(exe))
     results = []
